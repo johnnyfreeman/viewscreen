@@ -1,0 +1,15 @@
+{"type":"system","subtype":"init","cwd":"/home/user/project","tools":["Bash","Read","Write","Edit"],"model":"claude-opus-4-5-20251101","permissionMode":"default","claude_code_version":"1.0.0","agents":["code-reviewer","test-runner"]}
+{"type":"stream_event","event":{"type":"message_start","message":{}}}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"# Hello World\n\nThis is a **markdown** test with:\n\n- Bullet points\n- *Italics*\n- `inline code`\n\n```go\nfunc main() {\n    fmt.Println(\"Hello, World!\")\n}\n```\n\nGreat!"}}}
+{"type":"stream_event","event":{"type":"content_block_stop","index":0}}
+{"type":"stream_event","event":{"type":"message_stop"}}
+{"type":"assistant","message":{"id":"msg_123","type":"message","role":"assistant","model":"claude-opus-4-5-20251101","content":[{"type":"text","text":"# Hello World\n\nThis is a **markdown** test with:\n\n- Bullet points\n- *Italics*\n- `inline code`\n\n```go\nfunc main() {\n    fmt.Println(\"Hello, World!\")\n}\n```\n\nGreat!"}],"stop_reason":"end_turn"}}
+{"type":"stream_event","event":{"type":"message_start","message":{}}}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_123","name":"Read","input":{}}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"file_path\":\"/home/user/project/main.go\"}"}}}
+{"type":"stream_event","event":{"type":"content_block_stop","index":0}}
+{"type":"stream_event","event":{"type":"message_stop"}}
+{"type":"assistant","message":{"id":"msg_456","type":"message","role":"assistant","model":"claude-opus-4-5-20251101","content":[{"type":"tool_use","id":"toolu_123","name":"Read","input":{"file_path":"/home/user/project/main.go"}}],"stop_reason":"tool_use"}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_123","content":"package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello!\")\n}","is_error":false}]}}
+{"type":"result","subtype":"success","is_error":false,"duration_ms":5500,"duration_api_ms":4200,"num_turns":2,"result":"done","total_cost_usd":0.0125,"usage":{"input_tokens":1500,"cache_creation_input_tokens":100,"cache_read_input_tokens":200,"output_tokens":350},"modelUsage":{},"permission_denials":[],"errors":[]}

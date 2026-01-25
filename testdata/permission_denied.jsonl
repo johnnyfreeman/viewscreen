@@ -1,0 +1,9 @@
+{"type":"system","subtype":"init","cwd":"/home/user/project","tools":["Bash"],"model":"claude-opus-4-5-20251101","permissionMode":"default","claude_code_version":"1.0.0","agents":[]}
+{"type":"stream_event","event":{"type":"message_start","message":{}}}
+{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_789","name":"Bash","input":{}}}}
+{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\"rm -rf /important\"}"}}}
+{"type":"stream_event","event":{"type":"content_block_stop","index":0}}
+{"type":"stream_event","event":{"type":"message_stop"}}
+{"type":"assistant","message":{"id":"msg_789","type":"message","role":"assistant","model":"claude-opus-4-5-20251101","content":[{"type":"tool_use","id":"toolu_789","name":"Bash","input":{"command":"rm -rf /important"}}],"stop_reason":"tool_use"}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_789","content":"Permission denied: cannot delete /important","is_error":true}]}}
+{"type":"result","subtype":"error","is_error":true,"duration_ms":1200,"duration_api_ms":800,"num_turns":1,"result":"","total_cost_usd":0.005,"usage":{"input_tokens":500,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":100},"modelUsage":{},"permission_denials":[{"tool_name":"Bash","tool_use_id":"toolu_789","tool_input":{"command":"rm -rf /important"}}],"errors":["Tool execution failed","Permission denied"]}
