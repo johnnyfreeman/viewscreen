@@ -3,6 +3,7 @@ package stream
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -13,6 +14,20 @@ import (
 	"github.com/johnnyfreeman/viewscreen/types"
 	"golang.org/x/term"
 )
+
+// MarkdownRendererInterface abstracts markdown rendering for testability
+type MarkdownRendererInterface interface {
+	Render(content string) string
+}
+
+// IndicatorInterface abstracts the streaming indicator for testability
+type IndicatorInterface interface {
+	Show()
+	Clear()
+}
+
+// ToolHeaderRenderer abstracts tool header rendering for testability
+type ToolHeaderRenderer func(toolName string, input map[string]interface{})
 
 // EventData represents the nested event in stream_event
 type EventData struct {
@@ -57,8 +72,10 @@ type Renderer struct {
 	toolName          string
 	toolInput         strings.Builder
 	textBuffer        strings.Builder
-	markdownRenderer  *render.MarkdownRenderer
-	indicator         *render.StreamingIndicator
+	markdownRenderer  MarkdownRendererInterface
+	indicator         IndicatorInterface
+	toolHeaderRender  ToolHeaderRenderer
+	output            io.Writer
 	width             int
 }
 
@@ -74,8 +91,50 @@ func NewRenderer() *Renderer {
 		CurrentBlockIndex: -1,
 		markdownRenderer:  render.NewMarkdownRenderer(config.NoColor, width),
 		indicator:         render.NewStreamingIndicator(config.NoColor),
+		toolHeaderRender:  tools.RenderToolHeader,
+		output:            os.Stdout,
 		width:             width,
 	}
+}
+
+// RendererOption is a functional option for configuring a Renderer
+type RendererOption func(*Renderer)
+
+// WithOutput sets a custom output writer
+func WithOutput(w io.Writer) RendererOption {
+	return func(r *Renderer) {
+		r.output = w
+	}
+}
+
+// WithMarkdownRenderer sets a custom markdown renderer
+func WithMarkdownRenderer(mr MarkdownRendererInterface) RendererOption {
+	return func(r *Renderer) {
+		r.markdownRenderer = mr
+	}
+}
+
+// WithIndicator sets a custom streaming indicator
+func WithIndicator(i IndicatorInterface) RendererOption {
+	return func(r *Renderer) {
+		r.indicator = i
+	}
+}
+
+// WithToolHeaderRenderer sets a custom tool header renderer
+func WithToolHeaderRenderer(f ToolHeaderRenderer) RendererOption {
+	return func(r *Renderer) {
+		r.toolHeaderRender = f
+	}
+}
+
+// NewRendererWithOptions creates a new stream Renderer with custom options
+func NewRendererWithOptions(opts ...RendererOption) *Renderer {
+	r := NewRenderer()
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 // Render outputs the stream event to the terminal
@@ -125,17 +184,17 @@ func (r *Renderer) Render(event Event) {
 			text := r.textBuffer.String()
 			if text != "" {
 				rendered := r.markdownRenderer.Render(text)
-				fmt.Print(rendered)
+				fmt.Fprint(r.output, rendered)
 			}
 		} else if r.InToolUseBlock && event.Event.Index == r.CurrentBlockIndex {
 			// Parse and display the accumulated tool input with full header
 			var input map[string]interface{}
 			toolInputStr := r.toolInput.String()
 			if err := json.Unmarshal([]byte(toolInputStr), &input); err == nil {
-				tools.RenderToolHeader(r.toolName, input)
+				r.toolHeaderRender(r.toolName, input)
 			} else {
 				// Fallback if JSON parse fails
-				fmt.Println(style.ToolHeader.Render(fmt.Sprintf("%s%s()", style.Bullet, r.toolName)))
+				fmt.Fprintln(r.output, style.ToolHeader.Render(fmt.Sprintf("%s%s()", style.Bullet, r.toolName)))
 			}
 		}
 	case "message_delta":
