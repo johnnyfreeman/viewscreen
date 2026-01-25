@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jfreeman/viewscreen/config"
-	"github.com/jfreeman/viewscreen/render"
-	"github.com/jfreeman/viewscreen/style"
-	"github.com/jfreeman/viewscreen/tools"
-	"github.com/jfreeman/viewscreen/types"
+	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/tools"
+	"github.com/johnnyfreeman/viewscreen/types"
 	"golang.org/x/term"
 )
 

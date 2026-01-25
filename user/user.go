@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jfreeman/viewscreen/config"
-	"github.com/jfreeman/viewscreen/render"
-	"github.com/jfreeman/viewscreen/style"
-	"github.com/jfreeman/viewscreen/terminal"
-	"github.com/jfreeman/viewscreen/types"
+	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/terminal"
+	"github.com/johnnyfreeman/viewscreen/types"
 )
 
 // ToolResultContent represents tool result content

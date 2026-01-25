@@ -7,12 +7,12 @@ import (
 	"io"
 	"os"
 
-	"github.com/jfreeman/viewscreen/assistant"
-	"github.com/jfreeman/viewscreen/result"
-	"github.com/jfreeman/viewscreen/stream"
-	"github.com/jfreeman/viewscreen/system"
-	"github.com/jfreeman/viewscreen/types"
-	"github.com/jfreeman/viewscreen/user"
+	"github.com/johnnyfreeman/viewscreen/assistant"
+	"github.com/johnnyfreeman/viewscreen/result"
+	"github.com/johnnyfreeman/viewscreen/stream"
+	"github.com/johnnyfreeman/viewscreen/system"
+	"github.com/johnnyfreeman/viewscreen/types"
+	"github.com/johnnyfreeman/viewscreen/user"
 )
 
 // Parser handles reading and dispatching events from stdin

@@ -3,7 +3,7 @@ package config
 import (
 	"flag"
 
-	"github.com/jfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/style"
 )
 
 var (

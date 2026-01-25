@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/jfreeman/viewscreen/style"
-	"github.com/jfreeman/viewscreen/types"
-	"github.com/jfreeman/viewscreen/user"
+	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/types"
+	"github.com/johnnyfreeman/viewscreen/user"
 )
 
 // RenderToolUse renders a tool use block header and input

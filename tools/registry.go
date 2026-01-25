@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/jfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/config"
 )
 
 // ToolRenderer defines the interface for rendering tool headers

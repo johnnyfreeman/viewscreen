@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/jfreeman/viewscreen/config"
-	"github.com/jfreeman/viewscreen/style"
-	"github.com/jfreeman/viewscreen/types"
+	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/types"
 )
 
 // Event represents a system initialization event

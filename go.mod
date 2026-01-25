@@ -1,4 +1,4 @@
-module github.com/jfreeman/viewscreen
+module github.com/johnnyfreeman/viewscreen
 
 go 1.25.5
 

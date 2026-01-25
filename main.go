@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jfreeman/viewscreen/config"
-	"github.com/jfreeman/viewscreen/parser"
+	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/parser"
 )
 
 func main() {
