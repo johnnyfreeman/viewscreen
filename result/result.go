@@ -3,6 +3,8 @@ package result
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/style"
@@ -51,41 +53,85 @@ type Event struct {
 	Errors            []string              `json:"errors"`
 }
 
-// Render outputs the result event to the terminal
-func Render(event Event) {
-	fmt.Println()
+// Renderer handles rendering of result events with configurable output and options
+type Renderer struct {
+	output    io.Writer
+	showUsage func() bool
+	noColor   func() bool
+}
+
+// RendererOption is a functional option for configuring a Renderer
+type RendererOption func(*Renderer)
+
+// WithOutput sets the output writer for the renderer
+func WithOutput(w io.Writer) RendererOption {
+	return func(r *Renderer) {
+		r.output = w
+	}
+}
+
+// WithShowUsage sets the function to check if usage should be shown
+func WithShowUsage(fn func() bool) RendererOption {
+	return func(r *Renderer) {
+		r.showUsage = fn
+	}
+}
+
+// WithNoColor sets the function to check if color is disabled
+func WithNoColor(fn func() bool) RendererOption {
+	return func(r *Renderer) {
+		r.noColor = fn
+	}
+}
+
+// NewRenderer creates a new Renderer with the given options
+func NewRenderer(opts ...RendererOption) *Renderer {
+	r := &Renderer{
+		output:    os.Stdout,
+		showUsage: func() bool { return config.ShowUsage },
+		noColor:   style.NoColor,
+	}
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
+}
+
+// Render outputs the result event using this renderer's configuration
+func (r *Renderer) Render(event Event) {
+	fmt.Fprintln(r.output)
 	if event.IsError {
 		// Error header with gradient
 		header := fmt.Sprintf("%sSession Error", style.Bullet)
-		if !style.NoColor() {
+		if !r.noColor() {
 			header = style.ApplyErrorGradient(header)
 		} else {
 			header = style.Error.Bold(true).Render(header)
 		}
-		fmt.Println(header)
+		fmt.Fprintln(r.output, header)
 		for _, err := range event.Errors {
-			fmt.Printf("%s%s\n", style.OutputPrefix, style.Error.Render(err))
+			fmt.Fprintf(r.output, "%s%s\n", style.OutputPrefix, style.Error.Render(err))
 		}
 	} else {
 		// Success header with gradient
 		header := fmt.Sprintf("%sSession Complete", style.Bullet)
-		if !style.NoColor() {
+		if !r.noColor() {
 			header = style.ApplySuccessGradient(header)
 		} else {
 			header = style.Success.Bold(true).Render(header)
 		}
-		fmt.Println(header)
+		fmt.Fprintln(r.output, header)
 	}
 
-	fmt.Printf("%s%s %.2fs (API: %.2fs)\n",
+	fmt.Fprintf(r.output, "%s%s %.2fs (API: %.2fs)\n",
 		style.OutputPrefix,
 		style.Muted.Render("Duration:"),
 		float64(event.DurationMS)/1000, float64(event.DurationAPIMS)/1000)
-	fmt.Printf("%s%s %d\n", style.OutputContinue, style.Muted.Render("Turns:"), event.NumTurns)
-	fmt.Printf("%s%s $%.4f\n", style.OutputContinue, style.Muted.Render("Cost:"), event.TotalCostUSD)
+	fmt.Fprintf(r.output, "%s%s %d\n", style.OutputContinue, style.Muted.Render("Turns:"), event.NumTurns)
+	fmt.Fprintf(r.output, "%s%s $%.4f\n", style.OutputContinue, style.Muted.Render("Cost:"), event.TotalCostUSD)
 
-	if config.ShowUsage {
-		fmt.Printf("%s%s in=%d out=%d (cache: created=%d read=%d)\n",
+	if r.showUsage() {
+		fmt.Fprintf(r.output, "%s%s in=%d out=%d (cache: created=%d read=%d)\n",
 			style.OutputContinue,
 			style.Muted.Render("Tokens:"),
 			event.Usage.InputTokens, event.Usage.OutputTokens,
@@ -93,12 +139,20 @@ func Render(event Event) {
 	}
 
 	if len(event.PermissionDenials) > 0 {
-		fmt.Printf("%s%s %d\n",
+		fmt.Fprintf(r.output, "%s%s %d\n",
 			style.OutputContinue,
 			style.Warning.Render("Permission Denials:"),
 			len(event.PermissionDenials))
 		for _, denial := range event.PermissionDenials {
-			fmt.Printf("%s  - %s (%s)\n", style.OutputContinue, denial.ToolName, denial.ToolUseID)
+			fmt.Fprintf(r.output, "%s  - %s (%s)\n", style.OutputContinue, denial.ToolName, denial.ToolUseID)
 		}
 	}
+}
+
+// defaultRenderer is the default renderer used by the Render function
+var defaultRenderer = NewRenderer()
+
+// Render outputs the result event to the terminal using the default renderer
+func Render(event Event) {
+	defaultRenderer.Render(event)
 }
