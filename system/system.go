@@ -2,6 +2,8 @@ package system
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/config"
@@ -21,22 +23,118 @@ type Event struct {
 	Agents            []string `json:"agents"`
 }
 
-// Render outputs the system event to the terminal
-func Render(event Event) {
+// StyleApplier abstracts style application for testability
+type StyleApplier interface {
+	NoColor() bool
+	ApplyThemeBoldGradient(text string) string
+	SessionHeaderRender(text string) string
+	MutedRender(text string) string
+	Bullet() string
+	OutputPrefix() string
+	OutputContinue() string
+}
+
+// DefaultStyleApplier uses the actual style package
+type DefaultStyleApplier struct{}
+
+func (d DefaultStyleApplier) NoColor() bool                         { return style.NoColor() }
+func (d DefaultStyleApplier) ApplyThemeBoldGradient(text string) string { return style.ApplyThemeBoldGradient(text) }
+func (d DefaultStyleApplier) SessionHeaderRender(text string) string    { return style.SessionHeader.Render(text) }
+func (d DefaultStyleApplier) MutedRender(text string) string            { return style.Muted.Render(text) }
+func (d DefaultStyleApplier) Bullet() string                            { return style.Bullet }
+func (d DefaultStyleApplier) OutputPrefix() string                      { return style.OutputPrefix }
+func (d DefaultStyleApplier) OutputContinue() string                    { return style.OutputContinue }
+
+// VerboseChecker abstracts verbose flag checking for testability
+type VerboseChecker interface {
+	IsVerbose() bool
+}
+
+// DefaultVerboseChecker uses the actual config package
+type DefaultVerboseChecker struct{}
+
+func (d DefaultVerboseChecker) IsVerbose() bool { return config.Verbose }
+
+// Renderer handles rendering system events
+type Renderer struct {
+	output         io.Writer
+	styleApplier   StyleApplier
+	verboseChecker VerboseChecker
+}
+
+// RendererOption is a functional option for configuring a Renderer
+type RendererOption func(*Renderer)
+
+// WithOutput sets a custom output writer
+func WithOutput(w io.Writer) RendererOption {
+	return func(r *Renderer) {
+		r.output = w
+	}
+}
+
+// WithStyleApplier sets a custom style applier
+func WithStyleApplier(sa StyleApplier) RendererOption {
+	return func(r *Renderer) {
+		r.styleApplier = sa
+	}
+}
+
+// WithVerboseChecker sets a custom verbose checker
+func WithVerboseChecker(vc VerboseChecker) RendererOption {
+	return func(r *Renderer) {
+		r.verboseChecker = vc
+	}
+}
+
+// NewRenderer creates a new system Renderer with default dependencies
+func NewRenderer() *Renderer {
+	return &Renderer{
+		output:         os.Stdout,
+		styleApplier:   DefaultStyleApplier{},
+		verboseChecker: DefaultVerboseChecker{},
+	}
+}
+
+// NewRendererWithOptions creates a new system Renderer with custom options
+func NewRendererWithOptions(opts ...RendererOption) *Renderer {
+	r := NewRenderer()
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
+}
+
+// Render outputs the system event
+func (r *Renderer) Render(event Event) {
 	// Use gradient for session header when color is enabled
-	header := fmt.Sprintf("%sSession Started", style.Bullet)
-	if !style.NoColor() {
-		header = style.ApplyThemeBoldGradient(header)
+	header := fmt.Sprintf("%sSession Started", r.styleApplier.Bullet())
+	if !r.styleApplier.NoColor() {
+		header = r.styleApplier.ApplyThemeBoldGradient(header)
 	} else {
-		header = style.SessionHeader.Render(header)
+		header = r.styleApplier.SessionHeaderRender(header)
 	}
-	fmt.Println(header)
-	fmt.Printf("%s%s %s\n", style.OutputPrefix, style.Muted.Render("Model:"), event.Model)
-	fmt.Printf("%s%s %s\n", style.OutputContinue, style.Muted.Render("Version:"), event.ClaudeCodeVersion)
-	fmt.Printf("%s%s %s\n", style.OutputContinue, style.Muted.Render("CWD:"), event.CWD)
-	fmt.Printf("%s%s %d available\n", style.OutputContinue, style.Muted.Render("Tools:"), len(event.Tools))
-	if config.Verbose && len(event.Agents) > 0 {
-		fmt.Printf("%s%s %s\n", style.OutputContinue, style.Muted.Render("Agents:"), strings.Join(event.Agents, ", "))
+	fmt.Fprintln(r.output, header)
+	fmt.Fprintf(r.output, "%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedRender("Model:"), event.Model)
+	fmt.Fprintf(r.output, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Version:"), event.ClaudeCodeVersion)
+	fmt.Fprintf(r.output, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("CWD:"), event.CWD)
+	fmt.Fprintf(r.output, "%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Tools:"), len(event.Tools))
+	if r.verboseChecker.IsVerbose() && len(event.Agents) > 0 {
+		fmt.Fprintf(r.output, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Agents:"), strings.Join(event.Agents, ", "))
 	}
-	fmt.Println()
+	fmt.Fprintln(r.output)
+}
+
+// Package-level renderer for backward compatibility
+var defaultRenderer *Renderer
+
+func getDefaultRenderer() *Renderer {
+	if defaultRenderer == nil {
+		defaultRenderer = NewRenderer()
+	}
+	return defaultRenderer
+}
+
+// Render is a package-level convenience function for backward compatibility
+func Render(event Event) {
+	getDefaultRenderer().Render(event)
 }
