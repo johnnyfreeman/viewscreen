@@ -1,6 +1,8 @@
 package style
 
 import (
+	"os"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 )
@@ -58,8 +60,34 @@ func Init(disableColor bool) {
 		CurrentTheme = NoColorTheme
 	} else {
 		CurrentTheme = DefaultTheme
-		// Use TrueColor (24-bit) for richer color output
-		lipgloss.SetColorProfile(termenv.TrueColor)
+
+		// Force TrueColor output even when stdout is piped (not a TTY).
+		//
+		// By default, termenv checks isatty(stdout) and returns Ascii profile
+		// when piped, causing lipgloss to strip all color codes. Using WithUnsafe()
+		// bypasses the TTY check, allowing TrueColor to work in pipelines.
+		//
+		// Alternative approaches considered:
+		//
+		// 1. Environment variables (limited effectiveness):
+		//    - CLICOLOR_FORCE=1: Only upgrades Ascii->ANSI (16 colors), not TrueColor
+		//    - COLORTERM=truecolor: Only checked AFTER the TTY check, so ignored when piped
+		//    - NO_COLOR/CLICOLOR: These disable colors, not enable them
+		//
+		// 2. termenv.WithTTY(true): Similar to WithUnsafe() but slightly less
+		//    permissive. WithUnsafe() is preferred for CLI tools that intentionally
+		//    output to pipes.
+		//
+		// 3. lipgloss.SetColorProfile(termenv.TrueColor): Sets the profile on the
+		//    default renderer, but the underlying termenv.Output still thinks it's
+		//    not a TTY, which can cause issues with some operations.
+		//
+		// The WithUnsafe() approach is the most robust for tools designed to have
+		// their output piped or captured while preserving ANSI color codes.
+		output := termenv.NewOutput(os.Stdout, termenv.WithUnsafe(), termenv.WithProfile(termenv.TrueColor))
+		renderer := lipgloss.NewRenderer(os.Stdout, termenv.WithUnsafe())
+		renderer.SetOutput(output)
+		lipgloss.SetDefaultRenderer(renderer)
 	}
 
 	if noColor {
