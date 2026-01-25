@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -31,25 +32,74 @@ type Event struct {
 	Error   string  `json:"error,omitempty"`
 }
 
-var markdownRenderer *render.MarkdownRenderer
+// MarkdownRendererInterface abstracts markdown rendering for testability
+type MarkdownRendererInterface interface {
+	Render(content string) string
+}
 
-func getMarkdownRenderer() *render.MarkdownRenderer {
-	if markdownRenderer == nil {
-		width := 80
-		if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
-			width = w
-		}
-		markdownRenderer = render.NewMarkdownRenderer(config.NoColor, width)
+// ToolUseRenderer is a function type for rendering tool use blocks
+type ToolUseRenderer func(block types.ContentBlock)
+
+// Renderer handles rendering assistant events
+type Renderer struct {
+	output           io.Writer
+	markdownRenderer MarkdownRendererInterface
+	toolUseRenderer  ToolUseRenderer
+}
+
+// RendererOption is a functional option for configuring a Renderer
+type RendererOption func(*Renderer)
+
+// WithOutput sets a custom output writer
+func WithOutput(w io.Writer) RendererOption {
+	return func(r *Renderer) {
+		r.output = w
 	}
-	return markdownRenderer
+}
+
+// WithMarkdownRenderer sets a custom markdown renderer
+func WithMarkdownRenderer(mr MarkdownRendererInterface) RendererOption {
+	return func(r *Renderer) {
+		r.markdownRenderer = mr
+	}
+}
+
+// WithToolUseRenderer sets a custom tool use renderer
+func WithToolUseRenderer(tr ToolUseRenderer) RendererOption {
+	return func(r *Renderer) {
+		r.toolUseRenderer = tr
+	}
+}
+
+// NewRenderer creates a new assistant Renderer with default dependencies
+func NewRenderer() *Renderer {
+	width := 80
+	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+		width = w
+	}
+
+	return &Renderer{
+		output:           os.Stdout,
+		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, width),
+		toolUseRenderer:  tools.RenderToolUse,
+	}
+}
+
+// NewRendererWithOptions creates a new assistant Renderer with custom options
+func NewRendererWithOptions(opts ...RendererOption) *Renderer {
+	r := NewRenderer()
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
 }
 
 // Render outputs the assistant event to the terminal
 // inTextBlock and inToolUseBlock indicate whether we were streaming these block types
-func Render(event Event, inTextBlock, inToolUseBlock bool) {
+func (r *Renderer) Render(event Event, inTextBlock, inToolUseBlock bool) {
 	if event.Error != "" {
-		fmt.Println(style.Error.Bold(true).Render(fmt.Sprintf("%sError", style.Bullet)))
-		fmt.Printf("%s%s\n", style.OutputPrefix, style.Error.Render(event.Error))
+		fmt.Fprintln(r.output, style.Error.Bold(true).Render(fmt.Sprintf("%sError", style.Bullet)))
+		fmt.Fprintf(r.output, "%s%s\n", style.OutputPrefix, style.Error.Render(event.Error))
 	}
 
 	for _, block := range event.Message.Content {
@@ -58,17 +108,33 @@ func Render(event Event, inTextBlock, inToolUseBlock bool) {
 			// Only render if we weren't streaming (text would already be shown)
 			if !inTextBlock {
 				// Use markdown renderer for non-streamed text
-				rendered := getMarkdownRenderer().Render(block.Text)
-				fmt.Print(rendered)
+				rendered := r.markdownRenderer.Render(block.Text)
+				fmt.Fprint(r.output, rendered)
 				if !strings.HasSuffix(rendered, "\n") {
-					fmt.Println()
+					fmt.Fprintln(r.output)
 				}
 			}
 		case "tool_use":
 			// Only render if we weren't streaming
 			if !inToolUseBlock {
-				tools.RenderToolUse(block)
+				r.toolUseRenderer(block)
 			}
 		}
 	}
+}
+
+// Package-level renderer for backward compatibility
+var defaultRenderer *Renderer
+
+func getDefaultRenderer() *Renderer {
+	if defaultRenderer == nil {
+		defaultRenderer = NewRenderer()
+	}
+	return defaultRenderer
+}
+
+// Render is a package-level convenience function for backward compatibility
+// inTextBlock and inToolUseBlock indicate whether we were streaming these block types
+func Render(event Event, inTextBlock, inToolUseBlock bool) {
+	getDefaultRenderer().Render(event, inTextBlock, inToolUseBlock)
 }
