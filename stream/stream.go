@@ -91,7 +91,7 @@ func NewRenderer() *Renderer {
 		CurrentBlockIndex: -1,
 		markdownRenderer:  render.NewMarkdownRenderer(config.NoColor, width),
 		indicator:         render.NewStreamingIndicator(config.NoColor),
-		toolHeaderRender:  tools.RenderToolHeader,
+		toolHeaderRender:  tools.RenderToolHeaderDefault,
 		output:            os.Stdout,
 		width:             width,
 	}

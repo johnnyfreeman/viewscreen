@@ -81,7 +81,7 @@ func NewRenderer() *Renderer {
 	return &Renderer{
 		output:           os.Stdout,
 		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, width),
-		toolUseRenderer:  tools.RenderToolUse,
+		toolUseRenderer:  tools.RenderToolUseDefault,
 	}
 }
 
