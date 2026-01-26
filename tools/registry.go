@@ -169,4 +169,11 @@ func init() {
 		}
 		return ""
 	})
+
+	RegisterFunc("Skill", func(input map[string]interface{}) string {
+		if skill, ok := input["skill"].(string); ok {
+			return skill
+		}
+		return ""
+	})
 }
