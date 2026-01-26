@@ -87,6 +87,13 @@ type EditResult struct {
 	StructuredPatch []PatchHunk `json:"structuredPatch"`
 }
 
+// WriteResult represents the tool_use_result for Write operations
+type WriteResult struct {
+	Type     string `json:"type"` // "create" for new files
+	FilePath string `json:"filePath"`
+	Content  string `json:"content"`
+}
+
 // Event represents a user (tool result) event
 type Event struct {
 	types.BaseEvent
@@ -278,6 +285,12 @@ func (r *Renderer) Render(event Event) {
 	// Try to render as edit result with diff first
 	// Always show edit diffs by default - developers want to see what changed
 	if r.tryRenderEditResult(event.ToolUseResult) {
+		return
+	}
+
+	// Try to render as write result (new file creation)
+	// Show a concise summary instead of misleading "Read N lines"
+	if r.tryRenderWriteResult(event.ToolUseResult) {
 		return
 	}
 
@@ -508,6 +521,36 @@ func (r *Renderer) tryRenderEditResult(toolUseResult json.RawMessage) bool {
 			lineCount++
 		}
 	}
+	return true
+}
+
+// tryRenderWriteResult attempts to render a write/create result
+// Returns true if it rendered, false if not a write result
+func (r *Renderer) tryRenderWriteResult(toolUseResult json.RawMessage) bool {
+	if len(toolUseResult) == 0 {
+		return false
+	}
+
+	var writeResult WriteResult
+	if err := json.Unmarshal(toolUseResult, &writeResult); err != nil {
+		return false
+	}
+
+	// Check if this is a write/create result
+	if writeResult.Type != "create" || writeResult.FilePath == "" {
+		return false
+	}
+
+	// Count lines in the created file
+	lineCount := 1
+	if writeResult.Content != "" {
+		lineCount = len(strings.Split(writeResult.Content, "\n"))
+	}
+
+	// Show a summary of the created file
+	summary := fmt.Sprintf("Created (%d lines)", lineCount)
+	fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedRender(summary))
+
 	return true
 }
 

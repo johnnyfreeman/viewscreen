@@ -1120,6 +1120,171 @@ func TestRenderer_Render_LineNumbers(t *testing.T) {
 	}
 }
 
+func TestRenderer_Render_WriteResult_Create(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	writeResult := WriteResult{
+		Type:     "create",
+		FilePath: "/path/to/new-file.txt",
+		Content:  "line 1\nline 2\nline 3",
+	}
+	toolUseResult, _ := json.Marshal(writeResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Write results should show "Created (N lines)" instead of "Read N lines"
+	if !strings.Contains(output, "Created (3 lines)") {
+		t.Errorf("Expected 'Created (3 lines)' in output, got: %q", output)
+	}
+	// Should not show the misleading "Read" message
+	if strings.Contains(output, "Read") {
+		t.Errorf("Should not show 'Read' for write results, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_WriteResult_SingleLine(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	writeResult := WriteResult{
+		Type:     "create",
+		FilePath: "/path/to/file.txt",
+		Content:  "single line content",
+	}
+	toolUseResult, _ := json.Marshal(writeResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Single line file should show "Created (1 lines)"
+	if !strings.Contains(output, "Created (1 lines)") {
+		t.Errorf("Expected 'Created (1 lines)' in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_WriteResult_NotCreate(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	// Write result with different type should fall through
+	writeResult := WriteResult{
+		Type:     "update", // Not "create"
+		FilePath: "/path/to/file.txt",
+		Content:  "content",
+	}
+	toolUseResult, _ := json.Marshal(writeResult)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"fallback content"`),
+					IsError:    false,
+				},
+			},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should fall back to regular content rendering
+	if !strings.Contains(output, "fallback content") {
+		t.Errorf("Expected fallback content in output, got: %q", output)
+	}
+}
+
+func TestWriteResult_Unmarshaling(t *testing.T) {
+	tests := []struct {
+		name     string
+		jsonData string
+		expected WriteResult
+	}{
+		{
+			name:     "complete write result",
+			jsonData: `{"type": "create", "filePath": "/path/to/file.txt", "content": "hello world"}`,
+			expected: WriteResult{
+				Type:     "create",
+				FilePath: "/path/to/file.txt",
+				Content:  "hello world",
+			},
+		},
+		{
+			name:     "write result with multiline content",
+			jsonData: `{"type": "create", "filePath": "/test.go", "content": "line 1\nline 2\nline 3"}`,
+			expected: WriteResult{
+				Type:     "create",
+				FilePath: "/test.go",
+				Content:  "line 1\nline 2\nline 3",
+			},
+		},
+		{
+			name:     "minimal write result",
+			jsonData: `{"type": "create", "filePath": "/test.txt"}`,
+			expected: WriteResult{
+				Type:     "create",
+				FilePath: "/test.txt",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result WriteResult
+			err := json.Unmarshal([]byte(tt.jsonData), &result)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal: %v", err)
+			}
+
+			if result.Type != tt.expected.Type {
+				t.Errorf("Type = %q, expected %q", result.Type, tt.expected.Type)
+			}
+			if result.FilePath != tt.expected.FilePath {
+				t.Errorf("FilePath = %q, expected %q", result.FilePath, tt.expected.FilePath)
+			}
+			if result.Content != tt.expected.Content {
+				t.Errorf("Content = %q, expected %q", result.Content, tt.expected.Content)
+			}
+		})
+	}
+}
+
 func TestPackageLevelSetToolContext(t *testing.T) {
 	// Reset package state after test
 	originalToolName := lastToolName
