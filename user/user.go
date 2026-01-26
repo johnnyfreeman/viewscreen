@@ -3,8 +3,11 @@ package user
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
@@ -84,30 +87,162 @@ type Event struct {
 	ToolUseResult json.RawMessage `json:"tool_use_result"`
 }
 
-// toolContext tracks the last tool used to help with syntax highlighting
-var lastToolName string
-var lastToolPath string
-
-// SetToolContext sets context about the last tool used (called from stream renderer)
-func SetToolContext(toolName, path string) {
-	lastToolName = toolName
-	lastToolPath = path
+// ConfigChecker abstracts config flag checking for testability
+type ConfigChecker interface {
+	IsVerbose() bool
+	NoColor() bool
 }
 
-// codeRenderer is lazily initialized
-var codeRenderer *render.CodeRenderer
+// DefaultConfigChecker uses the actual config package
+type DefaultConfigChecker struct{}
 
-func getCodeRenderer() *render.CodeRenderer {
-	if codeRenderer == nil {
-		codeRenderer = render.NewCodeRenderer(config.NoColor)
+func (d DefaultConfigChecker) IsVerbose() bool { return config.Verbose }
+func (d DefaultConfigChecker) NoColor() bool   { return config.NoColor }
+
+// StyleApplier abstracts style application for testability
+type StyleApplier interface {
+	ErrorRender(text string) string
+	MutedRender(text string) string
+	SuccessRender(text string) string
+	OutputPrefix() string
+	OutputContinue() string
+	LineNumberRender(text string) string
+	LineNumberSepRender(text string) string
+	DiffAddRender(text string) string
+	DiffRemoveRender(text string) string
+	DiffAddBg() lipgloss.Color
+	DiffRemoveBg() lipgloss.Color
+}
+
+// DefaultStyleApplier uses the actual style package
+type DefaultStyleApplier struct{}
+
+func (d DefaultStyleApplier) ErrorRender(text string) string         { return style.Error.Render(text) }
+func (d DefaultStyleApplier) MutedRender(text string) string         { return style.Muted.Render(text) }
+func (d DefaultStyleApplier) SuccessRender(text string) string       { return style.Success.Render(text) }
+func (d DefaultStyleApplier) OutputPrefix() string                   { return style.OutputPrefix }
+func (d DefaultStyleApplier) OutputContinue() string                 { return style.OutputContinue }
+func (d DefaultStyleApplier) LineNumberRender(text string) string    { return style.LineNumber.Render(text) }
+func (d DefaultStyleApplier) LineNumberSepRender(text string) string { return style.LineNumberSep.Render("│") }
+func (d DefaultStyleApplier) DiffAddRender(text string) string       { return style.DiffAdd.Render(text) }
+func (d DefaultStyleApplier) DiffRemoveRender(text string) string    { return style.DiffRemove.Render(text) }
+func (d DefaultStyleApplier) DiffAddBg() lipgloss.Color              { return style.DiffAddBg }
+func (d DefaultStyleApplier) DiffRemoveBg() lipgloss.Color           { return style.DiffRemoveBg }
+
+// CodeHighlighter abstracts code highlighting for testability
+type CodeHighlighter interface {
+	Highlight(code, language string) string
+	HighlightFile(code, filename string) string
+	HighlightWithBg(code, language string, bgColor lipgloss.Color) string
+}
+
+// DefaultCodeHighlighter uses the actual render package
+type DefaultCodeHighlighter struct {
+	renderer *render.CodeRenderer
+}
+
+func NewDefaultCodeHighlighter(noColor bool) *DefaultCodeHighlighter {
+	return &DefaultCodeHighlighter{
+		renderer: render.NewCodeRenderer(noColor),
 	}
-	return codeRenderer
+}
+
+func (d *DefaultCodeHighlighter) Highlight(code, language string) string {
+	return d.renderer.Highlight(code, language)
+}
+
+func (d *DefaultCodeHighlighter) HighlightFile(code, filename string) string {
+	return d.renderer.HighlightFile(code, filename)
+}
+
+func (d *DefaultCodeHighlighter) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
+	return d.renderer.HighlightWithBg(code, language, bgColor)
+}
+
+// ToolContext holds information about the last tool used
+type ToolContext struct {
+	ToolName string
+	ToolPath string
+}
+
+// Renderer handles rendering user events
+type Renderer struct {
+	output        io.Writer
+	configChecker ConfigChecker
+	styleApplier  StyleApplier
+	highlighter   CodeHighlighter
+	toolContext   *ToolContext
+}
+
+// RendererOption is a functional option for configuring a Renderer
+type RendererOption func(*Renderer)
+
+// WithOutput sets a custom output writer
+func WithOutput(w io.Writer) RendererOption {
+	return func(r *Renderer) {
+		r.output = w
+	}
+}
+
+// WithConfigChecker sets a custom config checker
+func WithConfigChecker(cc ConfigChecker) RendererOption {
+	return func(r *Renderer) {
+		r.configChecker = cc
+	}
+}
+
+// WithStyleApplier sets a custom style applier
+func WithStyleApplier(sa StyleApplier) RendererOption {
+	return func(r *Renderer) {
+		r.styleApplier = sa
+	}
+}
+
+// WithCodeHighlighter sets a custom code highlighter
+func WithCodeHighlighter(ch CodeHighlighter) RendererOption {
+	return func(r *Renderer) {
+		r.highlighter = ch
+	}
+}
+
+// WithToolContext sets the tool context for syntax highlighting hints
+func WithToolContext(tc *ToolContext) RendererOption {
+	return func(r *Renderer) {
+		r.toolContext = tc
+	}
+}
+
+// NewRenderer creates a new user Renderer with default dependencies
+func NewRenderer() *Renderer {
+	cc := DefaultConfigChecker{}
+	return &Renderer{
+		output:        os.Stdout,
+		configChecker: cc,
+		styleApplier:  DefaultStyleApplier{},
+		highlighter:   NewDefaultCodeHighlighter(cc.NoColor()),
+		toolContext:   &ToolContext{},
+	}
+}
+
+// NewRendererWithOptions creates a new user Renderer with custom options
+func NewRendererWithOptions(opts ...RendererOption) *Renderer {
+	r := NewRenderer()
+	for _, opt := range opts {
+		opt(r)
+	}
+	return r
+}
+
+// SetToolContext sets the tool context for syntax highlighting
+func (r *Renderer) SetToolContext(toolName, path string) {
+	r.toolContext.ToolName = toolName
+	r.toolContext.ToolPath = path
 }
 
 // Render outputs the user event to the terminal
-func Render(event Event) {
+func (r *Renderer) Render(event Event) {
 	// Try to render as edit result with diff first
-	if config.Verbose && tryRenderEditResult(event.ToolUseResult) {
+	if r.configChecker.IsVerbose() && r.tryRenderEditResult(event.ToolUseResult) {
 		return
 	}
 
@@ -117,7 +252,7 @@ func Render(event Event) {
 			// Show error with output prefix
 			errMsg := terminal.StripSystemReminders(contentStr)
 			errMsg = terminal.Truncate(errMsg, 200)
-			fmt.Printf("%s%s\n", style.OutputPrefix, style.Error.Render(errMsg))
+			fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), r.styleApplier.ErrorRender(errMsg))
 		} else if contentStr != "" {
 			// Clean up the content
 			cleaned := terminal.StripSystemReminders(contentStr)
@@ -126,9 +261,9 @@ func Render(event Event) {
 			lines := strings.Split(cleaned, "\n")
 			lineCount := len(lines)
 
-			if config.Verbose {
+			if r.configChecker.IsVerbose() {
 				// Apply syntax highlighting first
-				highlighted := highlightContent(cleaned)
+				highlighted := r.highlightContent(cleaned)
 
 				// Truncate to max lines
 				truncated, remaining := terminal.TruncateLines(highlighted, terminal.DefaultMaxLines)
@@ -136,45 +271,47 @@ func Render(event Event) {
 
 				for i, line := range resultLines {
 					if i == 0 {
-						fmt.Printf("%s%s\n", style.OutputPrefix, line)
+						fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), line)
 					} else {
-						fmt.Printf("%s%s\n", style.OutputContinue, line)
+						fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), line)
 					}
 				}
 
 				// Show truncation indicator if content was truncated
 				if remaining > 0 {
 					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Printf("%s%s\n", style.OutputContinue, style.Muted.Render(indicator))
+					fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator))
 				}
 			} else {
 				// Show summary in non-verbose mode
 				summary := fmt.Sprintf("Read %d lines", lineCount)
-				fmt.Printf("%s%s\n", style.OutputPrefix, style.Muted.Render(summary))
+				fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedRender(summary))
 			}
 		}
 	}
 }
 
 // highlightContent applies syntax highlighting based on context
-func highlightContent(content string) string {
-	cr := getCodeRenderer()
-
+func (r *Renderer) highlightContent(content string) string {
 	// Try to detect language from the last tool's file path
-	if lastToolPath != "" {
-		lang := render.DetectLanguageFromPath(lastToolPath)
+	if r.toolContext != nil && r.toolContext.ToolPath != "" {
+		lang := render.DetectLanguageFromPath(r.toolContext.ToolPath)
 		if lang != "" {
-			return cr.Highlight(content, lang)
+			return r.highlighter.Highlight(content, lang)
 		}
 	}
 
 	// Try to auto-detect from content
-	return cr.HighlightFile(content, lastToolPath)
+	path := ""
+	if r.toolContext != nil {
+		path = r.toolContext.ToolPath
+	}
+	return r.highlighter.HighlightFile(content, path)
 }
 
 // tryRenderEditResult attempts to render an edit result with delta-style diff
 // Returns true if it rendered, false if not an edit result
-func tryRenderEditResult(toolUseResult json.RawMessage) bool {
+func (r *Renderer) tryRenderEditResult(toolUseResult json.RawMessage) bool {
 	if len(toolUseResult) == 0 {
 		return false
 	}
@@ -201,12 +338,11 @@ func tryRenderEditResult(toolUseResult json.RawMessage) bool {
 	}
 	numWidth := len(fmt.Sprintf("%d", maxLine))
 
-	// Get syntax highlighter for the file type
-	cr := getCodeRenderer()
+	// Get language for syntax highlighting
 	lang := render.DetectLanguageFromPath(editResult.FilePath)
 
 	// Separator character for line numbers
-	sep := style.LineNumberSep.Render("│")
+	sep := r.styleApplier.LineNumberSepRender("│")
 
 	first := true
 	lineCount := 0
@@ -229,7 +365,7 @@ func tryRenderEditResult(toolUseResult json.RawMessage) bool {
 				remaining -= lineCount
 				if remaining > 0 {
 					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Printf("%s%s\n", style.OutputContinue, style.Muted.Render(indicator))
+					fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator))
 				}
 				return true
 			}
@@ -244,12 +380,12 @@ func tryRenderEditResult(toolUseResult json.RawMessage) bool {
 			case '+':
 				// Added line: show new line number with + indicator
 				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
-				op = style.Success.Render("+")
+				op = r.styleApplier.SuccessRender("+")
 				newLine++
 			case '-':
 				// Removed line: show old line number with - indicator
 				lineNum = fmt.Sprintf("%*d", numWidth, oldLine)
-				op = style.Error.Render("-")
+				op = r.styleApplier.ErrorRender("-")
 				oldLine++
 			default:
 				// Context line: show new line number with space
@@ -258,26 +394,26 @@ func tryRenderEditResult(toolUseResult json.RawMessage) bool {
 				oldLine++
 				newLine++
 			}
-			lineNums := style.LineNumber.Render(lineNum)
+			lineNums := r.styleApplier.LineNumberRender(lineNum)
 
 			// Syntax highlight with appropriate background for diff lines
 			var styled string
 			switch prefix {
 			case '+':
 				if lang != "" {
-					styled = cr.HighlightWithBg(content, lang, style.DiffAddBg)
+					styled = r.highlighter.HighlightWithBg(content, lang, r.styleApplier.DiffAddBg())
 				} else {
-					styled = style.DiffAdd.Render(content)
+					styled = r.styleApplier.DiffAddRender(content)
 				}
 			case '-':
 				if lang != "" {
-					styled = cr.HighlightWithBg(content, lang, style.DiffRemoveBg)
+					styled = r.highlighter.HighlightWithBg(content, lang, r.styleApplier.DiffRemoveBg())
 				} else {
-					styled = style.DiffRemove.Render(content)
+					styled = r.styleApplier.DiffRemoveRender(content)
 				}
 			default:
 				if lang != "" {
-					styled = cr.Highlight(content, lang)
+					styled = r.highlighter.Highlight(content, lang)
 				} else {
 					styled = content
 				}
@@ -285,13 +421,45 @@ func tryRenderEditResult(toolUseResult json.RawMessage) bool {
 
 			// Output with separators: ⎿ 123 │ + code
 			if first {
-				fmt.Printf("%s%s %s %s %s\n", style.OutputPrefix, lineNums, sep, op, styled)
+				fmt.Fprintf(r.output, "%s%s %s %s %s\n", r.styleApplier.OutputPrefix(), lineNums, sep, op, styled)
 				first = false
 			} else {
-				fmt.Printf("%s%s %s %s %s\n", style.OutputContinue, lineNums, sep, op, styled)
+				fmt.Fprintf(r.output, "%s%s %s %s %s\n", r.styleApplier.OutputContinue(), lineNums, sep, op, styled)
 			}
 			lineCount++
 		}
 	}
 	return true
+}
+
+// Package-level state for backward compatibility
+var (
+	lastToolName    string
+	lastToolPath    string
+	defaultRenderer *Renderer
+)
+
+// SetToolContext sets context about the last tool used (called from stream renderer)
+// This is the package-level function for backward compatibility
+func SetToolContext(toolName, path string) {
+	lastToolName = toolName
+	lastToolPath = path
+	// Also update the default renderer if it exists
+	if defaultRenderer != nil {
+		defaultRenderer.SetToolContext(toolName, path)
+	}
+}
+
+func getDefaultRenderer() *Renderer {
+	if defaultRenderer == nil {
+		defaultRenderer = NewRenderer()
+		// Sync the tool context
+		defaultRenderer.SetToolContext(lastToolName, lastToolPath)
+	}
+	return defaultRenderer
+}
+
+// Render is a package-level convenience function for backward compatibility
+func Render(event Event) {
+	getDefaultRenderer().Render(event)
 }

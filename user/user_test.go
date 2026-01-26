@@ -1,8 +1,12 @@
 package user
 
 import (
+	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestToolResultContent_Content(t *testing.T) {
@@ -400,4 +404,770 @@ func TestContentBlock_Unmarshaling(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Mock implementations for testing
+
+type mockConfigChecker struct {
+	verbose bool
+	noColor bool
+}
+
+func (m mockConfigChecker) IsVerbose() bool { return m.verbose }
+func (m mockConfigChecker) NoColor() bool   { return m.noColor }
+
+type mockStyleApplier struct{}
+
+func (m mockStyleApplier) ErrorRender(text string) string         { return "[ERROR:" + text + "]" }
+func (m mockStyleApplier) MutedRender(text string) string         { return "[MUTED:" + text + "]" }
+func (m mockStyleApplier) SuccessRender(text string) string       { return "[SUCCESS:" + text + "]" }
+func (m mockStyleApplier) OutputPrefix() string                   { return "  ⎿  " }
+func (m mockStyleApplier) OutputContinue() string                 { return "     " }
+func (m mockStyleApplier) LineNumberRender(text string) string    { return "[LN:" + text + "]" }
+func (m mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
+func (m mockStyleApplier) DiffAddRender(text string) string       { return "[ADD:" + text + "]" }
+func (m mockStyleApplier) DiffRemoveRender(text string) string    { return "[REM:" + text + "]" }
+func (m mockStyleApplier) DiffAddBg() lipgloss.Color              { return lipgloss.Color("#00ff00") }
+func (m mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipgloss.Color("#ff0000") }
+
+type mockCodeHighlighter struct{}
+
+func (m mockCodeHighlighter) Highlight(code, language string) string { return code }
+func (m mockCodeHighlighter) HighlightFile(code, filename string) string {
+	return code
+}
+func (m mockCodeHighlighter) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
+	return code
+}
+
+func TestRenderer_SetToolContext(t *testing.T) {
+	r := NewRendererWithOptions(
+		WithConfigChecker(mockConfigChecker{noColor: true}),
+	)
+
+	r.SetToolContext("Read", "/path/to/file.go")
+
+	if r.toolContext.ToolName != "Read" {
+		t.Errorf("ToolName = %q, expected %q", r.toolContext.ToolName, "Read")
+	}
+	if r.toolContext.ToolPath != "/path/to/file.go" {
+		t.Errorf("ToolPath = %q, expected %q", r.toolContext.ToolPath, "/path/to/file.go")
+	}
+}
+
+func TestRenderer_Render_NonVerbose(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"line1\nline2\nline3"`),
+					IsError:    false,
+				},
+			},
+		},
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Non-verbose mode should show summary
+	if !strings.Contains(output, "Read 3 lines") {
+		t.Errorf("Expected 'Read 3 lines' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "[MUTED:") {
+		t.Errorf("Expected muted style in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_Verbose(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"line1\nline2\nline3"`),
+					IsError:    false,
+				},
+			},
+		},
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Verbose mode should show content
+	if !strings.Contains(output, "line1") {
+		t.Errorf("Expected 'line1' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "line2") {
+		t.Errorf("Expected 'line2' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "line3") {
+		t.Errorf("Expected 'line3' in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_Error(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"Something went wrong"`),
+					IsError:    true,
+				},
+			},
+		},
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should show error styled
+	if !strings.Contains(output, "[ERROR:") {
+		t.Errorf("Expected error style in output, got: %q", output)
+	}
+	if !strings.Contains(output, "Something went wrong") {
+		t.Errorf("Expected error message in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_EmptyContent(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`""`),
+					IsError:    false,
+				},
+			},
+		},
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Empty content should produce no output
+	if output != "" {
+		t.Errorf("Expected empty output for empty content, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_MultipleContent(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"first content"`),
+					IsError:    false,
+				},
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"second content"`),
+					IsError:    false,
+				},
+			},
+		},
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should have two output prefixes (one for each content block)
+	count := strings.Count(output, "  ⎿  ")
+	if count != 2 {
+		t.Errorf("Expected 2 output prefixes, got %d in: %q", count, output)
+	}
+}
+
+func TestRenderer_Render_EditResult_Verbose(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	editResult := EditResult{
+		FilePath: "/path/to/file.go",
+		StructuredPatch: []PatchHunk{
+			{
+				OldStart: 10,
+				OldLines: 2,
+				NewStart: 10,
+				NewLines: 2,
+				Lines:    []string{"-old line", "+new line"},
+			},
+		},
+	}
+	toolUseResult, _ := json.Marshal(editResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should show diff with styled markers
+	if !strings.Contains(output, "[SUCCESS:+]") {
+		t.Errorf("Expected success-styled + in output, got: %q", output)
+	}
+	if !strings.Contains(output, "[ERROR:-]") {
+		t.Errorf("Expected error-styled - in output, got: %q", output)
+	}
+	if !strings.Contains(output, "old line") {
+		t.Errorf("Expected 'old line' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "new line") {
+		t.Errorf("Expected 'new line' in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_EditResult_ContextLines(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	editResult := EditResult{
+		FilePath: "/path/to/file.txt",
+		StructuredPatch: []PatchHunk{
+			{
+				OldStart: 5,
+				OldLines: 3,
+				NewStart: 5,
+				NewLines: 3,
+				Lines:    []string{" context before", "-removed", "+added", " context after"},
+			},
+		},
+	}
+	toolUseResult, _ := json.Marshal(editResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Context lines should not have +/- styling
+	if !strings.Contains(output, "context before") {
+		t.Errorf("Expected 'context before' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "context after") {
+		t.Errorf("Expected 'context after' in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_EditResult_NonVerbose(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	editResult := EditResult{
+		FilePath: "/path/to/file.go",
+		StructuredPatch: []PatchHunk{
+			{
+				OldStart: 10,
+				OldLines: 2,
+				NewStart: 10,
+				NewLines: 2,
+				Lines:    []string{"-old line", "+new line"},
+			},
+		},
+	}
+	toolUseResult, _ := json.Marshal(editResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Non-verbose mode should NOT render diff (tryRenderEditResult returns early)
+	if strings.Contains(output, "old line") || strings.Contains(output, "new line") {
+		t.Errorf("Expected no diff output in non-verbose mode, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_EditResult_EmptyPatch(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	// Edit result without structured patch
+	editResult := EditResult{
+		FilePath: "/path/to/file.go",
+	}
+	toolUseResult, _ := json.Marshal(editResult)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"fallback content"`),
+					IsError:    false,
+				},
+			},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should fall back to regular content rendering
+	if !strings.Contains(output, "fallback content") {
+		t.Errorf("Expected fallback content in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_StripsSystemReminders(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"real content<system-reminder>secret stuff</system-reminder>more content"`),
+					IsError:    false,
+				},
+			},
+		},
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// System reminders should be stripped
+	if strings.Contains(output, "secret stuff") {
+		t.Errorf("Expected system reminder to be stripped, got: %q", output)
+	}
+	if !strings.Contains(output, "real content") {
+		t.Errorf("Expected 'real content' in output, got: %q", output)
+	}
+}
+
+func TestRenderer_highlightContent_WithToolContext(t *testing.T) {
+	highlightCalled := false
+	var capturedLang string
+
+	mockHighlighter := &trackingHighlighter{
+		highlightFunc: func(code, language string) string {
+			highlightCalled = true
+			capturedLang = language
+			return code
+		},
+	}
+
+	r := NewRendererWithOptions(
+		WithConfigChecker(mockConfigChecker{noColor: true}),
+		WithCodeHighlighter(mockHighlighter),
+		WithToolContext(&ToolContext{ToolPath: "/path/to/file.go"}),
+	)
+
+	r.highlightContent("package main")
+
+	if !highlightCalled {
+		t.Error("Expected Highlight to be called")
+	}
+	if capturedLang != "go" {
+		t.Errorf("Expected language 'go', got %q", capturedLang)
+	}
+}
+
+type trackingHighlighter struct {
+	highlightFunc     func(code, language string) string
+	highlightFileFunc func(code, filename string) string
+}
+
+func (t *trackingHighlighter) Highlight(code, language string) string {
+	if t.highlightFunc != nil {
+		return t.highlightFunc(code, language)
+	}
+	return code
+}
+
+func (t *trackingHighlighter) HighlightFile(code, filename string) string {
+	if t.highlightFileFunc != nil {
+		return t.highlightFileFunc(code, filename)
+	}
+	return code
+}
+
+func (t *trackingHighlighter) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
+	return code
+}
+
+func TestRenderer_highlightContent_FallsBackToHighlightFile(t *testing.T) {
+	highlightFileCalled := false
+
+	mockHighlighter := &trackingHighlighter{
+		highlightFileFunc: func(code, filename string) string {
+			highlightFileCalled = true
+			return code
+		},
+	}
+
+	r := NewRendererWithOptions(
+		WithConfigChecker(mockConfigChecker{noColor: true}),
+		WithCodeHighlighter(mockHighlighter),
+		WithToolContext(&ToolContext{ToolPath: "/path/to/file.unknown"}), // Unknown extension
+	)
+
+	r.highlightContent("some content")
+
+	if !highlightFileCalled {
+		t.Error("Expected HighlightFile to be called as fallback")
+	}
+}
+
+func TestNewRenderer_Defaults(t *testing.T) {
+	r := NewRenderer()
+
+	if r.output == nil {
+		t.Error("Expected output to be set")
+	}
+	if r.configChecker == nil {
+		t.Error("Expected configChecker to be set")
+	}
+	if r.styleApplier == nil {
+		t.Error("Expected styleApplier to be set")
+	}
+	if r.highlighter == nil {
+		t.Error("Expected highlighter to be set")
+	}
+	if r.toolContext == nil {
+		t.Error("Expected toolContext to be set")
+	}
+}
+
+func TestNewRendererWithOptions_AllOptions(t *testing.T) {
+	var buf bytes.Buffer
+	cc := mockConfigChecker{verbose: true}
+	sa := mockStyleApplier{}
+	ch := mockCodeHighlighter{}
+	tc := &ToolContext{ToolName: "Test", ToolPath: "/test"}
+
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(cc),
+		WithStyleApplier(sa),
+		WithCodeHighlighter(ch),
+		WithToolContext(tc),
+	)
+
+	if r.output != &buf {
+		t.Error("Expected output to be set via option")
+	}
+	if r.configChecker != cc {
+		t.Error("Expected configChecker to be set via option")
+	}
+	if r.toolContext != tc {
+		t.Error("Expected toolContext to be set via option")
+	}
+}
+
+func TestRenderer_Render_EditResult_MultipleHunks(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	editResult := EditResult{
+		FilePath: "/path/to/file.go",
+		StructuredPatch: []PatchHunk{
+			{
+				OldStart: 5,
+				OldLines: 1,
+				NewStart: 5,
+				NewLines: 1,
+				Lines:    []string{"-first change"},
+			},
+			{
+				OldStart: 20,
+				OldLines: 1,
+				NewStart: 20,
+				NewLines: 1,
+				Lines:    []string{"+second change"},
+			},
+		},
+	}
+	toolUseResult, _ := json.Marshal(editResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	if !strings.Contains(output, "first change") {
+		t.Errorf("Expected 'first change' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "second change") {
+		t.Errorf("Expected 'second change' in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_EditResult_SkipsEmptyLines(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	editResult := EditResult{
+		FilePath: "/path/to/file.go",
+		StructuredPatch: []PatchHunk{
+			{
+				OldStart: 10,
+				OldLines: 2,
+				NewStart: 10,
+				NewLines: 2,
+				Lines:    []string{"", "-valid line", "", "+another valid"},
+			},
+		},
+	}
+	toolUseResult, _ := json.Marshal(editResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should have rendered valid lines
+	if !strings.Contains(output, "valid line") {
+		t.Errorf("Expected 'valid line' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "another valid") {
+		t.Errorf("Expected 'another valid' in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_EditResult_InvalidJSON(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"fallback content"`),
+					IsError:    false,
+				},
+			},
+		},
+		ToolUseResult: json.RawMessage(`not valid json`),
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should fall back to regular content rendering
+	if !strings.Contains(output, "fallback content") {
+		t.Errorf("Expected fallback content in output, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_LineNumbers(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	editResult := EditResult{
+		FilePath: "/path/to/file.go",
+		StructuredPatch: []PatchHunk{
+			{
+				OldStart: 100,
+				OldLines: 2,
+				NewStart: 100,
+				NewLines: 2,
+				Lines:    []string{"-old at 100", "+new at 100"},
+			},
+		},
+	}
+	toolUseResult, _ := json.Marshal(editResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should have line numbers
+	if !strings.Contains(output, "[LN:100]") {
+		t.Errorf("Expected line number 100 in output, got: %q", output)
+	}
+}
+
+func TestPackageLevelSetToolContext(t *testing.T) {
+	// Reset package state after test
+	originalToolName := lastToolName
+	originalToolPath := lastToolPath
+	originalRenderer := defaultRenderer
+	defer func() {
+		lastToolName = originalToolName
+		lastToolPath = originalToolPath
+		defaultRenderer = originalRenderer
+	}()
+
+	// Test without default renderer
+	defaultRenderer = nil
+	SetToolContext("Bash", "/script.sh")
+
+	if lastToolName != "Bash" {
+		t.Errorf("lastToolName = %q, expected %q", lastToolName, "Bash")
+	}
+	if lastToolPath != "/script.sh" {
+		t.Errorf("lastToolPath = %q, expected %q", lastToolPath, "/script.sh")
+	}
+
+	// Test with default renderer
+	defaultRenderer = NewRenderer()
+	SetToolContext("Read", "/file.go")
+
+	if defaultRenderer.toolContext.ToolName != "Read" {
+		t.Errorf("renderer ToolName = %q, expected %q", defaultRenderer.toolContext.ToolName, "Read")
+	}
+}
+
+func TestDefaultConfigChecker(t *testing.T) {
+	cc := DefaultConfigChecker{}
+
+	// These just verify the methods exist and return bools
+	_ = cc.IsVerbose()
+	_ = cc.NoColor()
+}
+
+func TestDefaultStyleApplier(t *testing.T) {
+	sa := DefaultStyleApplier{}
+
+	// Verify all methods exist and return strings
+	_ = sa.ErrorRender("test")
+	_ = sa.MutedRender("test")
+	_ = sa.SuccessRender("test")
+	_ = sa.OutputPrefix()
+	_ = sa.OutputContinue()
+	_ = sa.LineNumberRender("test")
+	_ = sa.LineNumberSepRender("│")
+	_ = sa.DiffAddRender("test")
+	_ = sa.DiffRemoveRender("test")
+	_ = sa.DiffAddBg()
+	_ = sa.DiffRemoveBg()
 }
