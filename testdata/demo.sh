@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 for f in testdata/*.jsonl; do
     echo -e "\n\033[1;36m━━━ $(basename "$f") ━━━\033[0m\n"
-    cat "$f" | ./viewscreen -v
+    cat "$f" | go run . -v
     echo
     read -p "Press Enter for next..."
 done
