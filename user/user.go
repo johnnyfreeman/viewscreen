@@ -276,7 +276,8 @@ func (r *Renderer) Render(event Event) {
 	}
 
 	// Try to render as edit result with diff first
-	if r.configChecker.IsVerbose() && r.tryRenderEditResult(event.ToolUseResult) {
+	// Always show edit diffs by default - developers want to see what changed
+	if r.tryRenderEditResult(event.ToolUseResult) {
 		return
 	}
 

@@ -754,9 +754,13 @@ func TestRenderer_Render_EditResult_NonVerbose(t *testing.T) {
 	r.Render(event)
 	output := buf.String()
 
-	// Non-verbose mode should NOT render diff (tryRenderEditResult returns early)
-	if strings.Contains(output, "old line") || strings.Contains(output, "new line") {
-		t.Errorf("Expected no diff output in non-verbose mode, got: %q", output)
+	// Edit diffs are shown by default (even in non-verbose mode)
+	// because developers want to see what changed
+	if !strings.Contains(output, "old line") {
+		t.Errorf("Expected 'old line' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "new line") {
+		t.Errorf("Expected 'new line' in output, got: %q", output)
 	}
 }
 
