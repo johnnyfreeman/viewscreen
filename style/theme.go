@@ -61,17 +61,17 @@ var DefaultTheme = Theme{
 	DiffAddBg:    lipgloss.Color("#14532D"), // Green-900
 	DiffRemoveBg: lipgloss.Color("#7F1D1D"), // Red-900
 
-	// Gradient (purple to cyan)
+	// Gradient (purple to violet-blue)
 	GradientStart: lipgloss.Color("#A855F7"), // Purple-500
-	GradientEnd:   lipgloss.Color("#22D3EE"), // Cyan-400
+	GradientEnd:   lipgloss.Color("#818CF8"), // Indigo-400
 
-	// Success gradient (green to cyan)
+	// Success gradient (green to teal)
 	SuccessGradientStart: lipgloss.Color("#4ADE80"), // Green-400
-	SuccessGradientEnd:   lipgloss.Color("#22D3EE"), // Cyan-400
+	SuccessGradientEnd:   lipgloss.Color("#2DD4BF"), // Teal-400
 
-	// Error gradient (red to pink)
+	// Error gradient (red to orange)
 	ErrorGradientStart: lipgloss.Color("#F87171"), // Red-400
-	ErrorGradientEnd:   lipgloss.Color("#F472B6"), // Pink-400
+	ErrorGradientEnd:   lipgloss.Color("#FB923C"), // Orange-400
 }
 
 // NoColorTheme is used when color output is disabled

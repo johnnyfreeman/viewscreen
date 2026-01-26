@@ -13,6 +13,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/terminal"
 	"github.com/johnnyfreeman/viewscreen/types"
+	"golang.org/x/term"
 )
 
 // ToolResultContent represents tool result content
@@ -172,13 +173,19 @@ type ToolContext struct {
 	ToolPath string
 }
 
+// MarkdownRenderer abstracts markdown rendering for testability
+type MarkdownRenderer interface {
+	Render(content string) string
+}
+
 // Renderer handles rendering user events
 type Renderer struct {
-	output        io.Writer
-	configChecker ConfigChecker
-	styleApplier  StyleApplier
-	highlighter   CodeHighlighter
-	toolContext   *ToolContext
+	output           io.Writer
+	configChecker    ConfigChecker
+	styleApplier     StyleApplier
+	highlighter      CodeHighlighter
+	markdownRenderer MarkdownRenderer
+	toolContext      *ToolContext
 }
 
 // RendererOption is a functional option for configuring a Renderer
@@ -219,15 +226,27 @@ func WithToolContext(tc *ToolContext) RendererOption {
 	}
 }
 
+// WithMarkdownRenderer sets a custom markdown renderer
+func WithMarkdownRenderer(mr MarkdownRenderer) RendererOption {
+	return func(r *Renderer) {
+		r.markdownRenderer = mr
+	}
+}
+
 // NewRenderer creates a new user Renderer with default dependencies
 func NewRenderer() *Renderer {
 	cc := DefaultConfigChecker{}
+	width := 80
+	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
+		width = w
+	}
 	return &Renderer{
-		output:        os.Stdout,
-		configChecker: cc,
-		styleApplier:  DefaultStyleApplier{},
-		highlighter:   NewDefaultCodeHighlighter(cc.NoColor()),
-		toolContext:   &ToolContext{},
+		output:           os.Stdout,
+		configChecker:    cc,
+		styleApplier:     DefaultStyleApplier{},
+		highlighter:      NewDefaultCodeHighlighter(cc.NoColor()),
+		markdownRenderer: render.NewMarkdownRenderer(cc.NoColor(), width),
+		toolContext:      &ToolContext{},
 	}
 }
 
@@ -314,23 +333,35 @@ func (r *Renderer) renderSyntheticMessage(event Event) {
 			cleaned := terminal.StripSystemReminders(content.Text)
 			lines := strings.Split(cleaned, "\n")
 
-			// Truncate to max lines
-			truncated, remaining := terminal.TruncateLines(cleaned, terminal.DefaultMaxLines)
-			resultLines := strings.Split(truncated, "\n")
+			// Render as markdown if renderer is available
+			if r.markdownRenderer != nil {
+				rendered := r.markdownRenderer.Render(cleaned)
+				fmt.Fprint(r.output, rendered)
+				if !strings.HasSuffix(rendered, "\n") {
+					fmt.Fprintln(r.output)
+				}
+			} else {
+				// Fallback to plain text with truncation
+				truncated, remaining := terminal.TruncateLines(cleaned, terminal.DefaultMaxLines)
+				resultLines := strings.Split(truncated, "\n")
 
-			for i, line := range resultLines {
-				if i == 0 {
-					fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), line)
-				} else {
-					fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), line)
+				for i, line := range resultLines {
+					if i == 0 {
+						fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), line)
+					} else {
+						fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), line)
+					}
+				}
+
+				if remaining > 0 {
+					indicator := fmt.Sprintf("… (%d more lines)", remaining)
+					fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator))
+					return
 				}
 			}
 
-			if remaining > 0 {
-				indicator := fmt.Sprintf("… (%d more lines)", remaining)
-				fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator))
-			} else if len(lines) > 0 {
-				// Show line count summary
+			// Show line count summary
+			if len(lines) > 0 {
 				summary := fmt.Sprintf("(%d lines)", len(lines))
 				fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(summary))
 			}

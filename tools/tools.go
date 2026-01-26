@@ -48,11 +48,11 @@ func RenderToolUse(block types.ContentBlock, opts ...ToolRenderOption) {
 		}
 	}
 	// Fallback if no input or parse error
-	fmt.Fprintln(cfg.output, style.ToolHeader.Render(fmt.Sprintf("%s%s()", style.Bullet, block.Name)))
+	fmt.Fprintln(cfg.output, style.ApplyThemeBoldGradient(style.Bullet+block.Name))
 	user.SetToolContext(block.Name, "")
 }
 
-// RenderToolHeader renders the tool header in Claude Code format: ● ToolName(args)
+// RenderToolHeader renders the tool header in format: ● ToolName args
 func RenderToolHeader(toolName string, input map[string]interface{}, opts ...ToolRenderOption) {
 	cfg := newRenderConfig(opts...)
 
@@ -80,11 +80,12 @@ func RenderToolHeader(toolName string, input map[string]interface{}, opts ...Too
 		styledArgs = args
 	}
 
-	// Build header: ● ToolName(args)
-	header := fmt.Sprintf("%s%s(", style.Bullet, toolName)
-	fmt.Fprint(cfg.output, style.ToolHeader.Render(header))
-	fmt.Fprint(cfg.output, styledArgs)
-	fmt.Fprintln(cfg.output, style.ToolHeader.Render(")"))
+	// Build header: ● ToolName args
+	fmt.Fprint(cfg.output, style.ApplyThemeBoldGradient(style.Bullet+toolName))
+	if styledArgs != "" {
+		fmt.Fprint(cfg.output, " "+style.Muted.Render(styledArgs))
+	}
+	fmt.Fprintln(cfg.output)
 
 	// Set context for syntax highlighting of tool results
 	filePath := GetFilePath(toolName, input)

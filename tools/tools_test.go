@@ -29,9 +29,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"command": "ls -la"},
 			wantContains: []string{
 				style.Bullet,
-				"Bash(",
+				"Bash",
 				"ls -la",
-				")",
 			},
 		},
 		{
@@ -40,9 +39,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"file_path": "/path/to/file.go"},
 			wantContains: []string{
 				style.Bullet,
-				"Read(",
+				"Read",
 				"/path/to/file.go",
-				")",
 			},
 		},
 		{
@@ -51,9 +49,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"file_path": "/path/to/new.go"},
 			wantContains: []string{
 				style.Bullet,
-				"Write(",
+				"Write",
 				"/path/to/new.go",
-				")",
 			},
 		},
 		{
@@ -62,9 +59,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"file_path": "/path/to/edit.go"},
 			wantContains: []string{
 				style.Bullet,
-				"Edit(",
+				"Edit",
 				"/path/to/edit.go",
-				")",
 			},
 		},
 		{
@@ -73,9 +69,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"pattern": "**/*.go"},
 			wantContains: []string{
 				style.Bullet,
-				"Glob(",
+				"Glob",
 				"**/*.go",
-				")",
 			},
 		},
 		{
@@ -84,9 +79,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"pattern": "TODO:"},
 			wantContains: []string{
 				style.Bullet,
-				"Grep(",
+				"Grep",
 				"TODO:",
-				")",
 			},
 		},
 		{
@@ -95,9 +89,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"description": "Explore codebase"},
 			wantContains: []string{
 				style.Bullet,
-				"Task(",
+				"Task",
 				"Explore codebase",
-				")",
 			},
 		},
 		{
@@ -106,9 +99,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"url": "https://example.com"},
 			wantContains: []string{
 				style.Bullet,
-				"WebFetch(",
+				"WebFetch",
 				"https://example.com",
-				")",
 			},
 		},
 		{
@@ -117,9 +109,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"query": "golang testing"},
 			wantContains: []string{
 				style.Bullet,
-				"WebSearch(",
+				"WebSearch",
 				"golang testing",
-				")",
 			},
 		},
 		{
@@ -133,9 +124,8 @@ func TestRenderToolHeader(t *testing.T) {
 			},
 			wantContains: []string{
 				style.Bullet,
-				"TodoWrite(",
+				"TodoWrite",
 				"2 items",
-				")",
 			},
 		},
 		{
@@ -144,9 +134,8 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"question": "What should I do?"},
 			wantContains: []string{
 				style.Bullet,
-				"AskUser(",
+				"AskUser",
 				"What should I do?",
-				")",
 			},
 		},
 		{
@@ -155,8 +144,7 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{},
 			wantContains: []string{
 				style.Bullet,
-				"Bash(",
-				")",
+				"Bash",
 			},
 		},
 		{
@@ -165,8 +153,7 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    nil,
 			wantContains: []string{
 				style.Bullet,
-				"Read(",
-				")",
+				"Read",
 			},
 		},
 		{
@@ -175,8 +162,7 @@ func TestRenderToolHeader(t *testing.T) {
 			input:    map[string]interface{}{"key": "value"},
 			wantContains: []string{
 				style.Bullet,
-				"CustomTool(",
-				")",
+				"CustomTool",
 			},
 		},
 	}
@@ -293,9 +279,8 @@ func TestRenderToolUse(t *testing.T) {
 			},
 			wantContains: []string{
 				style.Bullet,
-				"Bash(",
+				"Bash",
 				"echo hello",
-				")",
 			},
 		},
 		{
@@ -307,8 +292,7 @@ func TestRenderToolUse(t *testing.T) {
 			},
 			wantContains: []string{
 				style.Bullet,
-				"TodoRead(",
-				")",
+				"TodoRead",
 			},
 		},
 		{
@@ -320,8 +304,7 @@ func TestRenderToolUse(t *testing.T) {
 			},
 			wantContains: []string{
 				style.Bullet,
-				"SomeTool(",
-				")",
+				"SomeTool",
 			},
 		},
 		{
@@ -333,8 +316,7 @@ func TestRenderToolUse(t *testing.T) {
 			},
 			wantContains: []string{
 				style.Bullet,
-				"Bash(",
-				")",
+				"Bash",
 			},
 		},
 		{
@@ -346,9 +328,8 @@ func TestRenderToolUse(t *testing.T) {
 			},
 			wantContains: []string{
 				style.Bullet,
-				"Read(",
+				"Read",
 				"/path/to/file.go",
-				")",
 			},
 		},
 		{
@@ -360,9 +341,8 @@ func TestRenderToolUse(t *testing.T) {
 			},
 			wantContains: []string{
 				style.Bullet,
-				"Edit(",
+				"Edit",
 				"/path/to/edit.go",
-				")",
 			},
 		},
 		{
@@ -374,9 +354,8 @@ func TestRenderToolUse(t *testing.T) {
 			},
 			wantContains: []string{
 				style.Bullet,
-				"Glob(",
+				"Glob",
 				"**/*.ts",
-				")",
 			},
 		},
 	}

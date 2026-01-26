@@ -194,7 +194,7 @@ func (r *Renderer) Render(event Event) {
 				r.toolHeaderRender(r.toolName, input)
 			} else {
 				// Fallback if JSON parse fails
-				fmt.Fprintln(r.output, style.ToolHeader.Render(fmt.Sprintf("%s%s()", style.Bullet, r.toolName)))
+				fmt.Fprintln(r.output, style.ApplyThemeBoldGradient(style.Bullet+r.toolName))
 			}
 		}
 	case "message_delta":

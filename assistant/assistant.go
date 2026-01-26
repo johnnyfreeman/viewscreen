@@ -98,7 +98,7 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 // inTextBlock and inToolUseBlock indicate whether we were streaming these block types
 func (r *Renderer) Render(event Event, inTextBlock, inToolUseBlock bool) {
 	if event.Error != "" {
-		fmt.Fprintln(r.output, style.Error.Bold(true).Render(fmt.Sprintf("%sError", style.Bullet)))
+		fmt.Fprintln(r.output, style.ApplyErrorGradient(style.Bullet+"Error"))
 		fmt.Fprintf(r.output, "%s%s\n", style.OutputPrefix, style.Error.Render(event.Error))
 	}
 
