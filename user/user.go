@@ -19,7 +19,8 @@ import (
 type ToolResultContent struct {
 	Type       string          `json:"type"`
 	ToolUseID  string          `json:"tool_use_id"`
-	RawContent json.RawMessage `json:"content"`
+	Text       string          `json:"text"`    // For synthetic text messages
+	RawContent json.RawMessage `json:"content"` // For tool results
 	IsError    bool            `json:"is_error"`
 }
 
@@ -31,6 +32,11 @@ type ContentBlock struct {
 
 // Content returns the content as a string, handling both string and array formats
 func (t *ToolResultContent) Content() string {
+	// For synthetic text messages, return the Text field directly
+	if t.Text != "" {
+		return t.Text
+	}
+
 	if len(t.RawContent) == 0 {
 		return ""
 	}
@@ -85,6 +91,7 @@ type Event struct {
 	types.BaseEvent
 	Message       Message         `json:"message"`
 	ToolUseResult json.RawMessage `json:"tool_use_result"`
+	IsSynthetic   bool            `json:"isSynthetic"`
 }
 
 // ConfigChecker abstracts config flag checking for testability
@@ -241,6 +248,14 @@ func (r *Renderer) SetToolContext(toolName, path string) {
 
 // Render outputs the user event to the terminal
 func (r *Renderer) Render(event Event) {
+	// Handle synthetic messages (e.g., skill content) in verbose mode
+	if event.IsSynthetic {
+		if r.configChecker.IsVerbose() {
+			r.renderSyntheticMessage(event)
+		}
+		return
+	}
+
 	// Try to render as edit result with diff first
 	if r.configChecker.IsVerbose() && r.tryRenderEditResult(event.ToolUseResult) {
 		return
@@ -286,6 +301,38 @@ func (r *Renderer) Render(event Event) {
 				// Show summary in non-verbose mode
 				summary := fmt.Sprintf("Read %d lines", lineCount)
 				fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedRender(summary))
+			}
+		}
+	}
+}
+
+// renderSyntheticMessage renders a synthetic user message (e.g., skill content)
+func (r *Renderer) renderSyntheticMessage(event Event) {
+	for _, content := range event.Message.Content {
+		// Synthetic messages have type "text" with Text field populated
+		if content.Type == "text" && content.Text != "" {
+			cleaned := terminal.StripSystemReminders(content.Text)
+			lines := strings.Split(cleaned, "\n")
+
+			// Truncate to max lines
+			truncated, remaining := terminal.TruncateLines(cleaned, terminal.DefaultMaxLines)
+			resultLines := strings.Split(truncated, "\n")
+
+			for i, line := range resultLines {
+				if i == 0 {
+					fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), line)
+				} else {
+					fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), line)
+				}
+			}
+
+			if remaining > 0 {
+				indicator := fmt.Sprintf("… (%d more lines)", remaining)
+				fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator))
+			} else if len(lines) > 0 {
+				// Show line count summary
+				summary := fmt.Sprintf("(%d lines)", len(lines))
+				fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(summary))
 			}
 		}
 	}
