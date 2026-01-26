@@ -94,6 +94,19 @@ type WriteResult struct {
 	Content  string `json:"content"`
 }
 
+// Todo represents a single todo item
+type Todo struct {
+	Content    string `json:"content"`
+	Status     string `json:"status"` // "pending", "in_progress", "completed"
+	ActiveForm string `json:"activeForm"`
+}
+
+// TodoResult represents the tool_use_result for TodoWrite operations
+type TodoResult struct {
+	OldTodos []Todo `json:"oldTodos"`
+	NewTodos []Todo `json:"newTodos"`
+}
+
 // Event represents a user (tool result) event
 type Event struct {
 	types.BaseEvent
@@ -119,6 +132,7 @@ type StyleApplier interface {
 	ErrorRender(text string) string
 	MutedRender(text string) string
 	SuccessRender(text string) string
+	WarningRender(text string) string
 	OutputPrefix() string
 	OutputContinue() string
 	LineNumberRender(text string) string
@@ -132,9 +146,10 @@ type StyleApplier interface {
 // DefaultStyleApplier uses the actual style package
 type DefaultStyleApplier struct{}
 
-func (d DefaultStyleApplier) ErrorRender(text string) string         { return style.Error.Render(text) }
-func (d DefaultStyleApplier) MutedRender(text string) string         { return style.Muted.Render(text) }
-func (d DefaultStyleApplier) SuccessRender(text string) string       { return style.Success.Render(text) }
+func (d DefaultStyleApplier) ErrorRender(text string) string   { return style.Error.Render(text) }
+func (d DefaultStyleApplier) MutedRender(text string) string   { return style.Muted.Render(text) }
+func (d DefaultStyleApplier) SuccessRender(text string) string { return style.Success.Render(text) }
+func (d DefaultStyleApplier) WarningRender(text string) string { return style.Warning.Render(text) }
 func (d DefaultStyleApplier) OutputPrefix() string                   { return style.OutputPrefix }
 func (d DefaultStyleApplier) OutputContinue() string                 { return style.OutputContinue }
 func (d DefaultStyleApplier) LineNumberRender(text string) string    { return style.LineNumber.Render(text) }
@@ -291,6 +306,11 @@ func (r *Renderer) Render(event Event) {
 	// Try to render as write result (new file creation)
 	// Show a concise summary instead of misleading "Read N lines"
 	if r.tryRenderWriteResult(event.ToolUseResult) {
+		return
+	}
+
+	// Try to render as todo result with visual todo list
+	if r.tryRenderTodoResult(event.ToolUseResult) {
 		return
 	}
 
@@ -521,6 +541,57 @@ func (r *Renderer) tryRenderEditResult(toolUseResult json.RawMessage) bool {
 			lineCount++
 		}
 	}
+	return true
+}
+
+// tryRenderTodoResult attempts to render a TodoWrite result with visual todo list
+// Returns true if it rendered, false if not a todo result
+func (r *Renderer) tryRenderTodoResult(toolUseResult json.RawMessage) bool {
+	if len(toolUseResult) == 0 {
+		return false
+	}
+
+	var todoResult TodoResult
+	if err := json.Unmarshal(toolUseResult, &todoResult); err != nil {
+		return false
+	}
+
+	// Check if this looks like a todo result (has newTodos array)
+	if len(todoResult.NewTodos) == 0 {
+		return false
+	}
+
+	// Render each todo with status indicator
+	for i, todo := range todoResult.NewTodos {
+		var statusIndicator string
+		var contentRenderer func(string) string
+
+		switch todo.Status {
+		case "completed":
+			statusIndicator = r.styleApplier.SuccessRender("✓")
+			contentRenderer = r.styleApplier.MutedRender
+		case "in_progress":
+			statusIndicator = r.styleApplier.WarningRender("→")
+			contentRenderer = func(s string) string { return s } // No special styling
+		default: // "pending"
+			statusIndicator = r.styleApplier.MutedRender("○")
+			contentRenderer = r.styleApplier.MutedRender
+		}
+
+		// Use OutputPrefix for first line, OutputContinue for rest
+		prefix := r.styleApplier.OutputContinue()
+		if i == 0 {
+			prefix = r.styleApplier.OutputPrefix()
+		}
+
+		content := todo.Content
+		if todo.Status == "in_progress" && todo.ActiveForm != "" {
+			content = todo.ActiveForm
+		}
+
+		fmt.Fprintf(r.output, "%s%s %s\n", prefix, statusIndicator, contentRenderer(content))
+	}
+
 	return true
 }
 

@@ -418,9 +418,10 @@ func (m mockConfigChecker) NoColor() bool   { return m.noColor }
 
 type mockStyleApplier struct{}
 
-func (m mockStyleApplier) ErrorRender(text string) string         { return "[ERROR:" + text + "]" }
-func (m mockStyleApplier) MutedRender(text string) string         { return "[MUTED:" + text + "]" }
-func (m mockStyleApplier) SuccessRender(text string) string       { return "[SUCCESS:" + text + "]" }
+func (m mockStyleApplier) ErrorRender(text string) string   { return "[ERROR:" + text + "]" }
+func (m mockStyleApplier) MutedRender(text string) string   { return "[MUTED:" + text + "]" }
+func (m mockStyleApplier) SuccessRender(text string) string { return "[SUCCESS:" + text + "]" }
+func (m mockStyleApplier) WarningRender(text string) string { return "[WARNING:" + text + "]" }
 func (m mockStyleApplier) OutputPrefix() string                   { return "  ⎿  " }
 func (m mockStyleApplier) OutputContinue() string                 { return "     " }
 func (m mockStyleApplier) LineNumberRender(text string) string    { return "[LN:" + text + "]" }
@@ -1331,6 +1332,7 @@ func TestDefaultStyleApplier(t *testing.T) {
 	_ = sa.ErrorRender("test")
 	_ = sa.MutedRender("test")
 	_ = sa.SuccessRender("test")
+	_ = sa.WarningRender("test")
 	_ = sa.OutputPrefix()
 	_ = sa.OutputContinue()
 	_ = sa.LineNumberRender("test")
@@ -1339,4 +1341,178 @@ func TestDefaultStyleApplier(t *testing.T) {
 	_ = sa.DiffRemoveRender("test")
 	_ = sa.DiffAddBg()
 	_ = sa.DiffRemoveBg()
+}
+
+func TestRenderer_Render_TodoResult(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	todoResult := TodoResult{
+		OldTodos: []Todo{},
+		NewTodos: []Todo{
+			{Content: "Review code", Status: "completed", ActiveForm: "Reviewing code"},
+			{Content: "Write tests", Status: "in_progress", ActiveForm: "Writing tests"},
+			{Content: "Update docs", Status: "pending", ActiveForm: "Updating docs"},
+		},
+	}
+	toolUseResult, _ := json.Marshal(todoResult)
+
+	event := Event{
+		Message: Message{
+			Role:    "user",
+			Content: []ToolResultContent{},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Check completed task shows checkmark and content is muted
+	if !strings.Contains(output, "[SUCCESS:✓]") {
+		t.Errorf("Expected success-styled checkmark for completed task, got: %q", output)
+	}
+	if !strings.Contains(output, "[MUTED:Review code]") {
+		t.Errorf("Expected muted content for completed task, got: %q", output)
+	}
+
+	// Check in_progress task shows arrow and uses activeForm
+	if !strings.Contains(output, "[WARNING:→]") {
+		t.Errorf("Expected warning-styled arrow for in_progress task, got: %q", output)
+	}
+	if !strings.Contains(output, "Writing tests") {
+		t.Errorf("Expected activeForm for in_progress task, got: %q", output)
+	}
+
+	// Check pending task shows circle and content is muted
+	if !strings.Contains(output, "[MUTED:○]") {
+		t.Errorf("Expected muted circle for pending task, got: %q", output)
+	}
+	if !strings.Contains(output, "[MUTED:Update docs]") {
+		t.Errorf("Expected muted content for pending task, got: %q", output)
+	}
+
+	// First line should have output prefix
+	if !strings.HasPrefix(output, "  ⎿  ") {
+		t.Errorf("Expected output to start with output prefix, got: %q", output)
+	}
+}
+
+func TestRenderer_Render_TodoResult_EmptyTodos(t *testing.T) {
+	var buf bytes.Buffer
+	r := NewRendererWithOptions(
+		WithOutput(&buf),
+		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithStyleApplier(mockStyleApplier{}),
+		WithCodeHighlighter(mockCodeHighlighter{}),
+	)
+
+	// Empty todo result should fall through to regular rendering
+	todoResult := TodoResult{
+		OldTodos: []Todo{},
+		NewTodos: []Todo{},
+	}
+	toolUseResult, _ := json.Marshal(todoResult)
+
+	event := Event{
+		Message: Message{
+			Role: "user",
+			Content: []ToolResultContent{
+				{
+					Type:       "tool_result",
+					RawContent: json.RawMessage(`"fallback content"`),
+					IsError:    false,
+				},
+			},
+		},
+		ToolUseResult: toolUseResult,
+	}
+
+	r.Render(event)
+	output := buf.String()
+
+	// Should fall back to regular content rendering
+	if !strings.Contains(output, "Read 1 lines") {
+		t.Errorf("Expected fallback to regular rendering, got: %q", output)
+	}
+}
+
+func TestTodo_Unmarshaling(t *testing.T) {
+	tests := []struct {
+		name     string
+		jsonData string
+		expected Todo
+	}{
+		{
+			name:     "complete todo",
+			jsonData: `{"content": "Review code", "status": "completed", "activeForm": "Reviewing code"}`,
+			expected: Todo{Content: "Review code", Status: "completed", ActiveForm: "Reviewing code"},
+		},
+		{
+			name:     "pending todo",
+			jsonData: `{"content": "Write tests", "status": "pending", "activeForm": "Writing tests"}`,
+			expected: Todo{Content: "Write tests", Status: "pending", ActiveForm: "Writing tests"},
+		},
+		{
+			name:     "in_progress todo",
+			jsonData: `{"content": "Update docs", "status": "in_progress", "activeForm": "Updating docs"}`,
+			expected: Todo{Content: "Update docs", Status: "in_progress", ActiveForm: "Updating docs"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result Todo
+			err := json.Unmarshal([]byte(tt.jsonData), &result)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal: %v", err)
+			}
+
+			if result.Content != tt.expected.Content {
+				t.Errorf("Content = %q, expected %q", result.Content, tt.expected.Content)
+			}
+			if result.Status != tt.expected.Status {
+				t.Errorf("Status = %q, expected %q", result.Status, tt.expected.Status)
+			}
+			if result.ActiveForm != tt.expected.ActiveForm {
+				t.Errorf("ActiveForm = %q, expected %q", result.ActiveForm, tt.expected.ActiveForm)
+			}
+		})
+	}
+}
+
+func TestTodoResult_Unmarshaling(t *testing.T) {
+	jsonData := `{
+		"oldTodos": [
+			{"content": "Old task", "status": "completed", "activeForm": "Old task"}
+		],
+		"newTodos": [
+			{"content": "Task 1", "status": "pending", "activeForm": "Task 1"},
+			{"content": "Task 2", "status": "in_progress", "activeForm": "Doing Task 2"}
+		]
+	}`
+
+	var result TodoResult
+	err := json.Unmarshal([]byte(jsonData), &result)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	if len(result.OldTodos) != 1 {
+		t.Errorf("OldTodos length = %d, expected 1", len(result.OldTodos))
+	}
+	if len(result.NewTodos) != 2 {
+		t.Errorf("NewTodos length = %d, expected 2", len(result.NewTodos))
+	}
+	if result.NewTodos[0].Content != "Task 1" {
+		t.Errorf("NewTodos[0].Content = %q, expected %q", result.NewTodos[0].Content, "Task 1")
+	}
+	if result.NewTodos[1].Status != "in_progress" {
+		t.Errorf("NewTodos[1].Status = %q, expected %q", result.NewTodos[1].Status, "in_progress")
+	}
 }
