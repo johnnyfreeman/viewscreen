@@ -129,13 +129,18 @@ func TestRenderToolHeader(t *testing.T) {
 			},
 		},
 		{
-			name:     "AskUser with question",
-			toolName: "AskUser",
-			input:    map[string]interface{}{"question": "What should I do?"},
+			name:     "AskUserQuestion with questions",
+			toolName: "AskUserQuestion",
+			input: map[string]interface{}{
+				"questions": []interface{}{
+					map[string]interface{}{"question": "What should I do?"},
+					map[string]interface{}{"question": "What else?"},
+				},
+			},
 			wantContains: []string{
 				style.Bullet,
-				"AskUser",
-				"What should I do?",
+				"AskUserQuestion",
+				"2 questions",
 			},
 		},
 		{
@@ -287,12 +292,12 @@ func TestRenderToolUse(t *testing.T) {
 			name: "tool with empty input",
 			block: types.ContentBlock{
 				Type:  "tool_use",
-				Name:  "TodoRead",
+				Name:  "EnterPlanMode",
 				Input: json.RawMessage(`{}`),
 			},
 			wantContains: []string{
 				style.Bullet,
-				"TodoRead",
+				"EnterPlanMode",
 			},
 		},
 		{

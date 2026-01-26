@@ -21,9 +21,15 @@ func TestGetRenderer(t *testing.T) {
 		{name: "Task renderer exists", toolName: "Task", wantNil: false},
 		{name: "WebFetch renderer exists", toolName: "WebFetch", wantNil: false},
 		{name: "WebSearch renderer exists", toolName: "WebSearch", wantNil: false},
-		{name: "TodoRead renderer exists", toolName: "TodoRead", wantNil: false},
 		{name: "TodoWrite renderer exists", toolName: "TodoWrite", wantNil: false},
-		{name: "AskUser renderer exists", toolName: "AskUser", wantNil: false},
+		{name: "AskUserQuestion renderer exists", toolName: "AskUserQuestion", wantNil: false},
+		{name: "Skill renderer exists", toolName: "Skill", wantNil: false},
+		{name: "NotebookEdit renderer exists", toolName: "NotebookEdit", wantNil: false},
+		{name: "TaskOutput renderer exists", toolName: "TaskOutput", wantNil: false},
+		{name: "TaskStop renderer exists", toolName: "TaskStop", wantNil: false},
+		{name: "EnterPlanMode renderer exists", toolName: "EnterPlanMode", wantNil: false},
+		{name: "ExitPlanMode renderer exists", toolName: "ExitPlanMode", wantNil: false},
+		{name: "ToolSearch renderer exists", toolName: "ToolSearch", wantNil: false},
 		{name: "unknown tool returns nil", toolName: "UnknownTool", wantNil: true},
 		{name: "empty string returns nil", toolName: "", wantNil: true},
 	}
@@ -138,13 +144,6 @@ func TestToolRenderers(t *testing.T) {
 			input:    map[string]interface{}{"query": "golang testing"},
 			expected: "golang testing",
 		},
-		// TodoRead
-		{
-			name:     "TodoRead always empty",
-			toolName: "TodoRead",
-			input:    map[string]interface{}{},
-			expected: "",
-		},
 		// TodoWrite
 		{
 			name:     "TodoWrite with todos",
@@ -170,12 +169,83 @@ func TestToolRenderers(t *testing.T) {
 			input:    map[string]interface{}{"todos": "not an array"},
 			expected: "",
 		},
-		// AskUser
+		// AskUserQuestion
 		{
-			name:     "AskUser with question",
-			toolName: "AskUser",
-			input:    map[string]interface{}{"question": "What is your name?"},
-			expected: "What is your name?",
+			name:     "AskUserQuestion with single question",
+			toolName: "AskUserQuestion",
+			input: map[string]interface{}{
+				"questions": []interface{}{
+					map[string]interface{}{"question": "What is your name?"},
+				},
+			},
+			expected: "1 question",
+		},
+		{
+			name:     "AskUserQuestion with multiple questions",
+			toolName: "AskUserQuestion",
+			input: map[string]interface{}{
+				"questions": []interface{}{
+					map[string]interface{}{"question": "Q1"},
+					map[string]interface{}{"question": "Q2"},
+					map[string]interface{}{"question": "Q3"},
+				},
+			},
+			expected: "3 questions",
+		},
+		{
+			name:     "AskUserQuestion without questions",
+			toolName: "AskUserQuestion",
+			input:    map[string]interface{}{},
+			expected: "",
+		},
+		// Skill
+		{
+			name:     "Skill with skill name",
+			toolName: "Skill",
+			input:    map[string]interface{}{"skill": "commit"},
+			expected: "commit",
+		},
+		// NotebookEdit
+		{
+			name:     "NotebookEdit with notebook_path",
+			toolName: "NotebookEdit",
+			input:    map[string]interface{}{"notebook_path": "/path/to/notebook.ipynb"},
+			expected: "/path/to/notebook.ipynb",
+		},
+		// TaskOutput
+		{
+			name:     "TaskOutput with task_id",
+			toolName: "TaskOutput",
+			input:    map[string]interface{}{"task_id": "abc123"},
+			expected: "abc123",
+		},
+		// TaskStop
+		{
+			name:     "TaskStop with task_id",
+			toolName: "TaskStop",
+			input:    map[string]interface{}{"task_id": "xyz789"},
+			expected: "xyz789",
+		},
+		// EnterPlanMode
+		{
+			name:     "EnterPlanMode always empty",
+			toolName: "EnterPlanMode",
+			input:    map[string]interface{}{},
+			expected: "",
+		},
+		// ExitPlanMode
+		{
+			name:     "ExitPlanMode always empty",
+			toolName: "ExitPlanMode",
+			input:    map[string]interface{}{},
+			expected: "",
+		},
+		// ToolSearch
+		{
+			name:     "ToolSearch with query",
+			toolName: "ToolSearch",
+			input:    map[string]interface{}{"query": "weather"},
+			expected: "weather",
 		},
 	}
 

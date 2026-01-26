@@ -152,10 +152,6 @@ func init() {
 		return ""
 	})
 
-	RegisterFunc("TodoRead", func(input map[string]interface{}) string {
-		return ""
-	})
-
 	RegisterFunc("TodoWrite", func(input map[string]interface{}) string {
 		if todos, ok := input["todos"].([]interface{}); ok {
 			return fmt.Sprintf("%d items", len(todos))
@@ -163,9 +159,13 @@ func init() {
 		return ""
 	})
 
-	RegisterFunc("AskUser", func(input map[string]interface{}) string {
-		if question, ok := input["question"].(string); ok {
-			return question
+	// AskUserQuestion displays the number of questions being asked
+	RegisterFunc("AskUserQuestion", func(input map[string]interface{}) string {
+		if questions, ok := input["questions"].([]interface{}); ok {
+			if len(questions) == 1 {
+				return "1 question"
+			}
+			return fmt.Sprintf("%d questions", len(questions))
 		}
 		return ""
 	})
@@ -173,6 +173,48 @@ func init() {
 	RegisterFunc("Skill", func(input map[string]interface{}) string {
 		if skill, ok := input["skill"].(string); ok {
 			return skill
+		}
+		return ""
+	})
+
+	// NotebookEdit displays the notebook path
+	RegisterFunc("NotebookEdit", func(input map[string]interface{}) string {
+		if path, ok := input["notebook_path"].(string); ok {
+			return path
+		}
+		return ""
+	})
+
+	// TaskOutput displays the task ID being checked
+	RegisterFunc("TaskOutput", func(input map[string]interface{}) string {
+		if taskID, ok := input["task_id"].(string); ok {
+			return taskID
+		}
+		return ""
+	})
+
+	// TaskStop displays the task ID being stopped
+	RegisterFunc("TaskStop", func(input map[string]interface{}) string {
+		if taskID, ok := input["task_id"].(string); ok {
+			return taskID
+		}
+		return ""
+	})
+
+	// EnterPlanMode has no meaningful arguments to display
+	RegisterFunc("EnterPlanMode", func(input map[string]interface{}) string {
+		return ""
+	})
+
+	// ExitPlanMode has no meaningful arguments to display
+	RegisterFunc("ExitPlanMode", func(input map[string]interface{}) string {
+		return ""
+	})
+
+	// ToolSearch displays the search query
+	RegisterFunc("ToolSearch", func(input map[string]interface{}) string {
+		if query, ok := input["query"].(string); ok {
+			return query
 		}
 		return ""
 	})
