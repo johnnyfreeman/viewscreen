@@ -2,6 +2,7 @@ package render
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sync"
 
@@ -17,23 +18,50 @@ type Spinner struct {
 	noColor   bool
 	gradStart colorful.Color
 	gradEnd   colorful.Color
+	output    io.Writer
 }
 
 // Default spinner frames (braille pattern)
 var defaultFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
+// SpinnerOption is a functional option for configuring a Spinner
+type SpinnerOption func(*Spinner)
+
+// WithSpinnerOutput sets a custom output writer for the Spinner
+func WithSpinnerOutput(w io.Writer) SpinnerOption {
+	return func(s *Spinner) {
+		s.output = w
+	}
+}
+
+// WithSpinnerFrames sets custom frames for the Spinner
+func WithSpinnerFrames(frames []string) SpinnerOption {
+	return func(s *Spinner) {
+		if len(frames) > 0 {
+			s.frames = frames
+		}
+	}
+}
+
 // NewSpinner creates a new spinner
-func NewSpinner(noColor bool) *Spinner {
+func NewSpinner(noColor bool, opts ...SpinnerOption) *Spinner {
 	// Gradient colors: purple to cyan
 	start, _ := colorful.Hex("#A855F7")
 	end, _ := colorful.Hex("#22D3EE")
 
-	return &Spinner{
+	s := &Spinner{
 		frames:    defaultFrames,
 		noColor:   noColor,
 		gradStart: start,
 		gradEnd:   end,
+		output:    os.Stdout,
 	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 // Frame returns the current spinner frame with gradient coloring
@@ -56,15 +84,15 @@ func (s *Spinner) Frame() string {
 	return style.Render(frame)
 }
 
-// Show writes the current spinner frame to stdout (overwrites previous)
+// Show writes the current spinner frame to output (overwrites previous)
 func (s *Spinner) Show() {
-	fmt.Fprint(os.Stdout, s.Frame())
+	fmt.Fprint(s.output, s.Frame())
 }
 
 // Clear clears the spinner from the line
 func (s *Spinner) Clear() {
 	// Move back one character and clear
-	fmt.Fprint(os.Stdout, "\b \b")
+	fmt.Fprint(s.output, "\b \b")
 }
 
 // Reset resets the spinner to the first frame
@@ -78,11 +106,31 @@ func (s *Spinner) Reset() {
 type StreamingIndicator struct {
 	shown   bool
 	noColor bool
+	output  io.Writer
+}
+
+// IndicatorOption is a functional option for configuring a StreamingIndicator
+type IndicatorOption func(*StreamingIndicator)
+
+// WithIndicatorOutput sets a custom output writer for the StreamingIndicator
+func WithIndicatorOutput(w io.Writer) IndicatorOption {
+	return func(i *StreamingIndicator) {
+		i.output = w
+	}
 }
 
 // NewStreamingIndicator creates a new streaming indicator
-func NewStreamingIndicator(noColor bool) *StreamingIndicator {
-	return &StreamingIndicator{noColor: noColor}
+func NewStreamingIndicator(noColor bool, opts ...IndicatorOption) *StreamingIndicator {
+	i := &StreamingIndicator{
+		noColor: noColor,
+		output:  os.Stdout,
+	}
+
+	for _, opt := range opts {
+		opt(i)
+	}
+
+	return i
 }
 
 // Show displays the streaming indicator
@@ -99,7 +147,7 @@ func (i *StreamingIndicator) Show() {
 		style := lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7"))
 		indicator = style.Render("●")
 	}
-	fmt.Fprint(os.Stdout, indicator)
+	fmt.Fprint(i.output, indicator)
 	i.shown = true
 }
 
@@ -111,9 +159,9 @@ func (i *StreamingIndicator) Clear() {
 
 	// Clear the indicator character(s)
 	if i.noColor {
-		fmt.Fprint(os.Stdout, "\b\b\b   \b\b\b")
+		fmt.Fprint(i.output, "\b\b\b   \b\b\b")
 	} else {
-		fmt.Fprint(os.Stdout, "\b \b")
+		fmt.Fprint(i.output, "\b \b")
 	}
 	i.shown = false
 }
