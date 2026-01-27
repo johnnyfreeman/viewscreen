@@ -1,6 +1,27 @@
 package tools
 
-import "github.com/johnnyfreeman/viewscreen/types"
+import (
+	"github.com/johnnyfreeman/viewscreen/types"
+)
+
+// AssistantMessage represents the minimal interface needed for buffering tool_use blocks.
+// This allows the tracker to accept assistant events without importing the assistant package.
+type AssistantMessage struct {
+	Content         []types.ContentBlock
+	ParentToolUseID *string
+}
+
+// UserMessage represents the minimal interface needed for matching tool results.
+// This allows the tracker to accept user events without importing the user package.
+type UserMessage struct {
+	Content []UserToolResult
+}
+
+// UserToolResult represents a tool result content block.
+type UserToolResult struct {
+	Type      string
+	ToolUseID string
+}
 
 // PendingTool holds a tool_use block waiting for its result.
 type PendingTool struct {
@@ -115,4 +136,33 @@ func (t *ToolUseTracker) FlushAll() []OrphanedTool {
 	})
 	t.Clear()
 	return orphaned
+}
+
+// BufferFromAssistantMessage buffers tool_use blocks from an assistant message.
+// The inToolUseBlock parameter indicates if we're currently streaming a tool_use block,
+// in which case we skip buffering (the tool will be rendered by the stream handler).
+// Returns true if any tools were buffered.
+func (t *ToolUseTracker) BufferFromAssistantMessage(msg AssistantMessage, inToolUseBlock bool) bool {
+	buffered := false
+	for _, block := range msg.Content {
+		if block.Type == "tool_use" && block.ID != "" {
+			if !inToolUseBlock {
+				t.Add(block.ID, block, msg.ParentToolUseID)
+				buffered = true
+			}
+		}
+	}
+	return buffered
+}
+
+// MatchFromUserMessage matches tool_result content blocks with pending tool_use blocks.
+// It extracts tool_use IDs from the message and removes matching tools from the tracker.
+func (t *ToolUseTracker) MatchFromUserMessage(msg UserMessage) []MatchedTool {
+	var toolUseIDs []string
+	for _, content := range msg.Content {
+		if content.Type == "tool_result" && content.ToolUseID != "" {
+			toolUseIDs = append(toolUseIDs, content.ToolUseID)
+		}
+	}
+	return t.MatchAndRemove(toolUseIDs)
 }

@@ -387,3 +387,290 @@ func TestToolUseTracker_FlushAll_NestedDetection(t *testing.T) {
 		t.Error("Child tool should be nested")
 	}
 }
+
+// Tests for BufferFromAssistantMessage
+
+func TestToolUseTracker_BufferFromAssistantMessage_BuffersNewTool(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	msg := AssistantMessage{
+		Content: []types.ContentBlock{
+			{Type: "tool_use", ID: "tool-123", Name: "Bash"},
+		},
+	}
+
+	buffered := tracker.BufferFromAssistantMessage(msg, false)
+	if !buffered {
+		t.Error("BufferFromAssistantMessage should return true when tool is buffered")
+	}
+	if tracker.Len() != 1 {
+		t.Errorf("Tracker should have 1 tool, got %d", tracker.Len())
+	}
+
+	pending, ok := tracker.Get("tool-123")
+	if !ok {
+		t.Fatal("Tracker should contain the buffered tool")
+	}
+	if pending.Block.Name != "Bash" {
+		t.Errorf("Buffered tool Name should be 'Bash', got %q", pending.Block.Name)
+	}
+}
+
+func TestToolUseTracker_BufferFromAssistantMessage_SkipsWhenInToolUseBlock(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	msg := AssistantMessage{
+		Content: []types.ContentBlock{
+			{Type: "tool_use", ID: "tool-123", Name: "Bash"},
+		},
+	}
+
+	// When inToolUseBlock is true, tools should NOT be buffered
+	buffered := tracker.BufferFromAssistantMessage(msg, true)
+	if buffered {
+		t.Error("BufferFromAssistantMessage should return false when inToolUseBlock is true")
+	}
+	if tracker.Len() != 0 {
+		t.Errorf("Tracker should be empty when skipping buffering, got %d tools", tracker.Len())
+	}
+}
+
+func TestToolUseTracker_BufferFromAssistantMessage_IgnoresEmptyID(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	msg := AssistantMessage{
+		Content: []types.ContentBlock{
+			{Type: "tool_use", ID: "", Name: "Bash"},
+		},
+	}
+
+	buffered := tracker.BufferFromAssistantMessage(msg, false)
+	if buffered {
+		t.Error("BufferFromAssistantMessage should return false when tool has empty ID")
+	}
+	if tracker.Len() != 0 {
+		t.Errorf("Tracker should be empty, got %d tools", tracker.Len())
+	}
+}
+
+func TestToolUseTracker_BufferFromAssistantMessage_IgnoresNonToolUseBlocks(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	msg := AssistantMessage{
+		Content: []types.ContentBlock{
+			{Type: "text", Text: "hello world"},
+		},
+	}
+
+	buffered := tracker.BufferFromAssistantMessage(msg, false)
+	if buffered {
+		t.Error("BufferFromAssistantMessage should return false for non-tool_use blocks")
+	}
+	if tracker.Len() != 0 {
+		t.Errorf("Tracker should be empty, got %d tools", tracker.Len())
+	}
+}
+
+func TestToolUseTracker_BufferFromAssistantMessage_PreservesParentToolUseID(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	parentID := "parent-456"
+	msg := AssistantMessage{
+		Content: []types.ContentBlock{
+			{Type: "tool_use", ID: "child-123", Name: "Read"},
+		},
+		ParentToolUseID: &parentID,
+	}
+
+	tracker.BufferFromAssistantMessage(msg, false)
+
+	pending, ok := tracker.Get("child-123")
+	if !ok {
+		t.Fatal("Tracker should contain the buffered tool")
+	}
+	if pending.ParentToolUseID == nil {
+		t.Fatal("ParentToolUseID should be preserved")
+	}
+	if *pending.ParentToolUseID != "parent-456" {
+		t.Errorf("ParentToolUseID should be 'parent-456', got %q", *pending.ParentToolUseID)
+	}
+}
+
+func TestToolUseTracker_BufferFromAssistantMessage_MultipleTools(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	msg := AssistantMessage{
+		Content: []types.ContentBlock{
+			{Type: "tool_use", ID: "tool-1", Name: "Bash"},
+			{Type: "text", Text: "some text"},
+			{Type: "tool_use", ID: "tool-2", Name: "Read"},
+		},
+	}
+
+	buffered := tracker.BufferFromAssistantMessage(msg, false)
+	if !buffered {
+		t.Error("BufferFromAssistantMessage should return true when tools are buffered")
+	}
+	if tracker.Len() != 2 {
+		t.Errorf("Tracker should have 2 tools, got %d", tracker.Len())
+	}
+
+	_, ok1 := tracker.Get("tool-1")
+	_, ok2 := tracker.Get("tool-2")
+	if !ok1 || !ok2 {
+		t.Error("Tracker should contain both buffered tools")
+	}
+}
+
+// Tests for MatchFromUserMessage
+
+func TestToolUseTracker_MatchFromUserMessage_NoMatch(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	msg := UserMessage{
+		Content: []UserToolResult{
+			{Type: "tool_result", ToolUseID: "unknown-tool"},
+		},
+	}
+
+	matched := tracker.MatchFromUserMessage(msg)
+	if len(matched) != 0 {
+		t.Errorf("MatchFromUserMessage should return empty slice for no matches, got %d", len(matched))
+	}
+}
+
+func TestToolUseTracker_MatchFromUserMessage_SingleMatch(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	// Add a pending tool
+	tracker.Add("tool-123", types.ContentBlock{ID: "tool-123", Name: "Bash"}, nil)
+
+	msg := UserMessage{
+		Content: []UserToolResult{
+			{Type: "tool_result", ToolUseID: "tool-123"},
+		},
+	}
+
+	matched := tracker.MatchFromUserMessage(msg)
+	if len(matched) != 1 {
+		t.Fatalf("MatchFromUserMessage should return 1 match, got %d", len(matched))
+	}
+	if matched[0].Block.ID != "tool-123" {
+		t.Errorf("Matched block ID should be 'tool-123', got %q", matched[0].Block.ID)
+	}
+	if matched[0].IsNested {
+		t.Error("Matched tool should not be nested")
+	}
+
+	// Tool should be removed from tracker
+	if tracker.Len() != 0 {
+		t.Error("Tracker should be empty after matching")
+	}
+}
+
+func TestToolUseTracker_MatchFromUserMessage_NestedTool(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	// Add parent tool
+	tracker.Add("parent-123", types.ContentBlock{ID: "parent-123", Name: "Task"}, nil)
+
+	// Add nested child tool
+	parentID := "parent-123"
+	tracker.Add("child-456", types.ContentBlock{ID: "child-456", Name: "Read"}, &parentID)
+
+	// Match the child tool result
+	msg := UserMessage{
+		Content: []UserToolResult{
+			{Type: "tool_result", ToolUseID: "child-456"},
+		},
+	}
+
+	matched := tracker.MatchFromUserMessage(msg)
+	if len(matched) != 1 {
+		t.Fatalf("MatchFromUserMessage should return 1 match, got %d", len(matched))
+	}
+	if !matched[0].IsNested {
+		t.Error("Matched tool should be nested when parent is still pending")
+	}
+
+	// Only child should be removed, parent still pending
+	if tracker.Len() != 1 {
+		t.Errorf("Tracker should have 1 remaining tool, got %d", tracker.Len())
+	}
+}
+
+func TestToolUseTracker_MatchFromUserMessage_IgnoresNonToolResultContent(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	// Add a pending tool
+	tracker.Add("tool-123", types.ContentBlock{ID: "tool-123", Name: "Bash"}, nil)
+
+	msg := UserMessage{
+		Content: []UserToolResult{
+			{Type: "text", ToolUseID: "tool-123"}, // Wrong type
+		},
+	}
+
+	matched := tracker.MatchFromUserMessage(msg)
+	if len(matched) != 0 {
+		t.Error("MatchFromUserMessage should ignore non-tool_result content")
+	}
+
+	// Tool should still be in tracker
+	if tracker.Len() != 1 {
+		t.Error("Tracker should still have the tool")
+	}
+}
+
+func TestToolUseTracker_MatchFromUserMessage_IgnoresEmptyToolUseID(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	// Add a pending tool
+	tracker.Add("tool-123", types.ContentBlock{ID: "tool-123", Name: "Bash"}, nil)
+
+	msg := UserMessage{
+		Content: []UserToolResult{
+			{Type: "tool_result", ToolUseID: ""},
+		},
+	}
+
+	matched := tracker.MatchFromUserMessage(msg)
+	if len(matched) != 0 {
+		t.Error("MatchFromUserMessage should ignore empty ToolUseID")
+	}
+
+	// Tool should still be in tracker
+	if tracker.Len() != 1 {
+		t.Error("Tracker should still have the tool")
+	}
+}
+
+func TestToolUseTracker_MatchFromUserMessage_MultipleResults(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	// Add multiple pending tools
+	tracker.Add("tool-1", types.ContentBlock{ID: "tool-1", Name: "Bash"}, nil)
+	tracker.Add("tool-2", types.ContentBlock{ID: "tool-2", Name: "Read"}, nil)
+	tracker.Add("tool-3", types.ContentBlock{ID: "tool-3", Name: "Write"}, nil)
+
+	msg := UserMessage{
+		Content: []UserToolResult{
+			{Type: "tool_result", ToolUseID: "tool-1"},
+			{Type: "tool_result", ToolUseID: "tool-3"},
+		},
+	}
+
+	matched := tracker.MatchFromUserMessage(msg)
+	if len(matched) != 2 {
+		t.Fatalf("MatchFromUserMessage should return 2 matches, got %d", len(matched))
+	}
+
+	// Only tool-2 should remain
+	if tracker.Len() != 1 {
+		t.Errorf("Tracker should have 1 remaining tool, got %d", tracker.Len())
+	}
+	_, ok := tracker.Get("tool-2")
+	if !ok {
+		t.Error("tool-2 should still be in tracker")
+	}
+}

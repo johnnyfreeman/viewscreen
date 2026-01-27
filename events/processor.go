@@ -100,8 +100,12 @@ func (p *EventProcessor) processAssistant(event assistant.Event) ProcessResult {
 	p.state.IncrementTurnCount()
 	r := p.renderers
 
-	// Buffer tool_use blocks
-	if BufferToolUse(event, r.PendingTools, r.Stream) {
+	// Buffer tool_use blocks using the tracker's method
+	msg := tools.AssistantMessage{
+		Content:         event.Message.Content,
+		ParentToolUseID: event.ParentToolUseID,
+	}
+	if r.PendingTools.BufferFromAssistantMessage(msg, r.Stream.InToolUseBlock()) {
 		// Update state to show the first pending tool
 		for _, block := range event.Message.Content {
 			if block.Type == "tool_use" && block.ID != "" {
@@ -129,8 +133,17 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 	p.state.UpdateFromToolUseResult(event.ToolUseResult)
 	r := p.renderers
 
-	// Match tool results with pending tools
-	matched := MatchToolResults(event, r.PendingTools)
+	// Match tool results with pending tools using the tracker's method
+	msg := tools.UserMessage{
+		Content: make([]tools.UserToolResult, len(event.Message.Content)),
+	}
+	for i, c := range event.Message.Content {
+		msg.Content[i] = tools.UserToolResult{
+			Type:      c.Type,
+			ToolUseID: c.ToolUseID,
+		}
+	}
+	matched := r.PendingTools.MatchFromUserMessage(msg)
 
 	var content strings.Builder
 	var isNested bool
@@ -184,8 +197,8 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 
 	var content strings.Builder
 
-	// Flush any orphaned pending tools
-	orphaned := FlushOrphanedTools(r.PendingTools)
+	// Flush any orphaned pending tools using the tracker's method
+	orphaned := r.PendingTools.FlushAll()
 	for _, o := range orphaned {
 		str, _ := tools.RenderToolUseToString(o.Block)
 		content.WriteString(str)
