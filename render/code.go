@@ -3,6 +3,7 @@ package render
 import (
 	"bytes"
 	"fmt"
+	"image/color"
 	"io"
 	"strings"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/lipgloss"
+	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 // maxCodeSize is the threshold above which syntax highlighting is skipped.
@@ -18,37 +21,68 @@ const maxCodeSize = 1024 * 1024
 
 // bgFormatter is a custom chroma formatter that applies syntax highlighting
 // foreground colors while forcing a specific background color per token.
+// Uses Ultraviolet for proper style/content separation - this ensures that
+// syntax-highlighted code with backgrounds can be safely composed with other
+// styles without escape sequence conflicts.
 type bgFormatter struct {
 	bgColor lipgloss.Color
 }
 
 func (f bgFormatter) Format(w io.Writer, style *chroma.Style, it chroma.Iterator) error {
+	// Convert background color once for all tokens
+	bg := hexToRGBA(string(f.bgColor))
+
 	for token := it(); token != chroma.EOF; token = it() {
 		value := strings.TrimRight(token.Value, "\n")
 
 		entry := style.Get(token.Type)
-		s := lipgloss.NewStyle().Background(f.bgColor)
+
+		// Build Ultraviolet style with background always set
+		uvStyle := &uv.Style{
+			Bg: bg,
+		}
 
 		if !entry.IsZero() {
+			// Accumulate text attributes
+			var attrs uint8
 			if entry.Bold == chroma.Yes {
-				s = s.Bold(true)
-			}
-			if entry.Underline == chroma.Yes {
-				s = s.Underline(true)
+				attrs |= uv.AttrBold
 			}
 			if entry.Italic == chroma.Yes {
-				s = s.Italic(true)
+				attrs |= uv.AttrItalic
 			}
+			uvStyle.Attrs = attrs
+
+			// Set underline via the Underline field (not as an attribute)
+			if entry.Underline == chroma.Yes {
+				uvStyle.Underline = uv.UnderlineSingle
+			}
+
+			// Set foreground color if specified
 			if entry.Colour.IsSet() {
-				s = s.Foreground(lipgloss.Color(entry.Colour.String()))
+				uvStyle.Fg = hexToRGBA(entry.Colour.String())
 			}
 		}
 
-		if _, err := fmt.Fprint(w, s.Render(value)); err != nil {
+		if _, err := fmt.Fprint(w, uvStyle.Styled(value)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// hexToRGBA converts a hex color string to color.RGBA.
+func hexToRGBA(hex string) color.RGBA {
+	c, err := colorful.Hex(hex)
+	if err != nil {
+		return color.RGBA{}
+	}
+	return color.RGBA{
+		R: uint8(c.R * 255),
+		G: uint8(c.G * 255),
+		B: uint8(c.B * 255),
+		A: 255,
+	}
 }
 
 // CodeRenderer handles syntax highlighting with chroma
