@@ -9,7 +9,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
-// mockMarkdownRenderer is a test double for MarkdownRendererInterface
+// mockMarkdownRenderer is a test double for MarkdownRenderer
 type mockMarkdownRenderer struct {
 	renderCalls []string
 	returnValue string

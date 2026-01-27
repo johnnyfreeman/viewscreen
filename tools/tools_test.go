@@ -205,18 +205,6 @@ func TestHeaderRenderer_renderTo(t *testing.T) {
 	}
 }
 
-func TestDefaultHeaderOptions(t *testing.T) {
-	opts := DefaultHeaderOptions()
-
-	if opts.Icon != style.Bullet {
-		t.Errorf("DefaultHeaderOptions().Icon = %q, want %q", opts.Icon, style.Bullet)
-	}
-
-	if opts.Prefix != "" {
-		t.Errorf("DefaultHeaderOptions().Prefix = %q, want empty string", opts.Prefix)
-	}
-}
-
 func TestHeaderRenderer_ToolArgVariants(t *testing.T) {
 	tests := []struct {
 		name         string

@@ -15,8 +15,8 @@ import (
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
-// MarkdownRendererInterface is an alias for types.MarkdownRenderer for backward compatibility.
-type MarkdownRendererInterface = types.MarkdownRenderer
+// MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
+type MarkdownRenderer = types.MarkdownRenderer
 
 // IndicatorInterface abstracts the streaming indicator for testability
 type IndicatorInterface interface {
@@ -65,7 +65,7 @@ type MessageDelta struct {
 // Renderer handles rendering stream events and tracks streaming state
 type Renderer struct {
 	block            *BlockState
-	markdownRenderer MarkdownRendererInterface
+	markdownRenderer MarkdownRenderer
 	indicator        IndicatorInterface
 	toolHeaderRender ToolHeaderRenderer
 	output           io.Writer
@@ -102,7 +102,7 @@ func WithOutput(w io.Writer) RendererOption {
 }
 
 // WithMarkdownRenderer sets a custom markdown renderer
-func WithMarkdownRenderer(mr MarkdownRendererInterface) RendererOption {
+func WithMarkdownRenderer(mr MarkdownRenderer) RendererOption {
 	return func(r *Renderer) {
 		r.markdownRenderer = mr
 	}
