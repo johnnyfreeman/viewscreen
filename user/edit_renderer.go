@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/render" // for DetectLanguageFromPath
 	"github.com/johnnyfreeman/viewscreen/terminal"
 )
 
@@ -22,9 +22,10 @@ func NewEditRenderer(styleApplier StyleApplier, highlighter CodeHighlighter) *Ed
 	}
 }
 
-// TryRender attempts to render an edit result to the given output.
+// TryRender implements ResultRenderer interface.
+// Attempts to render an edit result with syntax-highlighted diff.
 // Returns true if it was an edit result and was rendered, false otherwise.
-func (er *EditRenderer) TryRender(out *render.Output, toolUseResult json.RawMessage, outputPrefix, outputContinue string) bool {
+func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMessage) bool {
 	if len(toolUseResult) == 0 {
 		return false
 	}
@@ -78,7 +79,7 @@ func (er *EditRenderer) TryRender(out *render.Output, toolUseResult json.RawMess
 				remaining -= lineCount
 				if remaining > 0 {
 					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Fprintf(out, "%s%s\n", outputContinue, er.styleApplier.MutedRender(indicator))
+					fmt.Fprintf(ctx.Output, "%s%s\n", ctx.OutputContinue, er.styleApplier.MutedRender(indicator))
 				}
 				return true
 			}
@@ -134,10 +135,10 @@ func (er *EditRenderer) TryRender(out *render.Output, toolUseResult json.RawMess
 
 			// Output with separators: ⎿ 123 │ + code
 			if first {
-				fmt.Fprintf(out, "%s%s %s %s %s\n", outputPrefix, lineNums, sep, op, styled)
+				fmt.Fprintf(ctx.Output, "%s%s %s %s %s\n", ctx.OutputPrefix, lineNums, sep, op, styled)
 				first = false
 			} else {
-				fmt.Fprintf(out, "%s%s %s %s %s\n", outputContinue, lineNums, sep, op, styled)
+				fmt.Fprintf(ctx.Output, "%s%s %s %s %s\n", ctx.OutputContinue, lineNums, sep, op, styled)
 			}
 			lineCount++
 		}

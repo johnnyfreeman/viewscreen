@@ -208,10 +208,8 @@ type Renderer struct {
 	highlighter      CodeHighlighter
 	markdownRenderer MarkdownRenderer
 	toolContext      *ToolContext
-	// Sub-renderers for specific result types
-	editRenderer  *EditRenderer
-	todoRenderer  *TodoRenderer
-	writeRenderer *WriteRenderer
+	// Registry for result-specific renderers
+	resultRegistry *ResultRegistry
 }
 
 // RendererOption is a functional option for configuring a Renderer
@@ -268,6 +266,13 @@ func NewRenderer() *Renderer {
 	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
 		width = w
 	}
+
+	// Build the result registry with renderers in priority order
+	registry := NewResultRegistry()
+	registry.Register(NewEditRenderer(sa, ch))
+	registry.Register(NewWriteRenderer(sa))
+	registry.Register(NewTodoRenderer(sa))
+
 	return &Renderer{
 		output:           os.Stdout,
 		configChecker:    cc,
@@ -275,9 +280,7 @@ func NewRenderer() *Renderer {
 		highlighter:      ch,
 		markdownRenderer: render.NewMarkdownRenderer(cc.NoColor(), width),
 		toolContext:      &ToolContext{},
-		editRenderer:     NewEditRenderer(sa, ch),
-		todoRenderer:     NewTodoRenderer(sa),
-		writeRenderer:    NewWriteRenderer(sa),
+		resultRegistry:   registry,
 	}
 }
 
@@ -287,10 +290,11 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 	for _, opt := range opts {
 		opt(r)
 	}
-	// Rebuild sub-renderers with potentially updated dependencies
-	r.editRenderer = NewEditRenderer(r.styleApplier, r.highlighter)
-	r.todoRenderer = NewTodoRenderer(r.styleApplier)
-	r.writeRenderer = NewWriteRenderer(r.styleApplier)
+	// Rebuild result registry with potentially updated dependencies
+	r.resultRegistry = NewResultRegistry()
+	r.resultRegistry.Register(NewEditRenderer(r.styleApplier, r.highlighter))
+	r.resultRegistry.Register(NewWriteRenderer(r.styleApplier))
+	r.resultRegistry.Register(NewTodoRenderer(r.styleApplier))
 	return r
 }
 
@@ -323,20 +327,13 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 		return
 	}
 
-	// Try to render as edit result with diff first
-	// Always show edit diffs by default - developers want to see what changed
-	if r.editRenderer.TryRender(out, event.ToolUseResult, outputPrefix, outputContinue) {
-		return
+	// Try specialized result renderers via registry
+	ctx := &RenderContext{
+		Output:         out,
+		OutputPrefix:   outputPrefix,
+		OutputContinue: outputContinue,
 	}
-
-	// Try to render as write result (new file creation)
-	// Show a concise summary instead of misleading "Read N lines"
-	if r.writeRenderer.TryRender(out, event.ToolUseResult, outputPrefix) {
-		return
-	}
-
-	// Try to render as todo result with visual todo list
-	if r.todoRenderer.TryRender(out, event.ToolUseResult, outputPrefix, outputContinue) {
+	if r.resultRegistry.TryRender(ctx, event.ToolUseResult) {
 		return
 	}
 

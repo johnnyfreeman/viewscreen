@@ -3,8 +3,6 @@ package user
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/johnnyfreeman/viewscreen/render"
 )
 
 // TodoRenderer handles rendering of todo results with visual status indicators.
@@ -19,9 +17,10 @@ func NewTodoRenderer(styleApplier StyleApplier) *TodoRenderer {
 	}
 }
 
-// TryRender attempts to render a todo result to the given output.
+// TryRender implements ResultRenderer interface.
+// Attempts to render a todo list with visual status indicators.
 // Returns true if it was a todo result and was rendered, false otherwise.
-func (tr *TodoRenderer) TryRender(out *render.Output, toolUseResult json.RawMessage, outputPrefix, outputContinue string) bool {
+func (tr *TodoRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMessage) bool {
 	if len(toolUseResult) == 0 {
 		return false
 	}
@@ -54,9 +53,9 @@ func (tr *TodoRenderer) TryRender(out *render.Output, toolUseResult json.RawMess
 		}
 
 		// Use OutputPrefix for first line, OutputContinue for rest
-		prefix := outputContinue
+		prefix := ctx.OutputContinue
 		if i == 0 {
-			prefix = outputPrefix
+			prefix = ctx.OutputPrefix
 		}
 
 		content := todo.Content
@@ -64,7 +63,7 @@ func (tr *TodoRenderer) TryRender(out *render.Output, toolUseResult json.RawMess
 			content = todo.ActiveForm
 		}
 
-		fmt.Fprintf(out, "%s%s %s\n", prefix, statusIndicator, contentRenderer(content))
+		fmt.Fprintf(ctx.Output, "%s%s %s\n", prefix, statusIndicator, contentRenderer(content))
 	}
 
 	return true

@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/johnnyfreeman/viewscreen/render"
 )
 
 // WriteRenderer handles rendering of write/create results.
@@ -20,9 +18,10 @@ func NewWriteRenderer(styleApplier StyleApplier) *WriteRenderer {
 	}
 }
 
-// TryRender attempts to render a write result to the given output.
+// TryRender implements ResultRenderer interface.
+// Attempts to render a write/create result with a concise summary.
 // Returns true if it was a write/create result and was rendered, false otherwise.
-func (wr *WriteRenderer) TryRender(out *render.Output, toolUseResult json.RawMessage, outputPrefix string) bool {
+func (wr *WriteRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMessage) bool {
 	if len(toolUseResult) == 0 {
 		return false
 	}
@@ -45,7 +44,7 @@ func (wr *WriteRenderer) TryRender(out *render.Output, toolUseResult json.RawMes
 
 	// Show a summary of the created file
 	summary := fmt.Sprintf("Created (%d lines)", lineCount)
-	fmt.Fprintf(out, "%s%s\n", outputPrefix, wr.styleApplier.MutedRender(summary))
+	fmt.Fprintf(ctx.Output, "%s%s\n", ctx.OutputPrefix, wr.styleApplier.MutedRender(summary))
 
 	return true
 }
