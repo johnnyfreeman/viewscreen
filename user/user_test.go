@@ -438,10 +438,12 @@ func (m mockStyleApplier) ApplyErrorGradient(text string) string     { return "[
 func (m mockStyleApplier) NoColor() bool                             { return true }
 
 // Ultraviolet-based style methods
-func (m mockStyleApplier) UVSuccessText(text string) string { return "[UV_SUCCESS:" + text + "]" }
-func (m mockStyleApplier) UVWarningText(text string) string { return "[UV_WARNING:" + text + "]" }
-func (m mockStyleApplier) UVMutedText(text string) string   { return "[UV_MUTED:" + text + "]" }
-func (m mockStyleApplier) UVErrorText(text string) string   { return "[UV_ERROR:" + text + "]" }
+func (m mockStyleApplier) UVSuccessText(text string) string     { return "[UV_SUCCESS:" + text + "]" }
+func (m mockStyleApplier) UVWarningText(text string) string     { return "[UV_WARNING:" + text + "]" }
+func (m mockStyleApplier) UVMutedText(text string) string       { return "[UV_MUTED:" + text + "]" }
+func (m mockStyleApplier) UVErrorText(text string) string       { return "[UV_ERROR:" + text + "]" }
+func (m mockStyleApplier) UVErrorBoldText(text string) string   { return "[UV_ERROR_BOLD:" + text + "]" }
+func (m mockStyleApplier) UVSuccessBoldText(text string) string { return "[UV_SUCCESS_BOLD:" + text + "]" }
 
 type mockCodeHighlighter struct{}
 

@@ -77,6 +77,32 @@ func ErrorText(text string) string {
 	return style.Styled(text)
 }
 
+// ErrorBoldText applies error (red) foreground color with bold using Ultraviolet.
+// Use this for error headers when styling needs to be composition-safe.
+func ErrorBoldText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg:    hexToRGBA(string(CurrentTheme.Error)),
+		Attrs: uv.AttrBold,
+	}
+	return style.Styled(text)
+}
+
+// SuccessBoldText applies success (green) foreground color with bold using Ultraviolet.
+// Use this for success headers when styling needs to be composition-safe.
+func SuccessBoldText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg:    hexToRGBA(string(CurrentTheme.Success)),
+		Attrs: uv.AttrBold,
+	}
+	return style.Styled(text)
+}
+
 // Sidebar styling functions using Ultraviolet for proper style/content separation.
 // These use specific color codes matching the original lipgloss SidebarStyles.
 

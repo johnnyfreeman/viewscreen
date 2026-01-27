@@ -8,7 +8,6 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
-	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
@@ -103,39 +102,39 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 	sa := r.styleApplier
 	fmt.Fprintln(out)
 	if event.IsError {
-		// Error header with gradient
+		// Error header with gradient (or bold fallback for no-color mode)
 		header := fmt.Sprintf("%sSession Error", sa.Bullet())
 		if !sa.NoColor() {
 			header = sa.ApplyErrorGradient(header)
 		} else {
-			header = style.Error.Bold(true).Render(header)
+			header = sa.UVErrorBoldText(header)
 		}
 		fmt.Fprintln(out, header)
 		for _, err := range event.Errors {
-			fmt.Fprintf(out, "%s%s\n", sa.OutputPrefix(), sa.ErrorRender(err))
+			fmt.Fprintf(out, "%s%s\n", sa.OutputPrefix(), sa.UVErrorText(err))
 		}
 	} else {
-		// Success header with gradient
+		// Success header with gradient (or bold fallback for no-color mode)
 		header := fmt.Sprintf("%sSession Complete", sa.Bullet())
 		if !sa.NoColor() {
 			header = sa.ApplySuccessGradient(header)
 		} else {
-			header = style.Success.Bold(true).Render(header)
+			header = sa.UVSuccessBoldText(header)
 		}
 		fmt.Fprintln(out, header)
 	}
 
 	fmt.Fprintf(out, "%s%s %.2fs (API: %.2fs)\n",
 		sa.OutputPrefix(),
-		sa.MutedRender("Duration:"),
+		sa.UVMutedText("Duration:"),
 		float64(event.DurationMS)/1000, float64(event.DurationAPIMS)/1000)
-	fmt.Fprintf(out, "%s%s %d\n", sa.OutputContinue(), sa.MutedRender("Turns:"), event.NumTurns)
-	fmt.Fprintf(out, "%s%s $%.4f\n", sa.OutputContinue(), sa.MutedRender("Cost:"), event.TotalCostUSD)
+	fmt.Fprintf(out, "%s%s %d\n", sa.OutputContinue(), sa.UVMutedText("Turns:"), event.NumTurns)
+	fmt.Fprintf(out, "%s%s $%.4f\n", sa.OutputContinue(), sa.UVMutedText("Cost:"), event.TotalCostUSD)
 
 	if r.config.ShowUsage() {
 		fmt.Fprintf(out, "%s%s in=%d out=%d (cache: created=%d read=%d)\n",
 			sa.OutputContinue(),
-			sa.MutedRender("Tokens:"),
+			sa.UVMutedText("Tokens:"),
 			event.Usage.InputTokens, event.Usage.OutputTokens,
 			event.Usage.CacheCreationInputTokens, event.Usage.CacheReadInputTokens)
 	}
@@ -143,7 +142,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 	if len(event.PermissionDenials) > 0 {
 		fmt.Fprintf(out, "%s%s %d\n",
 			sa.OutputContinue(),
-			sa.WarningRender("Permission Denials:"),
+			sa.UVWarningText("Permission Denials:"),
 			len(event.PermissionDenials))
 		for _, denial := range event.PermissionDenials {
 			fmt.Fprintf(out, "%s  - %s (%s)\n", sa.OutputContinue(), denial.ToolName, denial.ToolUseID)

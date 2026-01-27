@@ -44,10 +44,12 @@ func (m mockStyleApplier) ApplyErrorGradient(text string) string     { return "[
 func (m mockStyleApplier) NoColor() bool                             { return m.noColor }
 
 // Ultraviolet-based style methods
-func (m mockStyleApplier) UVSuccessText(text string) string { return "[uv_success]" + text + "[/uv_success]" }
-func (m mockStyleApplier) UVWarningText(text string) string { return "[uv_warning]" + text + "[/uv_warning]" }
-func (m mockStyleApplier) UVMutedText(text string) string   { return "[uv_muted]" + text + "[/uv_muted]" }
-func (m mockStyleApplier) UVErrorText(text string) string   { return "[uv_error]" + text + "[/uv_error]" }
+func (m mockStyleApplier) UVSuccessText(text string) string     { return "[uv_success]" + text + "[/uv_success]" }
+func (m mockStyleApplier) UVWarningText(text string) string     { return "[uv_warning]" + text + "[/uv_warning]" }
+func (m mockStyleApplier) UVMutedText(text string) string       { return "[uv_muted]" + text + "[/uv_muted]" }
+func (m mockStyleApplier) UVErrorText(text string) string       { return "[uv_error]" + text + "[/uv_error]" }
+func (m mockStyleApplier) UVErrorBoldText(text string) string   { return "[uv_error_bold]" + text + "[/uv_error_bold]" }
+func (m mockStyleApplier) UVSuccessBoldText(text string) string { return "[uv_success_bold]" + text + "[/uv_success_bold]" }
 
 func TestNewRenderer(t *testing.T) {
 	r := NewRenderer()

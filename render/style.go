@@ -22,6 +22,8 @@ type StyleApplier interface {
 	UVWarningText(text string) string
 	UVMutedText(text string) string
 	UVErrorText(text string) string
+	UVErrorBoldText(text string) string
+	UVSuccessBoldText(text string) string
 
 	// Output prefixes
 	OutputPrefix() string
@@ -57,10 +59,14 @@ func (d DefaultStyleApplier) SuccessRender(text string) string { return style.Su
 func (d DefaultStyleApplier) WarningRender(text string) string { return style.Warning.Render(text) }
 
 // Ultraviolet-based text styles (composition-safe)
-func (d DefaultStyleApplier) UVSuccessText(text string) string { return style.SuccessText(text) }
-func (d DefaultStyleApplier) UVWarningText(text string) string { return style.WarningText(text) }
-func (d DefaultStyleApplier) UVMutedText(text string) string   { return style.MutedText(text) }
-func (d DefaultStyleApplier) UVErrorText(text string) string   { return style.ErrorText(text) }
+func (d DefaultStyleApplier) UVSuccessText(text string) string   { return style.SuccessText(text) }
+func (d DefaultStyleApplier) UVWarningText(text string) string   { return style.WarningText(text) }
+func (d DefaultStyleApplier) UVMutedText(text string) string     { return style.MutedText(text) }
+func (d DefaultStyleApplier) UVErrorText(text string) string     { return style.ErrorText(text) }
+func (d DefaultStyleApplier) UVErrorBoldText(text string) string { return style.ErrorBoldText(text) }
+func (d DefaultStyleApplier) UVSuccessBoldText(text string) string {
+	return style.SuccessBoldText(text)
+}
 
 // Output prefixes
 func (d DefaultStyleApplier) OutputPrefix() string   { return style.OutputPrefix }
