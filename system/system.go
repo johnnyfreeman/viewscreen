@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
@@ -104,8 +105,8 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 	return r
 }
 
-// Render outputs the system event
-func (r *Renderer) Render(event Event) {
+// renderTo writes the system event to the given output
+func (r *Renderer) renderTo(out *render.Output, event Event) {
 	// Use gradient for session header when color is enabled
 	header := fmt.Sprintf("%sSession Started", r.styleApplier.Bullet())
 	if !r.styleApplier.NoColor() {
@@ -113,15 +114,27 @@ func (r *Renderer) Render(event Event) {
 	} else {
 		header = r.styleApplier.SessionHeaderRender(header)
 	}
-	fmt.Fprintln(r.output, header)
-	fmt.Fprintf(r.output, "%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedRender("Model:"), event.Model)
-	fmt.Fprintf(r.output, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Version:"), event.ClaudeCodeVersion)
-	fmt.Fprintf(r.output, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("CWD:"), event.CWD)
-	fmt.Fprintf(r.output, "%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Tools:"), len(event.Tools))
+	fmt.Fprintln(out, header)
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedRender("Model:"), event.Model)
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Version:"), event.ClaudeCodeVersion)
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("CWD:"), event.CWD)
+	fmt.Fprintf(out, "%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Tools:"), len(event.Tools))
 	if r.verboseChecker.IsVerbose() && len(event.Agents) > 0 {
-		fmt.Fprintf(r.output, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Agents:"), strings.Join(event.Agents, ", "))
+		fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Agents:"), strings.Join(event.Agents, ", "))
 	}
-	fmt.Fprintln(r.output)
+	fmt.Fprintln(out)
+}
+
+// Render outputs the system event
+func (r *Renderer) Render(event Event) {
+	r.renderTo(render.WriterOutput(r.output), event)
+}
+
+// RenderToString renders the system event to a string
+func (r *Renderer) RenderToString(event Event) string {
+	out := render.StringOutput()
+	r.renderTo(out, event)
+	return out.String()
 }
 
 // Package-level renderer for backward compatibility
@@ -137,28 +150,6 @@ func getDefaultRenderer() *Renderer {
 // Render is a package-level convenience function for backward compatibility
 func Render(event Event) {
 	getDefaultRenderer().Render(event)
-}
-
-// RenderToString renders the system event to a string
-func (r *Renderer) RenderToString(event Event) string {
-	var sb strings.Builder
-	// Use gradient for session header when color is enabled
-	header := fmt.Sprintf("%sSession Started", r.styleApplier.Bullet())
-	if !r.styleApplier.NoColor() {
-		header = r.styleApplier.ApplyThemeBoldGradient(header)
-	} else {
-		header = r.styleApplier.SessionHeaderRender(header)
-	}
-	sb.WriteString(header + "\n")
-	sb.WriteString(fmt.Sprintf("%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedRender("Model:"), event.Model))
-	sb.WriteString(fmt.Sprintf("%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Version:"), event.ClaudeCodeVersion))
-	sb.WriteString(fmt.Sprintf("%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("CWD:"), event.CWD))
-	sb.WriteString(fmt.Sprintf("%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Tools:"), len(event.Tools)))
-	if r.verboseChecker.IsVerbose() && len(event.Agents) > 0 {
-		sb.WriteString(fmt.Sprintf("%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Agents:"), strings.Join(event.Agents, ", ")))
-	}
-	sb.WriteString("\n")
-	return sb.String()
 }
 
 // RenderToString is a package-level convenience function for backward compatibility

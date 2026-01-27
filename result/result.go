@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
@@ -98,9 +98,9 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 	return r
 }
 
-// Render outputs the result event using this renderer's configuration
-func (r *Renderer) Render(event Event) {
-	fmt.Fprintln(r.output)
+// renderTo writes the result event to the given output
+func (r *Renderer) renderTo(out *render.Output, event Event) {
+	fmt.Fprintln(out)
 	if event.IsError {
 		// Error header with gradient
 		header := fmt.Sprintf("%sSession Error", style.Bullet)
@@ -109,9 +109,9 @@ func (r *Renderer) Render(event Event) {
 		} else {
 			header = style.Error.Bold(true).Render(header)
 		}
-		fmt.Fprintln(r.output, header)
+		fmt.Fprintln(out, header)
 		for _, err := range event.Errors {
-			fmt.Fprintf(r.output, "%s%s\n", style.OutputPrefix, style.Error.Render(err))
+			fmt.Fprintf(out, "%s%s\n", style.OutputPrefix, style.Error.Render(err))
 		}
 	} else {
 		// Success header with gradient
@@ -121,18 +121,18 @@ func (r *Renderer) Render(event Event) {
 		} else {
 			header = style.Success.Bold(true).Render(header)
 		}
-		fmt.Fprintln(r.output, header)
+		fmt.Fprintln(out, header)
 	}
 
-	fmt.Fprintf(r.output, "%s%s %.2fs (API: %.2fs)\n",
+	fmt.Fprintf(out, "%s%s %.2fs (API: %.2fs)\n",
 		style.OutputPrefix,
 		style.Muted.Render("Duration:"),
 		float64(event.DurationMS)/1000, float64(event.DurationAPIMS)/1000)
-	fmt.Fprintf(r.output, "%s%s %d\n", style.OutputContinue, style.Muted.Render("Turns:"), event.NumTurns)
-	fmt.Fprintf(r.output, "%s%s $%.4f\n", style.OutputContinue, style.Muted.Render("Cost:"), event.TotalCostUSD)
+	fmt.Fprintf(out, "%s%s %d\n", style.OutputContinue, style.Muted.Render("Turns:"), event.NumTurns)
+	fmt.Fprintf(out, "%s%s $%.4f\n", style.OutputContinue, style.Muted.Render("Cost:"), event.TotalCostUSD)
 
 	if r.showUsage() {
-		fmt.Fprintf(r.output, "%s%s in=%d out=%d (cache: created=%d read=%d)\n",
+		fmt.Fprintf(out, "%s%s in=%d out=%d (cache: created=%d read=%d)\n",
 			style.OutputContinue,
 			style.Muted.Render("Tokens:"),
 			event.Usage.InputTokens, event.Usage.OutputTokens,
@@ -140,14 +140,26 @@ func (r *Renderer) Render(event Event) {
 	}
 
 	if len(event.PermissionDenials) > 0 {
-		fmt.Fprintf(r.output, "%s%s %d\n",
+		fmt.Fprintf(out, "%s%s %d\n",
 			style.OutputContinue,
 			style.Warning.Render("Permission Denials:"),
 			len(event.PermissionDenials))
 		for _, denial := range event.PermissionDenials {
-			fmt.Fprintf(r.output, "%s  - %s (%s)\n", style.OutputContinue, denial.ToolName, denial.ToolUseID)
+			fmt.Fprintf(out, "%s  - %s (%s)\n", style.OutputContinue, denial.ToolName, denial.ToolUseID)
 		}
 	}
+}
+
+// Render outputs the result event using this renderer's configuration
+func (r *Renderer) Render(event Event) {
+	r.renderTo(render.WriterOutput(r.output), event)
+}
+
+// RenderToString renders the result event to a string
+func (r *Renderer) RenderToString(event Event) string {
+	out := render.StringOutput()
+	r.renderTo(out, event)
+	return out.String()
 }
 
 // defaultRenderer is the default renderer used by the Render function
@@ -156,60 +168,6 @@ var defaultRenderer = NewRenderer()
 // Render outputs the result event to the terminal using the default renderer
 func Render(event Event) {
 	defaultRenderer.Render(event)
-}
-
-// RenderToString renders the result event to a string
-func (r *Renderer) RenderToString(event Event) string {
-	var sb strings.Builder
-	sb.WriteString("\n")
-	if event.IsError {
-		// Error header with gradient
-		header := fmt.Sprintf("%sSession Error", style.Bullet)
-		if !r.noColor() {
-			header = style.ApplyErrorGradient(header)
-		} else {
-			header = style.Error.Bold(true).Render(header)
-		}
-		sb.WriteString(header + "\n")
-		for _, err := range event.Errors {
-			sb.WriteString(fmt.Sprintf("%s%s\n", style.OutputPrefix, style.Error.Render(err)))
-		}
-	} else {
-		// Success header with gradient
-		header := fmt.Sprintf("%sSession Complete", style.Bullet)
-		if !r.noColor() {
-			header = style.ApplySuccessGradient(header)
-		} else {
-			header = style.Success.Bold(true).Render(header)
-		}
-		sb.WriteString(header + "\n")
-	}
-
-	sb.WriteString(fmt.Sprintf("%s%s %.2fs (API: %.2fs)\n",
-		style.OutputPrefix,
-		style.Muted.Render("Duration:"),
-		float64(event.DurationMS)/1000, float64(event.DurationAPIMS)/1000))
-	sb.WriteString(fmt.Sprintf("%s%s %d\n", style.OutputContinue, style.Muted.Render("Turns:"), event.NumTurns))
-	sb.WriteString(fmt.Sprintf("%s%s $%.4f\n", style.OutputContinue, style.Muted.Render("Cost:"), event.TotalCostUSD))
-
-	if r.showUsage() {
-		sb.WriteString(fmt.Sprintf("%s%s in=%d out=%d (cache: created=%d read=%d)\n",
-			style.OutputContinue,
-			style.Muted.Render("Tokens:"),
-			event.Usage.InputTokens, event.Usage.OutputTokens,
-			event.Usage.CacheCreationInputTokens, event.Usage.CacheReadInputTokens))
-	}
-
-	if len(event.PermissionDenials) > 0 {
-		sb.WriteString(fmt.Sprintf("%s%s %d\n",
-			style.OutputContinue,
-			style.Warning.Render("Permission Denials:"),
-			len(event.PermissionDenials)))
-		for _, denial := range event.PermissionDenials {
-			sb.WriteString(fmt.Sprintf("%s  - %s (%s)\n", style.OutputContinue, denial.ToolName, denial.ToolUseID))
-		}
-	}
-	return sb.String()
 }
 
 // RenderToString renders the result event to a string using the default renderer
