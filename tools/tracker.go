@@ -96,6 +96,15 @@ type MatchedTool struct {
 	IsNested bool
 }
 
+// RenderToString renders the matched tool header with appropriate nesting.
+// This consolidates the "if nested then X else Y" pattern.
+func (m MatchedTool) RenderToString() (string, ToolContext) {
+	if m.IsNested {
+		return NewHeaderRenderer(WithNested()).RenderBlockToString(m.Block)
+	}
+	return NewHeaderRenderer().RenderBlockToString(m.Block)
+}
+
 // MatchAndRemove finds pending tools by their IDs, removes them from the tracker,
 // and returns information about each matched tool.
 // This is the core matching logic used when processing tool results.
@@ -121,6 +130,15 @@ type OrphanedTool struct {
 	ID       string
 	Block    types.ContentBlock
 	IsNested bool
+}
+
+// RenderToString renders the orphaned tool header with appropriate nesting.
+// This consolidates the "if nested then X else Y" pattern.
+func (o OrphanedTool) RenderToString() (string, ToolContext) {
+	if o.IsNested {
+		return NewHeaderRenderer(WithNested()).RenderBlockToString(o.Block)
+	}
+	return NewHeaderRenderer().RenderBlockToString(o.Block)
 }
 
 // FlushAll removes all pending tools and returns them as orphaned.

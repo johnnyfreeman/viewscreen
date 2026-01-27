@@ -674,3 +674,104 @@ func TestToolUseTracker_MatchFromUserMessage_MultipleResults(t *testing.T) {
 		t.Error("tool-2 should still be in tracker")
 	}
 }
+
+// Tests for MatchedTool.RenderToString
+
+func TestMatchedTool_RenderToString_NonNested(t *testing.T) {
+	matched := MatchedTool{
+		Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
+		IsNested: false,
+	}
+
+	str, ctx := matched.RenderToString()
+
+	// Should produce output (contains tool name)
+	if str == "" {
+		t.Error("RenderToString() should produce non-empty output")
+	}
+	if !containsSubstring(str, "Bash") {
+		t.Errorf("RenderToString() output should contain tool name, got: %q", str)
+	}
+	if ctx.ToolName != "Bash" {
+		t.Errorf("RenderToString() context should have ToolName 'Bash', got %q", ctx.ToolName)
+	}
+}
+
+func TestMatchedTool_RenderToString_Nested(t *testing.T) {
+	matched := MatchedTool{
+		Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
+		IsNested: true,
+	}
+
+	str, ctx := matched.RenderToString()
+
+	// Should produce output with nested prefix
+	if str == "" {
+		t.Error("RenderToString() should produce non-empty output")
+	}
+	if !containsSubstring(str, "Read") {
+		t.Errorf("RenderToString() output should contain tool name, got: %q", str)
+	}
+	if ctx.ToolName != "Read" {
+		t.Errorf("RenderToString() context should have ToolName 'Read', got %q", ctx.ToolName)
+	}
+}
+
+// Tests for OrphanedTool.RenderToString
+
+func TestOrphanedTool_RenderToString_NonNested(t *testing.T) {
+	orphaned := OrphanedTool{
+		ID:       "tool-123",
+		Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
+		IsNested: false,
+	}
+
+	str, ctx := orphaned.RenderToString()
+
+	// Should produce output (contains tool name)
+	if str == "" {
+		t.Error("RenderToString() should produce non-empty output")
+	}
+	if !containsSubstring(str, "Bash") {
+		t.Errorf("RenderToString() output should contain tool name, got: %q", str)
+	}
+	if ctx.ToolName != "Bash" {
+		t.Errorf("RenderToString() context should have ToolName 'Bash', got %q", ctx.ToolName)
+	}
+}
+
+func TestOrphanedTool_RenderToString_Nested(t *testing.T) {
+	orphaned := OrphanedTool{
+		ID:       "tool-123",
+		Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
+		IsNested: true,
+	}
+
+	str, ctx := orphaned.RenderToString()
+
+	// Should produce output with nested prefix
+	if str == "" {
+		t.Error("RenderToString() should produce non-empty output")
+	}
+	if !containsSubstring(str, "Read") {
+		t.Errorf("RenderToString() output should contain tool name, got: %q", str)
+	}
+	if ctx.ToolName != "Read" {
+		t.Errorf("RenderToString() context should have ToolName 'Read', got %q", ctx.ToolName)
+	}
+}
+
+// containsSubstring is a helper to check if a string contains a substring
+func containsSubstring(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > 0 && len(substr) > 0 && findSubstring(s, substr)))
+}
+
+func findSubstring(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
