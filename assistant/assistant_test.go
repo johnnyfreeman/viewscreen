@@ -6,8 +6,14 @@ import (
 	"testing"
 
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
+
+func init() {
+	// Initialize style with noColor for consistent test output
+	style.Init(true)
+}
 
 // mockMarkdownRenderer is a test double for MarkdownRendererInterface
 type mockMarkdownRenderer struct {

@@ -6,7 +6,15 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/johnnyfreeman/viewscreen/state"
+	"github.com/johnnyfreeman/viewscreen/style"
 )
+
+func init() {
+	// Initialize style with noColor for consistent test output
+	// Without this, gradient functions produce ANSI codes that make
+	// substring checks fail (e.g., "█ █" becomes "\x1b[...m█\x1b[m\x1b[...m \x1b[m...")
+	style.Init(true)
+}
 
 func newTestSpinner() spinner.Model {
 	s := spinner.New()

@@ -7,11 +7,17 @@ import (
 	"github.com/johnnyfreeman/viewscreen/assistant"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/state"
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/system"
 	"github.com/johnnyfreeman/viewscreen/tools"
 	"github.com/johnnyfreeman/viewscreen/types"
 	"github.com/johnnyfreeman/viewscreen/user"
 )
+
+func init() {
+	// Initialize style with noColor for consistent test output
+	style.Init(true)
+}
 
 func TestNewEventProcessor(t *testing.T) {
 	s := state.NewState()
