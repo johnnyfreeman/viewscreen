@@ -41,15 +41,15 @@ func (m *mockIndicator) Clear() {
 type mockToolHeaderRenderer struct {
 	calls []struct {
 		toolName string
-		input    map[string]interface{}
+		input    map[string]any
 	}
 	returnValue string
 }
 
-func (m *mockToolHeaderRenderer) render(toolName string, input map[string]interface{}) (string, tools.ToolContext) {
+func (m *mockToolHeaderRenderer) render(toolName string, input map[string]any) (string, tools.ToolContext) {
 	m.calls = append(m.calls, struct {
 		toolName string
-		input    map[string]interface{}
+		input    map[string]any
 	}{toolName, input})
 	return m.returnValue, tools.ToolContext{ToolName: toolName}
 }
@@ -91,8 +91,8 @@ func TestNewRenderer(t *testing.T) {
 		t.Fatal("NewRenderer returned nil")
 	}
 
-	if r.CurrentBlockIndex != -1 {
-		t.Errorf("expected CurrentBlockIndex to be -1, got %d", r.CurrentBlockIndex)
+	if r.block == nil {
+		t.Error("expected block state to be non-nil")
 	}
 
 	if r.markdownRenderer == nil {
@@ -142,7 +142,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with custom tool header renderer", func(t *testing.T) {
 		called := false
-		custom := func(toolName string, input map[string]interface{}) (string, tools.ToolContext) {
+		custom := func(toolName string, input map[string]any) (string, tools.ToolContext) {
 			called = true
 			return "rendered", tools.ToolContext{ToolName: toolName}
 		}
@@ -167,10 +167,10 @@ func TestRenderer_Render_MessageStart(t *testing.T) {
 	// Should not panic or change state
 	r.Render(event)
 
-	if r.InTextBlock {
+	if r.InTextBlock() {
 		t.Error("InTextBlock should remain false")
 	}
-	if r.InToolUseBlock {
+	if r.InToolUseBlock() {
 		t.Error("InToolUseBlock should remain false")
 	}
 }
@@ -188,17 +188,17 @@ func TestRenderer_Render_ContentBlockStart_Text(t *testing.T) {
 
 	r.Render(event)
 
-	if !r.InTextBlock {
+	if !r.InTextBlock() {
 		t.Error("expected InTextBlock to be true")
 	}
-	if r.InToolUseBlock {
+	if r.InToolUseBlock() {
 		t.Error("expected InToolUseBlock to be false")
 	}
-	if r.CurrentBlockIndex != 0 {
-		t.Errorf("expected CurrentBlockIndex to be 0, got %d", r.CurrentBlockIndex)
+	if r.block.Index() != 0 {
+		t.Errorf("expected block index to be 0, got %d", r.block.Index())
 	}
-	if r.CurrentBlockType != "text" {
-		t.Errorf("expected CurrentBlockType to be 'text', got %s", r.CurrentBlockType)
+	if r.CurrentBlockType() != "text" {
+		t.Errorf("expected CurrentBlockType to be 'text', got %s", r.CurrentBlockType())
 	}
 }
 
@@ -215,14 +215,14 @@ func TestRenderer_Render_ContentBlockStart_ToolUse(t *testing.T) {
 
 	r.Render(event)
 
-	if r.InTextBlock {
+	if r.InTextBlock() {
 		t.Error("expected InTextBlock to be false")
 	}
-	if !r.InToolUseBlock {
+	if !r.InToolUseBlock() {
 		t.Error("expected InToolUseBlock to be true")
 	}
-	if r.toolName != "Read" {
-		t.Errorf("expected toolName to be 'Read', got %s", r.toolName)
+	if r.block.ToolName() != "Read" {
+		t.Errorf("expected toolName to be 'Read', got %s", r.block.ToolName())
 	}
 }
 
@@ -240,7 +240,7 @@ func TestRenderer_Render_ContentBlockStart_InvalidJSON(t *testing.T) {
 	// Should not panic
 	r.Render(event)
 
-	if r.InTextBlock {
+	if r.InTextBlock() {
 		t.Error("InTextBlock should remain false with invalid JSON")
 	}
 }
@@ -249,9 +249,14 @@ func TestRenderer_Render_ContentBlockDelta_TextDelta(t *testing.T) {
 	indicator := &mockIndicator{}
 	r := NewRendererWithOptions(WithIndicator(indicator))
 
-	// First start a text block
-	r.InTextBlock = true
-	r.CurrentBlockIndex = 0
+	// Start a text block via event
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("text", ""),
+		},
+	})
 
 	event := Event{
 		Event: EventData{
@@ -266,8 +271,8 @@ func TestRenderer_Render_ContentBlockDelta_TextDelta(t *testing.T) {
 	if indicator.showCalls != 1 {
 		t.Errorf("expected indicator.Show() to be called once, got %d", indicator.showCalls)
 	}
-	if r.textBuffer.String() != "Hello " {
-		t.Errorf("expected textBuffer to contain 'Hello ', got %q", r.textBuffer.String())
+	if r.GetBufferedText() != "Hello " {
+		t.Errorf("expected textBuffer to contain 'Hello ', got %q", r.GetBufferedText())
 	}
 
 	// Send another delta
@@ -277,18 +282,22 @@ func TestRenderer_Render_ContentBlockDelta_TextDelta(t *testing.T) {
 	if indicator.showCalls != 2 {
 		t.Errorf("expected indicator.Show() to be called twice, got %d", indicator.showCalls)
 	}
-	if r.textBuffer.String() != "Hello World!" {
-		t.Errorf("expected textBuffer to contain 'Hello World!', got %q", r.textBuffer.String())
+	if r.GetBufferedText() != "Hello World!" {
+		t.Errorf("expected textBuffer to contain 'Hello World!', got %q", r.GetBufferedText())
 	}
 }
 
 func TestRenderer_Render_ContentBlockDelta_InputJSONDelta(t *testing.T) {
 	r := NewRendererWithOptions()
 
-	// Start a tool use block
-	r.InToolUseBlock = true
-	r.CurrentBlockIndex = 0
-	r.toolName = "Read"
+	// Start a tool use block via event
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("tool_use", "Read"),
+		},
+	})
 
 	event := Event{
 		Event: EventData{
@@ -300,8 +309,8 @@ func TestRenderer_Render_ContentBlockDelta_InputJSONDelta(t *testing.T) {
 
 	r.Render(event)
 
-	if r.toolInput.String() != `{"file_` {
-		t.Errorf("expected toolInput to contain partial JSON, got %q", r.toolInput.String())
+	if r.block.ToolInput() != `{"file_` {
+		t.Errorf("expected toolInput to contain partial JSON, got %q", r.block.ToolInput())
 	}
 
 	// Send more JSON
@@ -309,8 +318,8 @@ func TestRenderer_Render_ContentBlockDelta_InputJSONDelta(t *testing.T) {
 	r.Render(event)
 
 	expected := `{"file_path": "/test.go"}`
-	if r.toolInput.String() != expected {
-		t.Errorf("expected toolInput to contain %q, got %q", expected, r.toolInput.String())
+	if r.block.ToolInput() != expected {
+		t.Errorf("expected toolInput to contain %q, got %q", expected, r.block.ToolInput())
 	}
 }
 
@@ -325,10 +334,21 @@ func TestRenderer_Render_ContentBlockStop_TextBlock(t *testing.T) {
 		WithMarkdownRenderer(markdown),
 	)
 
-	// Setup: text block with buffered content
-	r.InTextBlock = true
-	r.CurrentBlockIndex = 0
-	r.textBuffer.WriteString("Hello World")
+	// Setup: start text block and buffer content via events
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("text", ""),
+		},
+	})
+	r.Render(Event{
+		Event: EventData{
+			Type:  "content_block_delta",
+			Index: 0,
+			Delta: makeTextDelta("Hello World"),
+		},
+	})
 
 	event := Event{
 		Event: EventData{
@@ -365,9 +385,14 @@ func TestRenderer_Render_ContentBlockStop_TextBlock_Empty(t *testing.T) {
 		WithMarkdownRenderer(markdown),
 	)
 
-	// Setup: text block with no content
-	r.InTextBlock = true
-	r.CurrentBlockIndex = 0
+	// Setup: text block with no deltas (empty content)
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("text", ""),
+		},
+	})
 
 	event := Event{
 		Event: EventData{
@@ -391,11 +416,21 @@ func TestRenderer_Render_ContentBlockStop_ToolUseBlock(t *testing.T) {
 		WithToolHeaderRenderer(toolRenderer.render),
 	)
 
-	// Setup: tool use block with accumulated input
-	r.InToolUseBlock = true
-	r.CurrentBlockIndex = 0
-	r.toolName = "Read"
-	r.toolInput.WriteString(`{"file_path": "/test.go"}`)
+	// Setup: tool use block with accumulated input via events
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("tool_use", "Read"),
+		},
+	})
+	r.Render(Event{
+		Event: EventData{
+			Type:  "content_block_delta",
+			Index: 0,
+			Delta: makeInputJSONDelta(`{"file_path": "/test.go"}`),
+		},
+	})
 
 	event := Event{
 		Event: EventData{
@@ -428,11 +463,21 @@ func TestRenderer_Render_ContentBlockStop_ToolUseBlock_InvalidJSON(t *testing.T)
 		WithToolHeaderRenderer(toolRenderer.render),
 	)
 
-	// Setup: tool use block with invalid JSON
-	r.InToolUseBlock = true
-	r.CurrentBlockIndex = 0
-	r.toolName = "Read"
-	r.toolInput.WriteString(`invalid json`)
+	// Setup: tool use block with invalid JSON via events
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("tool_use", "Read"),
+		},
+	})
+	r.Render(Event{
+		Event: EventData{
+			Type:  "content_block_delta",
+			Index: 0,
+			Delta: makeInputJSONDelta(`invalid json`),
+		},
+	})
 
 	event := Event{
 		Event: EventData{
@@ -461,15 +506,27 @@ func TestRenderer_Render_ContentBlockStop_WrongIndex(t *testing.T) {
 		WithMarkdownRenderer(markdown),
 	)
 
-	// Setup: text block with content but wrong index
-	r.InTextBlock = true
-	r.CurrentBlockIndex = 0
-	r.textBuffer.WriteString("Hello World")
+	// Setup: text block with content
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("text", ""),
+		},
+	})
+	r.Render(Event{
+		Event: EventData{
+			Type:  "content_block_delta",
+			Index: 0,
+			Delta: makeTextDelta("Hello World"),
+		},
+	})
 
+	// Stop with wrong index
 	event := Event{
 		Event: EventData{
 			Type:  "content_block_stop",
-			Index: 1, // Different from CurrentBlockIndex
+			Index: 1, // Different from block index
 		},
 	}
 
@@ -493,14 +550,22 @@ func TestRenderer_Render_MessageDelta(t *testing.T) {
 	// Should not change any state
 	r.Render(event)
 
-	if r.InTextBlock {
+	if r.InTextBlock() {
 		t.Error("InTextBlock should remain false")
 	}
 }
 
 func TestRenderer_Render_MessageStop(t *testing.T) {
 	r := NewRendererWithOptions()
-	r.CurrentBlockIndex = 5
+
+	// Start a block first
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        5,
+			ContentBlock: makeContentBlock("text", ""),
+		},
+	})
 
 	event := Event{
 		Event: EventData{
@@ -510,8 +575,8 @@ func TestRenderer_Render_MessageStop(t *testing.T) {
 
 	r.Render(event)
 
-	if r.CurrentBlockIndex != -1 {
-		t.Errorf("expected CurrentBlockIndex to be reset to -1, got %d", r.CurrentBlockIndex)
+	if r.block.Index() != -1 {
+		t.Errorf("expected block index to be reset to -1, got %d", r.block.Index())
 	}
 }
 
@@ -522,7 +587,21 @@ func TestRenderer_GetBufferedText(t *testing.T) {
 		t.Error("expected empty buffer initially")
 	}
 
-	r.textBuffer.WriteString("test content")
+	// Start text block and add content
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("text", ""),
+		},
+	})
+	r.Render(Event{
+		Event: EventData{
+			Type:  "content_block_delta",
+			Index: 0,
+			Delta: makeTextDelta("test content"),
+		},
+	})
 
 	if r.GetBufferedText() != "test content" {
 		t.Errorf("expected 'test content', got %q", r.GetBufferedText())
@@ -531,15 +610,26 @@ func TestRenderer_GetBufferedText(t *testing.T) {
 
 func TestRenderer_ResetBlockState(t *testing.T) {
 	r := NewRendererWithOptions()
-	r.InTextBlock = true
-	r.InToolUseBlock = true
+
+	// Set up block state via events
+	r.Render(Event{
+		Event: EventData{
+			Type:         "content_block_start",
+			Index:        0,
+			ContentBlock: makeContentBlock("text", ""),
+		},
+	})
+
+	if !r.InTextBlock() {
+		t.Error("expected InTextBlock to be true before reset")
+	}
 
 	r.ResetBlockState()
 
-	if r.InTextBlock {
+	if r.InTextBlock() {
 		t.Error("expected InTextBlock to be false after reset")
 	}
-	if r.InToolUseBlock {
+	if r.InToolUseBlock() {
 		t.Error("expected InToolUseBlock to be false after reset")
 	}
 }
@@ -564,7 +654,7 @@ func TestRenderer_FullTextBlockFlow(t *testing.T) {
 		},
 	})
 
-	if !r.InTextBlock {
+	if !r.InTextBlock() {
 		t.Error("expected InTextBlock after start")
 	}
 
@@ -630,11 +720,11 @@ func TestRenderer_FullToolUseBlockFlow(t *testing.T) {
 		},
 	})
 
-	if !r.InToolUseBlock {
+	if !r.InToolUseBlock() {
 		t.Error("expected InToolUseBlock after start")
 	}
-	if r.toolName != "Bash" {
-		t.Errorf("expected toolName 'Bash', got %q", r.toolName)
+	if r.block.ToolName() != "Bash" {
+		t.Errorf("expected toolName 'Bash', got %q", r.block.ToolName())
 	}
 
 	// 2. Multiple input JSON deltas

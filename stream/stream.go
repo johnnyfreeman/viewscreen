@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/indicator"
@@ -27,7 +26,7 @@ type IndicatorInterface interface {
 
 // ToolHeaderRenderer abstracts tool header rendering for testability.
 // It returns the rendered string (and optional tool context) instead of printing directly.
-type ToolHeaderRenderer func(toolName string, input map[string]interface{}) (string, tools.ToolContext)
+type ToolHeaderRenderer func(toolName string, input map[string]any) (string, tools.ToolContext)
 
 // EventData represents the nested event in stream_event
 type EventData struct {
@@ -65,18 +64,12 @@ type MessageDelta struct {
 
 // Renderer handles rendering stream events and tracks streaming state
 type Renderer struct {
-	CurrentBlockIndex int
-	CurrentBlockType  string
-	InTextBlock       bool
-	InToolUseBlock    bool
-	toolName          string
-	toolInput         strings.Builder
-	textBuffer        strings.Builder
-	markdownRenderer  MarkdownRendererInterface
-	indicator         IndicatorInterface
-	toolHeaderRender  ToolHeaderRenderer
-	output            io.Writer
-	width             int
+	block            *BlockState
+	markdownRenderer MarkdownRendererInterface
+	indicator        IndicatorInterface
+	toolHeaderRender ToolHeaderRenderer
+	output           io.Writer
+	width            int
 }
 
 // NewRenderer creates a new stream Renderer
@@ -84,12 +77,12 @@ func NewRenderer() *Renderer {
 	width := terminal.Width()
 
 	return &Renderer{
-		CurrentBlockIndex: -1,
-		markdownRenderer:  render.NewMarkdownRenderer(config.NoColor, width),
-		indicator:         indicator.NewStreamingIndicator(config.NoColor),
-		toolHeaderRender:  tools.RenderToolHeaderToString,
-		output:            os.Stdout,
-		width:             width,
+		block:            NewBlockState(),
+		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, width),
+		indicator:        indicator.NewStreamingIndicator(config.NoColor),
+		toolHeaderRender: tools.RenderToolHeaderToString,
+		output:           os.Stdout,
+		width:            width,
 	}
 }
 
@@ -139,25 +132,10 @@ func (r *Renderer) renderTo(out *render.Output, event Event, showIndicator bool)
 	switch event.Event.Type {
 	case "message_start":
 		// Message starting, nothing to render
+
 	case "content_block_start":
-		r.CurrentBlockIndex = event.Event.Index
-		// Reset block state flags - only one block type active at a time
-		r.InTextBlock = false
-		r.InToolUseBlock = false
-		if len(event.Event.ContentBlock) > 0 {
-			var block types.ContentBlock
-			if err := json.Unmarshal(event.Event.ContentBlock, &block); err == nil {
-				r.CurrentBlockType = block.Type
-				if block.Type == "text" {
-					r.InTextBlock = true
-					r.textBuffer.Reset()
-				} else if block.Type == "tool_use" {
-					r.InToolUseBlock = true
-					r.toolName = block.Name
-					r.toolInput.Reset()
-				}
-			}
-		}
+		r.block.StartBlock(event.Event.Index, event.Event.ContentBlock)
+
 	case "content_block_delta":
 		if len(event.Event.Delta) > 0 {
 			// Try text delta first
@@ -166,47 +144,47 @@ func (r *Renderer) renderTo(out *render.Output, event Event, showIndicator bool)
 				if showIndicator {
 					r.indicator.Show()
 				}
-				// Buffer text for markdown rendering when block completes
-				r.textBuffer.WriteString(textDelta.Text)
+				r.block.AccumulateText(textDelta.Text)
 				return
 			}
 			// Try input JSON delta
 			var jsonDelta InputJSONDelta
 			if err := json.Unmarshal(event.Event.Delta, &jsonDelta); err == nil && jsonDelta.Type == "input_json_delta" {
-				r.toolInput.WriteString(jsonDelta.PartialJSON)
+				r.block.AccumulateToolInput(jsonDelta.PartialJSON)
 			}
 		}
+
 	case "content_block_stop":
 		if showIndicator {
 			r.indicator.Clear()
 		}
 
-		if r.InTextBlock && event.Event.Index == r.CurrentBlockIndex {
-			// Render buffered text with markdown
-			text := r.textBuffer.String()
+		stoppedType := r.block.StopBlock(event.Event.Index)
+		switch stoppedType {
+		case BlockText:
+			text := r.block.TextContent()
 			if text != "" {
 				rendered := r.markdownRenderer.Render(text)
 				fmt.Fprint(out, rendered)
 			}
-		} else if r.InToolUseBlock && event.Event.Index == r.CurrentBlockIndex {
-			// Parse and display the accumulated tool input with full header
-			var input map[string]interface{}
-			toolInputStr := r.toolInput.String()
-			if err := json.Unmarshal([]byte(toolInputStr), &input); err == nil {
-				str, _ := r.toolHeaderRender(r.toolName, input)
+		case BlockToolUse:
+			if input, ok := r.block.ParseToolInput(); ok {
+				str, _ := r.toolHeaderRender(r.block.ToolName(), input)
 				out.WriteString(str)
 			} else {
 				// Fallback if JSON parse fails
-				fmt.Fprintln(out, style.ApplyThemeBoldGradient(style.Bullet+r.toolName))
+				fmt.Fprintln(out, style.ApplyThemeBoldGradient(style.Bullet+r.block.ToolName()))
 			}
 		}
+
 	case "message_delta":
 		// Contains stop_reason, nothing to render
+
 	case "message_stop":
 		// Message complete
-		// Note: Don't reset InTextBlock/InToolUseBlock here - they persist
-		// until after the assistant event is processed to prevent duplicate rendering
-		r.CurrentBlockIndex = -1
+		// Note: Don't reset block type here - it persists until after
+		// the assistant event is processed to prevent duplicate rendering
+		r.block.ResetMessage()
 	}
 }
 
@@ -217,13 +195,12 @@ func (r *Renderer) Render(event Event) {
 
 // GetBufferedText returns the accumulated text buffer content
 func (r *Renderer) GetBufferedText() string {
-	return r.textBuffer.String()
+	return r.block.TextContent()
 }
 
 // ResetBlockState resets the block tracking state after an assistant event
 func (r *Renderer) ResetBlockState() {
-	r.InTextBlock = false
-	r.InToolUseBlock = false
+	r.block.Reset()
 }
 
 // RenderToString renders the stream event to a string and returns it
@@ -231,4 +208,22 @@ func (r *Renderer) RenderToString(event Event) string {
 	out := render.StringOutput()
 	r.renderTo(out, event, false)
 	return out.String()
+}
+
+// InTextBlock returns true if currently processing a text block.
+// This is used by external code (TUI, parser) to check streaming state.
+func (r *Renderer) InTextBlock() bool {
+	return r.block.InTextBlock()
+}
+
+// InToolUseBlock returns true if currently processing a tool_use block.
+// This is used by external code (TUI, parser) to check streaming state.
+func (r *Renderer) InToolUseBlock() bool {
+	return r.block.InToolUseBlock()
+}
+
+// CurrentBlockType returns the current block type as a string.
+// This is used by external code to query the block type.
+func (r *Renderer) CurrentBlockType() string {
+	return r.block.Type().String()
 }

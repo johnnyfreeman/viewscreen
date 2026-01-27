@@ -121,13 +121,13 @@ func (p *Parser) handleAssistant(line []byte) error {
 	// They will be rendered together with their results
 	for _, block := range event.Message.Content {
 		if block.Type == "tool_use" && block.ID != "" {
-			if !p.streamRenderer.InToolUseBlock {
+			if !p.streamRenderer.InToolUseBlock() {
 				p.pendingTools.Add(block.ID, block, event.ParentToolUseID)
 			}
 		}
 	}
 	// Render text blocks (tool_use rendering is always suppressed)
-	p.assistantRenderer.Render(event, p.streamRenderer.InTextBlock, true)
+	p.assistantRenderer.Render(event, p.streamRenderer.InTextBlock(), true)
 	p.streamRenderer.ResetBlockState()
 	return nil
 }

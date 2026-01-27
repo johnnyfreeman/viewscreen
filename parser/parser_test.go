@@ -420,20 +420,30 @@ func TestParser_Run_StreamRendererIntegration(t *testing.T) {
 	}
 
 	// After processing content_block_start for text, InTextBlock should be true
-	if !sr.InTextBlock {
+	if !sr.InTextBlock() {
 		t.Error("expected InTextBlock to be true after text block start")
 	}
 }
 
 func TestParser_Run_AssistantResetsBlockState(t *testing.T) {
-	// Set up stream renderer with active blocks
 	outputBuf := &bytes.Buffer{}
 	sr := stream.NewRendererWithOptions(stream.WithOutput(outputBuf))
-	sr.InTextBlock = true
-	sr.InToolUseBlock = true
 
-	// Send an assistant event
-	event := map[string]any{
+	// First send a stream event to start a text block
+	streamEvent := map[string]any{
+		"type": "stream_event",
+		"event": map[string]any{
+			"type":  "content_block_start",
+			"index": 0,
+			"content_block": map[string]any{
+				"type": "text",
+			},
+		},
+	}
+	streamEventJSON, _ := json.Marshal(streamEvent)
+
+	// Then send an assistant event
+	assistantEvent := map[string]any{
 		"type": "assistant",
 		"message": map[string]any{
 			"id":      "msg_123",
@@ -443,10 +453,12 @@ func TestParser_Run_AssistantResetsBlockState(t *testing.T) {
 			"content": []any{},
 		},
 	}
-	eventJSON, _ := json.Marshal(event)
+	assistantEventJSON, _ := json.Marshal(assistantEvent)
+
+	input := string(streamEventJSON) + "\n" + string(assistantEventJSON)
 
 	p := NewParserWithOptions(
-		WithInput(strings.NewReader(string(eventJSON))),
+		WithInput(strings.NewReader(input)),
 		WithErrOutput(io.Discard),
 		WithStreamRenderer(sr),
 	)
@@ -457,10 +469,10 @@ func TestParser_Run_AssistantResetsBlockState(t *testing.T) {
 	}
 
 	// After assistant event, block state should be reset
-	if sr.InTextBlock {
+	if sr.InTextBlock() {
 		t.Error("expected InTextBlock to be false after assistant event")
 	}
-	if sr.InToolUseBlock {
+	if sr.InToolUseBlock() {
 		t.Error("expected InToolUseBlock to be false after assistant event")
 	}
 }

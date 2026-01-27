@@ -189,7 +189,7 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		// They'll be rendered with spinner in updateViewportWithPendingTools
 		for _, block := range msg.Event.Message.Content {
 			if block.Type == "tool_use" && block.ID != "" {
-				if !m.streamRenderer.InToolUseBlock {
+				if !m.streamRenderer.InToolUseBlock() {
 					m.pendingTools.Add(block.ID, block, msg.Event.ParentToolUseID)
 					// Set tool state so sidebar shows spinner too
 					m.state.SetCurrentTool(block.Name, tools.GetToolArgFromBlock(block))
@@ -199,7 +199,7 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		// Render text blocks only (tools are buffered)
 		rendered := m.assistantRenderer.RenderToString(
 			msg.Event,
-			m.streamRenderer.InTextBlock,
+			m.streamRenderer.InTextBlock(),
 			true, // Suppress tool rendering - we handle it separately
 		)
 		m.content.WriteString(rendered)
@@ -256,8 +256,8 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 		// Update state for tool progress tracking
-		if msg.Event.Event.Type == "content_block_start" && m.streamRenderer.InToolUseBlock {
-			m.state.SetCurrentTool(m.streamRenderer.CurrentBlockType, "")
+		if msg.Event.Event.Type == "content_block_start" && m.streamRenderer.InToolUseBlock() {
+			m.state.SetCurrentTool(m.streamRenderer.CurrentBlockType(), "")
 		}
 
 	case ResultEventMsg:
