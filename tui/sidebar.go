@@ -17,14 +17,6 @@ import (
 	"github.com/johnnyfreeman/viewscreen/textutil"
 )
 
-// Logo - "viewscreen" in big ASCII art
-var logoLines = []string{
-	"█ █ █ █▀▀ █ █ █",
-	"▀▄▀ █ ██▄ ▀▄▀▄▀",
-	"█▀ █▀▀ █▀█ █▀▀ █▀▀ █▄ █",
-	"▄█ █▄▄ █▀▄ ██▄ ██▄ █ ▀█",
-}
-
 const (
 	sidebarWidth    = 30
 	breakpointWidth = 80 // below this, use header mode
@@ -58,48 +50,33 @@ func NewSidebarStyles() SidebarStyles {
 	}
 }
 
-// SidebarRenderer renders individual sidebar sections.
-// Each method is independent and testable.
+// SidebarRenderer renders the sidebar by composing focused sub-renderers.
+// Each sub-renderer (LogoRenderer, TodoRenderer) handles one concern.
 type SidebarRenderer struct {
 	styles  SidebarStyles
 	width   int
+	logo    *LogoRenderer
+	todo    *TodoRenderer
 	spinner spinner.Model
 }
 
-// NewSidebarRenderer creates a new sidebar renderer
+// NewSidebarRenderer creates a new sidebar renderer with composed sub-renderers.
 func NewSidebarRenderer(styles SidebarStyles, spinner spinner.Model) *SidebarRenderer {
 	return &SidebarRenderer{
 		styles:  styles,
 		width:   sidebarWidth,
+		logo:    NewLogoRenderer(),
+		todo:    NewTodoRenderer(sidebarWidth, spinner),
 		spinner: spinner,
 	}
 }
 
-// RenderLogo renders the ASCII logo with gradient and decorations.
-// Uses Ultraviolet for text styling to avoid escape sequence conflicts.
+// RenderLogo delegates to the LogoRenderer.
 func (r *SidebarRenderer) RenderLogo() string {
-	var sb strings.Builder
-
-	deco := "· · · · · · · · · · · · ·"
-
-	sb.WriteString(style.SidebarDecoText(deco))
-	sb.WriteString("\n")
-	sb.WriteString(style.MutedText("claude"))
-	sb.WriteString("\n")
-
-	for _, line := range logoLines {
-		sb.WriteString(style.ApplyThemeBoldGradient(line))
-		sb.WriteString("\n")
-	}
-
-	sb.WriteString(style.SidebarDecoText(deco))
-	sb.WriteString("\n")
-
-	return sb.String()
+	return r.logo.Render()
 }
 
 // RenderPrompt renders the user's prompt if available.
-// Uses Ultraviolet for text styling.
 func (r *SidebarRenderer) RenderPrompt(prompt string) string {
 	if prompt == "" {
 		return ""
@@ -109,13 +86,12 @@ func (r *SidebarRenderer) RenderPrompt(prompt string) string {
 }
 
 // RenderLabelValue renders a label/value pair (used for model, turns, cost).
-// Uses Ultraviolet for text styling.
 func (r *SidebarRenderer) RenderLabelValue(label, value string) string {
 	return style.SidebarHeaderText(label) + "\n" +
 		style.SidebarValueText(value) + "\n\n"
 }
 
-// RenderSessionInfo renders model, turns, and cost
+// RenderSessionInfo renders model, turns, and cost.
 func (r *SidebarRenderer) RenderSessionInfo(model string, turns int, cost float64) string {
 	var sb strings.Builder
 
@@ -133,7 +109,6 @@ func (r *SidebarRenderer) RenderSessionInfo(model string, turns int, cost float6
 }
 
 // RenderCurrentTool renders the currently running tool with spinner.
-// Uses Ultraviolet for text styling.
 func (r *SidebarRenderer) RenderCurrentTool(toolName, toolInput string) string {
 	if toolName == "" {
 		return ""
@@ -156,61 +131,17 @@ func (r *SidebarRenderer) RenderCurrentTool(toolName, toolInput string) string {
 	return sb.String()
 }
 
-// RenderTodo renders a single todo item.
-// Uses Ultraviolet for text styling.
+// RenderTodo delegates to the TodoRenderer.
 func (r *SidebarRenderer) RenderTodo(todo state.Todo) string {
-	var sb strings.Builder
-	maxWidth := r.width - 6
-
-	switch todo.Status {
-	case "completed":
-		sb.WriteString(style.SuccessText("✓ "))
-		text := todo.Subject
-		if text == "" {
-			text = todo.ActiveForm
-		}
-		sb.WriteString(style.SidebarTodoDoneText(textutil.Truncate(text, maxWidth)))
-
-	case "in_progress":
-		sb.WriteString(r.spinner.View())
-		text := todo.ActiveForm
-		if text == "" {
-			text = todo.Subject
-		}
-		sb.WriteString(style.SidebarTodoActiveText(textutil.Truncate(text, maxWidth)))
-
-	default: // pending
-		sb.WriteString(style.SidebarTodoPendingText("○ "))
-		text := todo.Subject
-		if text == "" {
-			text = todo.ActiveForm
-		}
-		sb.WriteString(style.SidebarTodoPendingText(textutil.Truncate(text, maxWidth)))
-	}
-
-	sb.WriteString("\n")
-	return sb.String()
+	return r.todo.RenderItem(todo)
 }
 
-// RenderTodos renders the todo list section.
-// Uses Ultraviolet for text styling.
+// RenderTodos delegates to the TodoRenderer.
 func (r *SidebarRenderer) RenderTodos(todos []state.Todo) string {
-	if len(todos) == 0 {
-		return ""
-	}
-
-	var sb strings.Builder
-	sb.WriteString(style.SidebarHeaderText("Tasks"))
-	sb.WriteString("\n")
-
-	for _, todo := range todos {
-		sb.WriteString(r.RenderTodo(todo))
-	}
-
-	return sb.String()
+	return r.todo.RenderList(todos)
 }
 
-// Render renders the complete sidebar
+// Render renders the complete sidebar by composing all sections.
 func (r *SidebarRenderer) Render(s *state.State, height int) string {
 	var sb strings.Builder
 
@@ -256,6 +187,8 @@ func NewHeaderStyles() HeaderStyles {
 // RenderHeader renders a single-line header for narrow terminals.
 // Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 ─── [d] ───
 func RenderHeader(s *state.State, width int) string {
+	logo := NewLogoRenderer()
+
 	// Build the info section: model │ turns │ cost
 	model := s.Model
 	maxModelLen := 15
@@ -271,7 +204,7 @@ func RenderHeader(s *state.State, width int) string {
 		s.TotalCost)
 
 	// Fixed parts
-	title := style.ApplyThemeBoldGradient("VIEWSCREEN")
+	title := logo.RenderTitle()
 	keyHint := style.MutedText("[d]")
 
 	// Calculate decoration lengths
