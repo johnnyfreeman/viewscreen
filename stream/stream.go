@@ -15,10 +15,8 @@ import (
 	"golang.org/x/term"
 )
 
-// MarkdownRendererInterface abstracts markdown rendering for testability
-type MarkdownRendererInterface interface {
-	Render(content string) string
-}
+// MarkdownRendererInterface is an alias for types.MarkdownRenderer for backward compatibility.
+type MarkdownRendererInterface = types.MarkdownRenderer
 
 // IndicatorInterface abstracts the streaming indicator for testability
 type IndicatorInterface interface {

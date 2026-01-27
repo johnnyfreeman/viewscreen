@@ -163,10 +163,8 @@ type ToolContext struct {
 	ToolPath string
 }
 
-// MarkdownRenderer abstracts markdown rendering for testability
-type MarkdownRenderer interface {
-	Render(content string) string
-}
+// MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
+type MarkdownRenderer = types.MarkdownRenderer
 
 // Renderer handles rendering user events
 type Renderer struct {

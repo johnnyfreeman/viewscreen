@@ -14,6 +14,9 @@ import (
 	"golang.org/x/term"
 )
 
+// MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
+type MarkdownRenderer = types.MarkdownRenderer
+
 // Message represents the message object in assistant events
 type Message struct {
 	Model      string               `json:"model"`
@@ -32,10 +35,6 @@ type Event struct {
 	Error   string  `json:"error,omitempty"`
 }
 
-// MarkdownRendererInterface abstracts markdown rendering for testability
-type MarkdownRendererInterface interface {
-	Render(content string) string
-}
 
 // ToolUseRenderer is a function type for rendering tool use blocks to a writer
 type ToolUseRenderer func(out *render.Output, block types.ContentBlock)
@@ -43,7 +42,7 @@ type ToolUseRenderer func(out *render.Output, block types.ContentBlock)
 // Renderer handles rendering assistant events
 type Renderer struct {
 	output           io.Writer
-	markdownRenderer MarkdownRendererInterface
+	markdownRenderer types.MarkdownRenderer
 	toolUseRenderer  ToolUseRenderer
 }
 
@@ -58,7 +57,7 @@ func WithOutput(w io.Writer) RendererOption {
 }
 
 // WithMarkdownRenderer sets a custom markdown renderer
-func WithMarkdownRenderer(mr MarkdownRendererInterface) RendererOption {
+func WithMarkdownRenderer(mr types.MarkdownRenderer) RendererOption {
 	return func(r *Renderer) {
 		r.markdownRenderer = mr
 	}
