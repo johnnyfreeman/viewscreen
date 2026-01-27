@@ -8,6 +8,13 @@ import (
 	"github.com/johnnyfreeman/viewscreen/render"
 )
 
+// WriteResult represents the tool_use_result for Write operations
+type WriteResult struct {
+	Type     string `json:"type"` // "create" for new files
+	FilePath string `json:"filePath"`
+	Content  string `json:"content"`
+}
+
 // WriteRenderer handles rendering of write/create results.
 type WriteRenderer struct {
 	styleApplier render.StyleApplier

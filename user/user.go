@@ -71,43 +71,6 @@ type Message struct {
 	Content []ToolResultContent `json:"content"`
 }
 
-// PatchHunk represents a single hunk in a structured patch
-type PatchHunk struct {
-	OldStart int      `json:"oldStart"`
-	OldLines int      `json:"oldLines"`
-	NewStart int      `json:"newStart"`
-	NewLines int      `json:"newLines"`
-	Lines    []string `json:"lines"`
-}
-
-// EditResult represents the tool_use_result for Edit operations
-type EditResult struct {
-	FilePath        string      `json:"filePath"`
-	OldString       string      `json:"oldString"`
-	NewString       string      `json:"newString"`
-	StructuredPatch []PatchHunk `json:"structuredPatch"`
-}
-
-// WriteResult represents the tool_use_result for Write operations
-type WriteResult struct {
-	Type     string `json:"type"` // "create" for new files
-	FilePath string `json:"filePath"`
-	Content  string `json:"content"`
-}
-
-// Todo represents a single todo item
-type Todo struct {
-	Content    string `json:"content"`
-	Status     string `json:"status"` // "pending", "in_progress", "completed"
-	ActiveForm string `json:"activeForm"`
-}
-
-// TodoResult represents the tool_use_result for TodoWrite operations
-type TodoResult struct {
-	OldTodos []Todo `json:"oldTodos"`
-	NewTodos []Todo `json:"newTodos"`
-}
-
 // Event represents a user (tool result) event
 type Event struct {
 	types.BaseEvent

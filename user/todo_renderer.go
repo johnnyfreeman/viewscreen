@@ -7,6 +7,19 @@ import (
 	"github.com/johnnyfreeman/viewscreen/render"
 )
 
+// Todo represents a single todo item
+type Todo struct {
+	Content    string `json:"content"`
+	Status     string `json:"status"` // "pending", "in_progress", "completed"
+	ActiveForm string `json:"activeForm"`
+}
+
+// TodoResult represents the tool_use_result for TodoWrite operations
+type TodoResult struct {
+	OldTodos []Todo `json:"oldTodos"`
+	NewTodos []Todo `json:"newTodos"`
+}
+
 // TodoRenderer handles rendering of todo results with visual status indicators.
 type TodoRenderer struct {
 	styleApplier render.StyleApplier

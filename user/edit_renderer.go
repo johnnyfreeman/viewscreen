@@ -8,6 +8,23 @@ import (
 	"github.com/johnnyfreeman/viewscreen/textutil"
 )
 
+// PatchHunk represents a single hunk in a structured patch
+type PatchHunk struct {
+	OldStart int      `json:"oldStart"`
+	OldLines int      `json:"oldLines"`
+	NewStart int      `json:"newStart"`
+	NewLines int      `json:"newLines"`
+	Lines    []string `json:"lines"`
+}
+
+// EditResult represents the tool_use_result for Edit operations
+type EditResult struct {
+	FilePath        string      `json:"filePath"`
+	OldString       string      `json:"oldString"`
+	NewString       string      `json:"newString"`
+	StructuredPatch []PatchHunk `json:"structuredPatch"`
+}
+
 // EditRenderer handles rendering of edit results with syntax-highlighted diffs.
 type EditRenderer struct {
 	styleApplier render.StyleApplier
