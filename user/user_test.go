@@ -116,22 +116,16 @@ func TestToolResultContent_ContentWithFields(t *testing.T) {
 	}
 }
 
-func TestSetToolContext(t *testing.T) {
-	// Reset after test
-	originalToolName := lastToolName
-	originalToolPath := lastToolPath
-	defer func() {
-		lastToolName = originalToolName
-		lastToolPath = originalToolPath
-	}()
+func TestRendererSetToolContext(t *testing.T) {
+	r := NewRenderer()
 
-	SetToolContext("Read", "/path/to/file.go")
+	r.SetToolContext("Read", "/path/to/file.go")
 
-	if lastToolName != "Read" {
-		t.Errorf("lastToolName = %q, expected %q", lastToolName, "Read")
+	if r.toolContext.ToolName != "Read" {
+		t.Errorf("ToolName = %q, expected %q", r.toolContext.ToolName, "Read")
 	}
-	if lastToolPath != "/path/to/file.go" {
-		t.Errorf("lastToolPath = %q, expected %q", lastToolPath, "/path/to/file.go")
+	if r.toolContext.ToolPath != "/path/to/file.go" {
+		t.Errorf("ToolPath = %q, expected %q", r.toolContext.ToolPath, "/path/to/file.go")
 	}
 }
 
@@ -1293,34 +1287,27 @@ func TestWriteResult_Unmarshaling(t *testing.T) {
 	}
 }
 
-func TestPackageLevelSetToolContext(t *testing.T) {
-	// Reset package state after test
-	originalToolName := lastToolName
-	originalToolPath := lastToolPath
-	originalRenderer := defaultRenderer
-	defer func() {
-		lastToolName = originalToolName
-		lastToolPath = originalToolPath
-		defaultRenderer = originalRenderer
-	}()
+func TestRendererSetToolContextMultiple(t *testing.T) {
+	r := NewRenderer()
 
-	// Test without default renderer
-	defaultRenderer = nil
-	SetToolContext("Bash", "/script.sh")
+	// Set initial context
+	r.SetToolContext("Bash", "/script.sh")
 
-	if lastToolName != "Bash" {
-		t.Errorf("lastToolName = %q, expected %q", lastToolName, "Bash")
+	if r.toolContext.ToolName != "Bash" {
+		t.Errorf("ToolName = %q, expected %q", r.toolContext.ToolName, "Bash")
 	}
-	if lastToolPath != "/script.sh" {
-		t.Errorf("lastToolPath = %q, expected %q", lastToolPath, "/script.sh")
+	if r.toolContext.ToolPath != "/script.sh" {
+		t.Errorf("ToolPath = %q, expected %q", r.toolContext.ToolPath, "/script.sh")
 	}
 
-	// Test with default renderer
-	defaultRenderer = NewRenderer()
-	SetToolContext("Read", "/file.go")
+	// Update context
+	r.SetToolContext("Read", "/file.go")
 
-	if defaultRenderer.toolContext.ToolName != "Read" {
-		t.Errorf("renderer ToolName = %q, expected %q", defaultRenderer.toolContext.ToolName, "Read")
+	if r.toolContext.ToolName != "Read" {
+		t.Errorf("ToolName = %q, expected %q", r.toolContext.ToolName, "Read")
+	}
+	if r.toolContext.ToolPath != "/file.go" {
+		t.Errorf("ToolPath = %q, expected %q", r.toolContext.ToolPath, "/file.go")
 	}
 }
 

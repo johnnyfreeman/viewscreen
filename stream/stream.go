@@ -25,8 +25,8 @@ type IndicatorInterface interface {
 }
 
 // ToolHeaderRenderer abstracts tool header rendering for testability.
-// It returns the rendered string instead of printing directly.
-type ToolHeaderRenderer func(toolName string, input map[string]interface{}) string
+// It returns the rendered string (and optional tool context) instead of printing directly.
+type ToolHeaderRenderer func(toolName string, input map[string]interface{}) (string, tools.ToolContext)
 
 // EventData represents the nested event in stream_event
 type EventData struct {
@@ -196,7 +196,8 @@ func (r *Renderer) renderTo(out *render.Output, event Event, showIndicator bool)
 			var input map[string]interface{}
 			toolInputStr := r.toolInput.String()
 			if err := json.Unmarshal([]byte(toolInputStr), &input); err == nil {
-				out.WriteString(r.toolHeaderRender(r.toolName, input))
+				str, _ := r.toolHeaderRender(r.toolName, input)
+				out.WriteString(str)
 			} else {
 				// Fallback if JSON parse fails
 				fmt.Fprintln(out, style.ApplyThemeBoldGradient(style.Bullet+r.toolName))

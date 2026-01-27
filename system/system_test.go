@@ -500,36 +500,6 @@ func TestEvent_JSONUnmarshal(t *testing.T) {
 	}
 }
 
-func TestPackageLevelRender(t *testing.T) {
-	// Reset default renderer to ensure clean state
-	defaultRenderer = nil
-
-	// The package-level Render function should work without panicking
-	event := Event{
-		Model:             "claude-3-opus",
-		ClaudeCodeVersion: "1.0.0",
-		CWD:               "/test",
-		Tools:             []string{},
-	}
-
-	// Should not panic (output goes to os.Stdout which we can't easily capture here)
-	Render(event)
-}
-
-func TestGetDefaultRenderer(t *testing.T) {
-	// Reset to test lazy initialization
-	defaultRenderer = nil
-
-	r1 := getDefaultRenderer()
-	if r1 == nil {
-		t.Fatal("expected non-nil renderer")
-	}
-
-	r2 := getDefaultRenderer()
-	if r1 != r2 {
-		t.Error("expected same renderer instance on subsequent calls")
-	}
-}
 
 func TestDefaultStyleApplier(t *testing.T) {
 	dsa := render.DefaultStyleApplier{}

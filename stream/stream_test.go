@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/tools"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
@@ -45,12 +46,12 @@ type mockToolHeaderRenderer struct {
 	returnValue string
 }
 
-func (m *mockToolHeaderRenderer) render(toolName string, input map[string]interface{}) string {
+func (m *mockToolHeaderRenderer) render(toolName string, input map[string]interface{}) (string, tools.ToolContext) {
 	m.calls = append(m.calls, struct {
 		toolName string
 		input    map[string]interface{}
 	}{toolName, input})
-	return m.returnValue
+	return m.returnValue, tools.ToolContext{ToolName: toolName}
 }
 
 // Helper to create a content block JSON
@@ -141,9 +142,9 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with custom tool header renderer", func(t *testing.T) {
 		called := false
-		custom := func(toolName string, input map[string]interface{}) string {
+		custom := func(toolName string, input map[string]interface{}) (string, tools.ToolContext) {
 			called = true
-			return "rendered"
+			return "rendered", tools.ToolContext{ToolName: toolName}
 		}
 		r := NewRendererWithOptions(WithToolHeaderRenderer(custom))
 

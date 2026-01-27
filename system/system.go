@@ -115,22 +115,3 @@ func (r *Renderer) RenderToString(event Event) string {
 	return out.String()
 }
 
-// Package-level renderer for backward compatibility
-var defaultRenderer *Renderer
-
-func getDefaultRenderer() *Renderer {
-	if defaultRenderer == nil {
-		defaultRenderer = NewRenderer()
-	}
-	return defaultRenderer
-}
-
-// Render is a package-level convenience function for backward compatibility
-func Render(event Event) {
-	getDefaultRenderer().Render(event)
-}
-
-// RenderToString is a package-level convenience function for backward compatibility
-func RenderToString(event Event) string {
-	return getDefaultRenderer().RenderToString(event)
-}

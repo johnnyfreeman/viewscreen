@@ -28,6 +28,12 @@ type Parser struct {
 	eventHandler   EventHandler
 	pendingTools   *tools.ToolUseTracker
 	dispatcher     *EventDispatcher
+
+	// Renderers for each event type
+	systemRenderer    *system.Renderer
+	assistantRenderer *assistant.Renderer
+	userRenderer      *user.Renderer
+	resultRenderer    *result.Renderer
 }
 
 // Option configures a Parser
@@ -69,10 +75,14 @@ func NewParser() *Parser {
 // NewParserWithOptions creates a new Parser with custom options
 func NewParserWithOptions(opts ...Option) *Parser {
 	p := &Parser{
-		input:          os.Stdin,
-		errOutput:      os.Stderr,
-		streamRenderer: stream.NewRenderer(),
-		pendingTools:   tools.NewToolUseTracker(),
+		input:             os.Stdin,
+		errOutput:         os.Stderr,
+		streamRenderer:    stream.NewRenderer(),
+		pendingTools:      tools.NewToolUseTracker(),
+		systemRenderer:    system.NewRenderer(),
+		assistantRenderer: assistant.NewRenderer(),
+		userRenderer:      user.NewRenderer(),
+		resultRenderer:    result.NewRenderer(),
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -98,7 +108,7 @@ func (p *Parser) handleSystem(line []byte) error {
 	if err := json.Unmarshal(line, &event); err != nil {
 		return err
 	}
-	system.Render(event)
+	p.systemRenderer.Render(event)
 	return nil
 }
 
@@ -117,7 +127,7 @@ func (p *Parser) handleAssistant(line []byte) error {
 		}
 	}
 	// Render text blocks (tool_use rendering is always suppressed)
-	assistant.Render(event, p.streamRenderer.InTextBlock, true)
+	p.assistantRenderer.Render(event, p.streamRenderer.InTextBlock, true)
 	p.streamRenderer.ResetBlockState()
 	return nil
 }
@@ -134,20 +144,23 @@ func (p *Parser) handleUser(line []byte) error {
 			if pending, ok := p.pendingTools.Get(content.ToolUseID); ok {
 				// Check if this is a nested tool (parent is still pending)
 				isNested = p.pendingTools.IsNested(pending)
+				var ctx tools.ToolContext
 				if isNested {
-					tools.RenderNestedToolUse(pending.Block)
+					ctx = tools.RenderNestedToolUse(pending.Block)
 				} else {
-					tools.RenderToolUse(pending.Block)
+					ctx = tools.RenderToolUse(pending.Block)
 				}
+				// Set tool context on the user renderer for syntax highlighting
+				p.userRenderer.SetToolContext(ctx.ToolName, ctx.FilePath)
 				p.pendingTools.Remove(content.ToolUseID)
 			}
 		}
 	}
 	// Render the tool result (with nested prefix if applicable)
 	if isNested {
-		user.RenderNested(event)
+		p.userRenderer.RenderNested(event)
 	} else {
-		user.Render(event)
+		p.userRenderer.Render(event)
 	}
 	return nil
 }
@@ -172,7 +185,7 @@ func (p *Parser) handleResult(line []byte) error {
 	if err := json.Unmarshal(line, &event); err != nil {
 		return err
 	}
-	result.Render(event)
+	p.resultRenderer.Render(event)
 	return nil
 }
 

@@ -173,7 +173,7 @@ func TestRenderToolHeaderToString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output := RenderToolHeaderToString(tt.toolName, tt.input)
+			output, _ := RenderToolHeaderToString(tt.toolName, tt.input)
 
 			for _, want := range tt.wantContains {
 				if !strings.Contains(output, want) {
@@ -248,7 +248,7 @@ func TestRenderToolHeaderTruncation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output := RenderToolHeaderToString(tt.toolName, tt.input)
+			output, _ := RenderToolHeaderToString(tt.toolName, tt.input)
 
 			hasTrunc := strings.Contains(output, "...")
 			if hasTrunc != tt.wantTrunc {
@@ -360,7 +360,7 @@ func TestRenderToolUseToString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output := RenderToolUseToString(tt.block)
+			output, _ := RenderToolUseToString(tt.block)
 
 			for _, want := range tt.wantContains {
 				if !strings.Contains(output, want) {
@@ -413,7 +413,7 @@ func TestRenderNestedToolUseToString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output := RenderNestedToolUseToString(tt.block)
+			output, _ := RenderNestedToolUseToString(tt.block)
 
 			for _, want := range tt.wantContains {
 				if !strings.Contains(output, want) {
@@ -431,21 +431,21 @@ func TestRenderNestedToolUseToString(t *testing.T) {
 func TestFunctionSignatures(t *testing.T) {
 	// Verify that the function signatures match what callers expect
 	t.Run("RenderToolUse signature", func(t *testing.T) {
-		var fn func(types.ContentBlock) = RenderToolUse
+		var fn func(types.ContentBlock) ToolContext = RenderToolUse
 		if fn == nil {
 			t.Error("RenderToolUse should not be nil")
 		}
 	})
 
 	t.Run("RenderToolHeader signature", func(t *testing.T) {
-		var fn func(string, map[string]any) = RenderToolHeader
+		var fn func(string, map[string]any) ToolContext = RenderToolHeader
 		if fn == nil {
 			t.Error("RenderToolHeader should not be nil")
 		}
 	})
 
 	t.Run("RenderNestedToolUse signature", func(t *testing.T) {
-		var fn func(types.ContentBlock) = RenderNestedToolUse
+		var fn func(types.ContentBlock) ToolContext = RenderNestedToolUse
 		if fn == nil {
 			t.Error("RenderNestedToolUse should not be nil")
 		}

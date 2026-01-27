@@ -576,22 +576,3 @@ func TestRenderer_Render_ErrorWithColor(t *testing.T) {
 		t.Error("expected error message in output")
 	}
 }
-
-func TestDefaultRenderer(t *testing.T) {
-	// Test that defaultRenderer is initialized
-	if defaultRenderer == nil {
-		t.Fatal("defaultRenderer should not be nil")
-	}
-
-	if defaultRenderer.output == nil {
-		t.Error("defaultRenderer.output should not be nil")
-	}
-
-	if defaultRenderer.showUsage == nil {
-		t.Error("defaultRenderer.showUsage should not be nil")
-	}
-
-	if defaultRenderer.styleApplier == nil {
-		t.Error("defaultRenderer.styleApplier should not be nil")
-	}
-}

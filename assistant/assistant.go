@@ -72,7 +72,8 @@ func WithToolUseRenderer(tr ToolUseRenderer) RendererOption {
 
 // defaultToolUseRenderer wraps tools.RenderToolUse to write to an Output
 func defaultToolUseRenderer(out *render.Output, block types.ContentBlock) {
-	out.WriteString(tools.RenderToolUseToString(block))
+	str, _ := tools.RenderToolUseToString(block)
+	out.WriteString(str)
 }
 
 // NewRenderer creates a new assistant Renderer with default dependencies
@@ -132,31 +133,10 @@ func (r *Renderer) Render(event Event, inTextBlock, inToolUseBlock bool) {
 	r.renderTo(render.WriterOutput(r.output), event, inTextBlock, inToolUseBlock)
 }
 
-// Package-level renderer for backward compatibility
-var defaultRenderer *Renderer
-
-func getDefaultRenderer() *Renderer {
-	if defaultRenderer == nil {
-		defaultRenderer = NewRenderer()
-	}
-	return defaultRenderer
-}
-
-// Render is a package-level convenience function for backward compatibility
-// inTextBlock and inToolUseBlock indicate whether we were streaming these block types
-func Render(event Event, inTextBlock, inToolUseBlock bool) {
-	getDefaultRenderer().Render(event, inTextBlock, inToolUseBlock)
-}
-
 // RenderToString renders the assistant event to a string
 // inTextBlock and inToolUseBlock indicate whether we were streaming these block types
 func (r *Renderer) RenderToString(event Event, inTextBlock, inToolUseBlock bool) string {
 	out := render.StringOutput()
 	r.renderTo(out, event, inTextBlock, inToolUseBlock)
 	return out.String()
-}
-
-// RenderToString is a package-level convenience function
-func RenderToString(event Event, inTextBlock, inToolUseBlock bool) string {
-	return getDefaultRenderer().RenderToString(event, inTextBlock, inToolUseBlock)
 }

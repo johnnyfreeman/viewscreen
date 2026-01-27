@@ -410,43 +410,6 @@ func (r *Renderer) highlightContent(content string) string {
 	return r.highlighter.HighlightFile(content, path)
 }
 
-// Package-level state for backward compatibility
-var (
-	lastToolName    string
-	lastToolPath    string
-	defaultRenderer *Renderer
-)
-
-// SetToolContext sets context about the last tool used (called from stream renderer)
-// This is the package-level function for backward compatibility
-func SetToolContext(toolName, path string) {
-	lastToolName = toolName
-	lastToolPath = path
-	// Also update the default renderer if it exists
-	if defaultRenderer != nil {
-		defaultRenderer.SetToolContext(toolName, path)
-	}
-}
-
-func getDefaultRenderer() *Renderer {
-	if defaultRenderer == nil {
-		defaultRenderer = NewRenderer()
-		// Sync the tool context
-		defaultRenderer.SetToolContext(lastToolName, lastToolPath)
-	}
-	return defaultRenderer
-}
-
-// Render is a package-level convenience function for backward compatibility
-func Render(event Event) {
-	getDefaultRenderer().Render(event)
-}
-
-// RenderNested is a package-level convenience function for rendering nested tool results
-func RenderNested(event Event) {
-	getDefaultRenderer().RenderNested(event)
-}
-
 // RenderNestedToString renders the user event with nested indentation
 func (r *Renderer) RenderNestedToString(event Event) string {
 	out := render.StringOutput()
@@ -459,9 +422,4 @@ func (r *Renderer) RenderToString(event Event) string {
 	out := render.StringOutput()
 	r.renderTo(out, event, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
 	return out.String()
-}
-
-// RenderToString is a package-level convenience function for backward compatibility
-func RenderToString(event Event) string {
-	return getDefaultRenderer().RenderToString(event)
 }

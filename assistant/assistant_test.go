@@ -612,32 +612,3 @@ func TestMessage_JSONUnmarshal(t *testing.T) {
 	}
 }
 
-func TestPackageLevelRender(t *testing.T) {
-	// Reset default renderer to ensure clean state
-	defaultRenderer = nil
-
-	// The package-level Render function should work without panicking
-	event := Event{
-		Message: Message{
-			Content: []types.ContentBlock{},
-		},
-	}
-
-	// Should not panic
-	Render(event, false, false)
-}
-
-func TestGetDefaultRenderer(t *testing.T) {
-	// Reset to test lazy initialization
-	defaultRenderer = nil
-
-	r1 := getDefaultRenderer()
-	if r1 == nil {
-		t.Fatal("expected non-nil renderer")
-	}
-
-	r2 := getDefaultRenderer()
-	if r1 != r2 {
-		t.Error("expected same renderer instance on subsequent calls")
-	}
-}

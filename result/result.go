@@ -163,15 +163,3 @@ func (r *Renderer) RenderToString(event Event) string {
 	return out.String()
 }
 
-// defaultRenderer is the default renderer used by the Render function
-var defaultRenderer = NewRenderer()
-
-// Render outputs the result event to the terminal using the default renderer
-func Render(event Event) {
-	defaultRenderer.Render(event)
-}
-
-// RenderToString renders the result event to a string using the default renderer
-func RenderToString(event Event) string {
-	return defaultRenderer.RenderToString(event)
-}

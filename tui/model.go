@@ -217,11 +217,16 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 					// Check if this is a nested tool (parent is still pending)
 					isNested = m.pendingTools.IsNested(pending)
 					// Now write the tool header (with bullet, not spinner)
+					var str string
+					var ctx tools.ToolContext
 					if isNested {
-						m.content.WriteString(tools.RenderNestedToolUseToString(pending.Block))
+						str, ctx = tools.RenderNestedToolUseToString(pending.Block)
 					} else {
-						m.content.WriteString(tools.RenderToolUseToString(pending.Block))
+						str, ctx = tools.RenderToolUseToString(pending.Block)
 					}
+					m.content.WriteString(str)
+					// Set tool context for syntax highlighting of results
+					m.userRenderer.SetToolContext(ctx.ToolName, ctx.FilePath)
 					m.pendingTools.Remove(content.ToolUseID)
 				}
 			}
@@ -259,7 +264,8 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		// Flush any orphaned pending tools before rendering result
 		m.pendingTools.ForEach(func(id string, pending tools.PendingTool) {
 			// Write with bullet (not spinner) since we're done
-			m.content.WriteString(tools.RenderToolUseToString(pending.Block))
+			str, _ := tools.RenderToolUseToString(pending.Block)
+			m.content.WriteString(str)
 			m.content.WriteString(style.OutputPrefix + style.Muted.Render("(no result)") + "\n")
 		})
 		m.pendingTools.Clear()
