@@ -349,7 +349,7 @@ func TestParser_Run_ParseErrorsForEachEventType(t *testing.T) {
 			name:        "invalid stream_event",
 			eventType:   "stream_event",
 			invalidJSON: `{"type":"stream_event","event":"not_an_object"}`,
-			expectedErr: "Error parsing stream event",
+			expectedErr: "Error parsing stream_event event",
 		},
 		{
 			name:        "invalid result event",
