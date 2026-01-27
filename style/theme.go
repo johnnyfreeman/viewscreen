@@ -1,100 +1,103 @@
 package style
 
-import "github.com/charmbracelet/lipgloss"
+// Color is a hex color string (e.g., "#A855F7").
+// This type replaces lipgloss.Color to avoid Lipgloss v1 dependency in the theme.
+// The actual styling is done by Ultraviolet, which accepts color.RGBA.
+type Color string
 
 // Theme defines a color palette for the application
 type Theme struct {
 	// Foreground colors
-	FgBase      lipgloss.Color // Primary text
-	FgMuted     lipgloss.Color // Secondary/dimmed text
-	FgSubtle    lipgloss.Color // Very subtle text (line numbers)
+	FgBase  Color // Primary text
+	FgMuted Color // Secondary/dimmed text
+	FgSubtle Color // Very subtle text (line numbers)
 
 	// Background colors
-	BgBase      lipgloss.Color // Primary background
-	BgSubtle    lipgloss.Color // Subtle background
-	BgOverlay   lipgloss.Color // Overlay/modal background
+	BgBase    Color // Primary background
+	BgSubtle  Color // Subtle background
+	BgOverlay Color // Overlay/modal background
 
 	// Semantic colors
-	Success     lipgloss.Color // Green for success/added
-	Error       lipgloss.Color // Red for errors/removed
-	Warning     lipgloss.Color // Yellow for warnings
-	Info        lipgloss.Color // Cyan for info
-	Accent      lipgloss.Color // Purple/magenta accent (Claude branding)
+	Success Color // Green for success/added
+	Error   Color // Red for errors/removed
+	Warning Color // Yellow for warnings
+	Info    Color // Cyan for info
+	Accent  Color // Purple/magenta accent (Claude branding)
 
 	// Diff-specific colors
-	DiffAddBg   lipgloss.Color // Background for added lines
-	DiffRemoveBg lipgloss.Color // Background for removed lines
+	DiffAddBg    Color // Background for added lines
+	DiffRemoveBg Color // Background for removed lines
 
 	// Gradient colors (for headers)
-	GradientStart lipgloss.Color
-	GradientEnd   lipgloss.Color
+	GradientStart Color
+	GradientEnd   Color
 
 	// Success gradient (for session complete)
-	SuccessGradientStart lipgloss.Color
-	SuccessGradientEnd   lipgloss.Color
+	SuccessGradientStart Color
+	SuccessGradientEnd   Color
 
 	// Error gradient (for session error)
-	ErrorGradientStart lipgloss.Color
-	ErrorGradientEnd   lipgloss.Color
+	ErrorGradientStart Color
+	ErrorGradientEnd   Color
 }
 
 // DefaultTheme is the default color theme using TrueColor hex values
 var DefaultTheme = Theme{
 	// Foreground colors
-	FgBase:      lipgloss.Color("#E4E4E7"), // Zinc-200
-	FgMuted:     lipgloss.Color("#A1A1AA"), // Zinc-400
-	FgSubtle:    lipgloss.Color("#71717A"), // Zinc-500
+	FgBase:   "#E4E4E7", // Zinc-200
+	FgMuted:  "#A1A1AA", // Zinc-400
+	FgSubtle: "#71717A", // Zinc-500
 
 	// Background colors
-	BgBase:      lipgloss.Color("#18181B"), // Zinc-900
-	BgSubtle:    lipgloss.Color("#27272A"), // Zinc-800
-	BgOverlay:   lipgloss.Color("#3F3F46"), // Zinc-700
+	BgBase:    "#18181B", // Zinc-900
+	BgSubtle:  "#27272A", // Zinc-800
+	BgOverlay: "#3F3F46", // Zinc-700
 
 	// Semantic colors
-	Success:     lipgloss.Color("#4ADE80"), // Green-400
-	Error:       lipgloss.Color("#F87171"), // Red-400
-	Warning:     lipgloss.Color("#FACC15"), // Yellow-400
-	Info:        lipgloss.Color("#22D3EE"), // Cyan-400
-	Accent:      lipgloss.Color("#A855F7"), // Purple-500 (Claude-like)
+	Success: "#4ADE80", // Green-400
+	Error:   "#F87171", // Red-400
+	Warning: "#FACC15", // Yellow-400
+	Info:    "#22D3EE", // Cyan-400
+	Accent:  "#A855F7", // Purple-500 (Claude-like)
 
 	// Diff colors (subtle backgrounds)
-	DiffAddBg:    lipgloss.Color("#14532D"), // Green-900
-	DiffRemoveBg: lipgloss.Color("#7F1D1D"), // Red-900
+	DiffAddBg:    "#14532D", // Green-900
+	DiffRemoveBg: "#7F1D1D", // Red-900
 
 	// Gradient (purple to violet-blue)
-	GradientStart: lipgloss.Color("#A855F7"), // Purple-500
-	GradientEnd:   lipgloss.Color("#818CF8"), // Indigo-400
+	GradientStart: "#A855F7", // Purple-500
+	GradientEnd:   "#818CF8", // Indigo-400
 
 	// Success gradient (green to teal)
-	SuccessGradientStart: lipgloss.Color("#4ADE80"), // Green-400
-	SuccessGradientEnd:   lipgloss.Color("#2DD4BF"), // Teal-400
+	SuccessGradientStart: "#4ADE80", // Green-400
+	SuccessGradientEnd:   "#2DD4BF", // Teal-400
 
 	// Error gradient (red to orange)
-	ErrorGradientStart: lipgloss.Color("#F87171"), // Red-400
-	ErrorGradientEnd:   lipgloss.Color("#FB923C"), // Orange-400
+	ErrorGradientStart: "#F87171", // Red-400
+	ErrorGradientEnd:   "#FB923C", // Orange-400
 }
 
 // NoColorTheme is used when color output is disabled
 var NoColorTheme = Theme{
-	FgBase:               lipgloss.Color(""),
-	FgMuted:              lipgloss.Color(""),
-	FgSubtle:             lipgloss.Color(""),
-	BgBase:               lipgloss.Color(""),
-	BgSubtle:             lipgloss.Color(""),
-	BgOverlay:            lipgloss.Color(""),
-	Success:              lipgloss.Color(""),
-	Error:                lipgloss.Color(""),
-	Warning:              lipgloss.Color(""),
-	Info:                 lipgloss.Color(""),
-	Accent:               lipgloss.Color(""),
-	DiffAddBg:            lipgloss.Color(""),
-	DiffRemoveBg:         lipgloss.Color(""),
-	GradientStart:        lipgloss.Color(""),
-	GradientEnd:          lipgloss.Color(""),
-	SuccessGradientStart: lipgloss.Color(""),
-	SuccessGradientEnd:   lipgloss.Color(""),
-	ErrorGradientStart:   lipgloss.Color(""),
-	ErrorGradientEnd:     lipgloss.Color(""),
+	FgBase:               "",
+	FgMuted:              "",
+	FgSubtle:             "",
+	BgBase:               "",
+	BgSubtle:             "",
+	BgOverlay:            "",
+	Success:              "",
+	Error:                "",
+	Warning:              "",
+	Info:                 "",
+	Accent:               "",
+	DiffAddBg:            "",
+	DiffRemoveBg:         "",
+	GradientStart:        "",
+	GradientEnd:          "",
+	SuccessGradientStart: "",
+	SuccessGradientEnd:   "",
+	ErrorGradientStart:   "",
+	ErrorGradientEnd:     "",
 }
 
 // CurrentTheme holds the active theme

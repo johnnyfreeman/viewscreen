@@ -4,7 +4,6 @@ import (
 	"image/color"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/lucasb-eyer/go-colorful"
 )
@@ -14,7 +13,7 @@ import (
 // Uses Ultraviolet for proper style/content separation - this ensures that
 // gradient text can be safely composed with other styles without escape
 // sequence conflicts.
-func applyGradientCore(text string, from, to lipgloss.Color, bold bool) string {
+func applyGradientCore(text string, from, to Color, bold bool) string {
 	if noColor {
 		if bold {
 			return BoldText(text)
@@ -85,7 +84,7 @@ func colorfulToRGBA(c colorful.Color) color.RGBA {
 }
 
 // ApplyGradient applies a horizontal color gradient to text.
-func ApplyGradient(text string, from, to lipgloss.Color) string {
+func ApplyGradient(text string, from, to Color) string {
 	return applyGradientCore(text, from, to, false)
 }
 
@@ -95,7 +94,7 @@ func ApplyThemeGradient(text string) string {
 }
 
 // ApplyBoldGradient applies a bold gradient to text.
-func ApplyBoldGradient(text string, from, to lipgloss.Color) string {
+func ApplyBoldGradient(text string, from, to Color) string {
 	return applyGradientCore(text, from, to, true)
 }
 

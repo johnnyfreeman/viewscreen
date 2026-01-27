@@ -3,8 +3,6 @@ package style
 import (
 	"strings"
 	"testing"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
 func TestInit(t *testing.T) {
@@ -128,8 +126,8 @@ func TestApplyGradient(t *testing.T) {
 	tests := []struct {
 		name         string
 		text         string
-		from         lipgloss.Color
-		to           lipgloss.Color
+		from         Color
+		to           Color
 		disableColor bool
 		wantPlain    bool
 		wantContains string
@@ -137,64 +135,64 @@ func TestApplyGradient(t *testing.T) {
 		{
 			name:         "empty text",
 			text:         "",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("#A855F7"),
+			to:           Color("#22D3EE"),
 			disableColor: false,
 			wantPlain:    true,
 		},
 		{
 			name:         "single character",
 			text:         "A",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("#A855F7"),
+			to:           Color("#22D3EE"),
 			disableColor: false,
 			wantContains: "A",
 		},
 		{
 			name:         "multiple characters",
 			text:         "Hello",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("#A855F7"),
+			to:           Color("#22D3EE"),
 			disableColor: false,
 			wantContains: "H",
 		},
 		{
 			name:         "with color disabled",
 			text:         "Hello",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("#A855F7"),
+			to:           Color("#22D3EE"),
 			disableColor: true,
 			wantPlain:    true,
 		},
 		{
 			name:         "invalid from color",
 			text:         "Test",
-			from:         lipgloss.Color("invalid"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("invalid"),
+			to:           Color("#22D3EE"),
 			disableColor: false,
 			wantPlain:    true,
 		},
 		{
 			name:         "invalid to color",
 			text:         "Test",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("invalid"),
+			from:         Color("#A855F7"),
+			to:           Color("invalid"),
 			disableColor: false,
 			wantPlain:    true,
 		},
 		{
 			name:         "unicode text",
 			text:         "こんにちは",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("#A855F7"),
+			to:           Color("#22D3EE"),
 			disableColor: false,
 			wantContains: "こ",
 		},
 		{
 			name:         "same start and end color",
 			text:         "Test",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#A855F7"),
+			from:         Color("#A855F7"),
+			to:           Color("#A855F7"),
 			disableColor: false,
 			wantContains: "T",
 		},
@@ -227,8 +225,8 @@ func TestApplyBoldGradient(t *testing.T) {
 	tests := []struct {
 		name         string
 		text         string
-		from         lipgloss.Color
-		to           lipgloss.Color
+		from         Color
+		to           Color
 		disableColor bool
 		wantPlain    bool
 		wantContains string
@@ -236,40 +234,40 @@ func TestApplyBoldGradient(t *testing.T) {
 		{
 			name:         "empty text",
 			text:         "",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("#A855F7"),
+			to:           Color("#22D3EE"),
 			disableColor: false,
 			wantPlain:    true,
 		},
 		{
 			name:         "with valid colors",
 			text:         "Hello",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("#A855F7"),
+			to:           Color("#22D3EE"),
 			disableColor: false,
 			wantContains: "H",
 		},
 		{
 			name:         "with color disabled",
 			text:         "Hello",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("#A855F7"),
+			to:           Color("#22D3EE"),
 			disableColor: true,
 			wantContains: "Hello",
 		},
 		{
 			name:         "invalid from color",
 			text:         "Test",
-			from:         lipgloss.Color("bad"),
-			to:           lipgloss.Color("#22D3EE"),
+			from:         Color("bad"),
+			to:           Color("#22D3EE"),
 			disableColor: false,
 			wantContains: "Test",
 		},
 		{
 			name:         "invalid to color",
 			text:         "Test",
-			from:         lipgloss.Color("#A855F7"),
-			to:           lipgloss.Color("bad"),
+			from:         Color("#A855F7"),
+			to:           Color("bad"),
 			disableColor: false,
 			wantContains: "Test",
 		},
@@ -354,9 +352,9 @@ func TestApplyErrorGradient(t *testing.T) {
 func TestSetTheme(t *testing.T) {
 	// Create a custom theme
 	customTheme := Theme{
-		FgBase:   lipgloss.Color("#FFFFFF"),
-		FgMuted:  lipgloss.Color("#888888"),
-		FgSubtle: lipgloss.Color("#444444"),
+		FgBase:   Color("#FFFFFF"),
+		FgMuted:  Color("#888888"),
+		FgSubtle: Color("#444444"),
 	}
 
 	SetTheme(customTheme)

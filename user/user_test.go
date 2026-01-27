@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/content"
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/tools"
 )
 
@@ -436,8 +436,8 @@ func (m mockStyleApplier) LineNumberRender(text string) string    { return "[LN:
 func (m mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
 func (m mockStyleApplier) DiffAddRender(text string) string       { return "[ADD:" + text + "]" }
 func (m mockStyleApplier) DiffRemoveRender(text string) string    { return "[REM:" + text + "]" }
-func (m mockStyleApplier) DiffAddBg() lipgloss.Color              { return lipgloss.Color("#00ff00") }
-func (m mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipgloss.Color("#ff0000") }
+func (m mockStyleApplier) DiffAddBg() style.Color    { return "#00ff00" }
+func (m mockStyleApplier) DiffRemoveBg() style.Color { return "#ff0000" }
 
 // Session/header styles
 func (m mockStyleApplier) SessionHeaderRender(text string) string    { return "[HEADER:" + text + "]" }
@@ -454,10 +454,10 @@ func (m mockCodeHighlighter) Highlight(code, language string) string { return co
 func (m mockCodeHighlighter) HighlightFile(code, filename string) string {
 	return code
 }
-func (m mockCodeHighlighter) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
+func (m mockCodeHighlighter) HighlightWithBg(code, language string, bgColor style.Color) string {
 	return code
 }
-func (m mockCodeHighlighter) HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string {
+func (m mockCodeHighlighter) HighlightFileWithBg(code, filename string, bgColor style.Color) string {
 	return code
 }
 
@@ -904,11 +904,11 @@ func (t *trackingHighlighter) HighlightFile(code, filename string) string {
 	return code
 }
 
-func (t *trackingHighlighter) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
+func (t *trackingHighlighter) HighlightWithBg(code, language string, bgColor style.Color) string {
 	return code
 }
 
-func (t *trackingHighlighter) HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string {
+func (t *trackingHighlighter) HighlightFileWithBg(code, filename string, bgColor style.Color) string {
 	return code
 }
 

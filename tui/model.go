@@ -35,11 +35,11 @@ type Model struct {
 // NewModel creates a new TUI model
 func NewModel() Model {
 	// Initialize spinner with Dot spinner using theme accent color.
-	// Note: bubbles spinner requires lipgloss.Style, but we use the theme
-	// color to stay consistent with the rest of the application styling.
+	// Note: bubbles spinner requires lipgloss.Style, so we convert our
+	// style.Color to lipgloss.Color for the spinner foreground.
 	s := spinner.New(
 		spinner.WithSpinner(spinner.Dot),
-		spinner.WithStyle(lipgloss.NewStyle().Foreground(style.CurrentTheme.Accent)),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(string(style.CurrentTheme.Accent)))),
 	)
 
 	// Create scanner for stdin with large buffer

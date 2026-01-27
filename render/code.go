@@ -11,8 +11,8 @@ import (
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
-	"github.com/charmbracelet/lipgloss"
 	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/lucasb-eyer/go-colorful"
 )
 
@@ -25,7 +25,7 @@ const maxCodeSize = 1024 * 1024
 // syntax-highlighted code with backgrounds can be safely composed with other
 // styles without escape sequence conflicts.
 type bgFormatter struct {
-	bgColor lipgloss.Color
+	bgColor style.Color
 }
 
 func (f bgFormatter) Format(w io.Writer, style *chroma.Style, it chroma.Iterator) error {
@@ -181,7 +181,7 @@ func (c *CodeRenderer) HighlightDiff(diff string) string {
 // HighlightWithBg highlights code with a forced background color per token.
 // This allows syntax highlighting colors to show through while maintaining
 // a consistent background (e.g., for diff added/removed lines).
-func (c *CodeRenderer) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
+func (c *CodeRenderer) HighlightWithBg(code, language string, bgColor style.Color) string {
 	if c.shouldSkip(code) || language == "" {
 		return code
 	}
@@ -196,7 +196,7 @@ func (c *CodeRenderer) HighlightWithBg(code, language string, bgColor lipgloss.C
 
 // HighlightFileWithBg highlights code with a background color, detecting language from filename.
 // Returns the original code if no lexer can be determined.
-func (c *CodeRenderer) HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string {
+func (c *CodeRenderer) HighlightFileWithBg(code, filename string, bgColor style.Color) string {
 	if c.shouldSkip(code) {
 		return code
 	}

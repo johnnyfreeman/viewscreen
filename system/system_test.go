@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/style"
 )
 
 // mockStyleApplier is a test double for render.StyleApplier
@@ -42,8 +42,8 @@ func (m *mockStyleApplier) LineNumberRender(text string) string    { return "[ln
 func (m *mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
 func (m *mockStyleApplier) DiffAddRender(text string) string       { return "[add]" + text + "[/add]" }
 func (m *mockStyleApplier) DiffRemoveRender(text string) string    { return "[rem]" + text + "[/rem]" }
-func (m *mockStyleApplier) DiffAddBg() lipgloss.Color              { return lipgloss.Color("#00ff00") }
-func (m *mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipgloss.Color("#ff0000") }
+func (m *mockStyleApplier) DiffAddBg() style.Color    { return "#00ff00" }
+func (m *mockStyleApplier) DiffRemoveBg() style.Color { return "#ff0000" }
 
 // Session/header styles
 func (m *mockStyleApplier) ApplyThemeBoldGradient(text string) string {

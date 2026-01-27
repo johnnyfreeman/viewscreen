@@ -2,7 +2,6 @@
 package render
 
 import (
-	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/style"
 )
 
@@ -31,8 +30,8 @@ type StyleApplier interface {
 	LineNumberSepRender(text string) string
 	DiffAddRender(text string) string
 	DiffRemoveRender(text string) string
-	DiffAddBg() lipgloss.Color
-	DiffRemoveBg() lipgloss.Color
+	DiffAddBg() style.Color
+	DiffRemoveBg() style.Color
 
 	// Session/header styles
 	SessionHeaderRender(text string) string
@@ -66,8 +65,8 @@ func (d DefaultStyleApplier) LineNumberRender(text string) string    { return st
 func (d DefaultStyleApplier) LineNumberSepRender(text string) string { return style.LineNumberSepText("│") }
 func (d DefaultStyleApplier) DiffAddRender(text string) string       { return style.DiffAdd.Render(text) }
 func (d DefaultStyleApplier) DiffRemoveRender(text string) string    { return style.DiffRemove.Render(text) }
-func (d DefaultStyleApplier) DiffAddBg() lipgloss.Color              { return style.DiffAddBg }
-func (d DefaultStyleApplier) DiffRemoveBg() lipgloss.Color           { return style.DiffRemoveBg }
+func (d DefaultStyleApplier) DiffAddBg() style.Color    { return style.DiffAddBg }
+func (d DefaultStyleApplier) DiffRemoveBg() style.Color { return style.DiffRemoveBg }
 
 // Session/header styles
 func (d DefaultStyleApplier) SessionHeaderRender(text string) string { return style.InfoBoldText(text) }

@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/content"
 	"github.com/johnnyfreeman/viewscreen/render"
@@ -55,8 +54,8 @@ type Event struct {
 type CodeHighlighter interface {
 	Highlight(code, language string) string
 	HighlightFile(code, filename string) string
-	HighlightWithBg(code, language string, bgColor lipgloss.Color) string
-	HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string
+	HighlightWithBg(code, language string, bgColor style.Color) string
+	HighlightFileWithBg(code, filename string, bgColor style.Color) string
 }
 
 // DefaultCodeHighlighter uses the actual render package
@@ -78,11 +77,11 @@ func (d *DefaultCodeHighlighter) HighlightFile(code, filename string) string {
 	return d.renderer.HighlightFile(code, filename)
 }
 
-func (d *DefaultCodeHighlighter) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
+func (d *DefaultCodeHighlighter) HighlightWithBg(code, language string, bgColor style.Color) string {
 	return d.renderer.HighlightWithBg(code, language, bgColor)
 }
 
-func (d *DefaultCodeHighlighter) HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string {
+func (d *DefaultCodeHighlighter) HighlightFileWithBg(code, filename string, bgColor style.Color) string {
 	return d.renderer.HighlightFileWithBg(code, filename, bgColor)
 }
 

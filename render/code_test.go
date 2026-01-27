@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"github.com/johnnyfreeman/viewscreen/style"
 )
 
 func TestCodeRenderer_NewCodeRenderer(t *testing.T) {
@@ -225,7 +225,7 @@ func TestCodeRenderer_HighlightWithBg(t *testing.T) {
 		name     string
 		code     string
 		language string
-		bgColor  lipgloss.Color
+		bgColor  style.Color
 		noColor  bool
 		check    func(t *testing.T, result string)
 	}{
@@ -233,7 +233,7 @@ func TestCodeRenderer_HighlightWithBg(t *testing.T) {
 			name:     "go code with green background",
 			code:     `func test() {}`,
 			language: "go",
-			bgColor:  lipgloss.Color("#14532D"),
+			bgColor:  style.Color("#14532D"),
 			noColor:  false,
 			check: func(t *testing.T, result string) {
 				// Result should contain original text content
@@ -251,7 +251,7 @@ func TestCodeRenderer_HighlightWithBg(t *testing.T) {
 			name:     "no color mode returns unchanged",
 			code:     `func test() {}`,
 			language: "go",
-			bgColor:  lipgloss.Color("#14532D"),
+			bgColor:  style.Color("#14532D"),
 			noColor:  true,
 			check: func(t *testing.T, result string) {
 				if result != "func test() {}" {
@@ -263,7 +263,7 @@ func TestCodeRenderer_HighlightWithBg(t *testing.T) {
 			name:     "empty language returns unchanged",
 			code:     `some code`,
 			language: "",
-			bgColor:  lipgloss.Color("#14532D"),
+			bgColor:  style.Color("#14532D"),
 			noColor:  false,
 			check: func(t *testing.T, result string) {
 				if result != "some code" {
@@ -304,7 +304,7 @@ func TestCodeRenderer_LargeContentSkipped(t *testing.T) {
 
 	t.Run("HighlightWithBg skips large content", func(t *testing.T) {
 		cr := NewCodeRenderer(false)
-		result := cr.HighlightWithBg(largeContent, "go", lipgloss.Color("#000000"))
+		result := cr.HighlightWithBg(largeContent, "go", style.Color("#000000"))
 		if result != largeContent {
 			t.Error("expected large content to be returned unchanged")
 		}
@@ -315,7 +315,7 @@ func TestBgFormatter(t *testing.T) {
 	// Test the custom bgFormatter type
 	t.Run("formats with background color", func(t *testing.T) {
 		cr := NewCodeRenderer(false)
-		result := cr.HighlightWithBg("test", "text", lipgloss.Color("#FF0000"))
+		result := cr.HighlightWithBg("test", "text", style.Color("#FF0000"))
 		// Should produce some output
 		if result == "" {
 			t.Error("expected non-empty result")
