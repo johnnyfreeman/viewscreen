@@ -21,13 +21,6 @@ const (
 	NestedOutputContinue = "  │      " // Continued nested output
 )
 
-// ANSI escape codes for extended underline styles
-// These work in modern terminals (kitty, iTerm2, WezTerm, etc.)
-const (
-	ansiDottedUnderline = "\x1b[4:4m"
-	ansiUnderlineReset  = "\x1b[24m"
-)
-
 var (
 	// Diff styles (Lipgloss for backgrounds, Ultraviolet for foregrounds)
 	// These are valid Lipgloss use cases - background colors for diff highlighting.
@@ -99,13 +92,4 @@ func Init(disableColor bool) {
 // NoColor returns whether color output is disabled
 func NoColor() bool {
 	return noColor
-}
-
-// DottedUnderline applies a dotted underline to text.
-// Falls back to regular underline in terminals that don't support it.
-func DottedUnderline(text string) string {
-	if noColor {
-		return text
-	}
-	return ansiDottedUnderline + text + ansiUnderlineReset
 }
