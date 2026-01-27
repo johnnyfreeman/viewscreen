@@ -133,7 +133,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Don't quit immediately - let user view the content
 		// They can press 'q' to quit
 
-	case ParseErrorMsg:
+	case events.ParseError:
 		// Optionally show parse errors in verbose mode
 		if config.Verbose {
 			m.content.WriteString("Parse error: " + msg.Line + "\n")
@@ -153,20 +153,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // processEvent handles a parsed event message
 func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
-	// Convert TUI message to events.Event
-	var event events.Event
-	switch msg := msg.(type) {
-	case SystemEventMsg:
-		event = events.SystemEvent{Data: msg.Event}
-	case AssistantEventMsg:
-		event = events.AssistantEvent{Data: msg.Event}
-	case UserEventMsg:
-		event = events.UserEvent{Data: msg.Event}
-	case StreamEventMsg:
-		event = events.StreamEvent{Data: msg.Event}
-	case ResultEventMsg:
-		event = events.ResultEvent{Data: msg.Event}
-	default:
+	// The message is already an events.Event from ParseEvent
+	event, ok := msg.(events.Event)
+	if !ok {
 		return m, nil
 	}
 
