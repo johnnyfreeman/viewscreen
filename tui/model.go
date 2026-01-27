@@ -22,12 +22,6 @@ import (
 	"github.com/johnnyfreeman/viewscreen/user"
 )
 
-// PendingTool holds a tool_use block waiting for its result
-type PendingTool struct {
-	Block           types.ContentBlock
-	ParentToolUseID *string // ID of parent tool if this is a nested child
-}
-
 // Model is the main Bubbletea model for the TUI
 type Model struct {
 	width          int
@@ -41,7 +35,7 @@ type Model struct {
 	sidebarStyles  SidebarStyles
 	streamRenderer *stream.Renderer
 	ready          bool
-	pendingTools   map[string]PendingTool // keyed by tool_use id
+	pendingTools   *tools.ToolUseTracker
 
 	// Renderers for events
 	systemRenderer    *system.Renderer
@@ -73,7 +67,7 @@ func NewModel() Model {
 		scanner:        scanner,
 		sidebarStyles:  NewSidebarStyles(),
 		streamRenderer: streamRenderer,
-		pendingTools:   make(map[string]PendingTool),
+		pendingTools:   tools.NewToolUseTracker(),
 
 		// Initialize package-level renderers
 		systemRenderer:    system.NewRenderer(),
@@ -139,7 +133,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 		// Refresh viewport to animate spinner for pending tools
-		if len(m.pendingTools) > 0 {
+		if m.pendingTools.Len() > 0 {
 			m.updateViewportWithPendingTools()
 		}
 
@@ -196,10 +190,7 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		for _, block := range msg.Event.Message.Content {
 			if block.Type == "tool_use" && block.ID != "" {
 				if !m.streamRenderer.InToolUseBlock {
-					m.pendingTools[block.ID] = PendingTool{
-						Block:           block,
-						ParentToolUseID: msg.Event.ParentToolUseID,
-					}
+					m.pendingTools.Add(block.ID, block, msg.Event.ParentToolUseID)
 					// Set tool state so sidebar shows spinner too
 					m.state.SetCurrentTool(block.Name, tools.GetToolArgFromBlock(block))
 				}
@@ -223,21 +214,21 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		var isNested bool
 		for _, content := range msg.Event.Message.Content {
 			if content.Type == "tool_result" && content.ToolUseID != "" {
-				if pending, ok := m.pendingTools[content.ToolUseID]; ok {
+				if pending, ok := m.pendingTools.Get(content.ToolUseID); ok {
 					// Check if this is a nested tool (parent is still pending)
-					isNested = pending.ParentToolUseID != nil && m.isParentPending(*pending.ParentToolUseID)
+					isNested = m.pendingTools.IsNested(pending)
 					// Now write the tool header (with bullet, not spinner)
 					if isNested {
 						m.content.WriteString(tools.RenderNestedToolUseToString(pending.Block))
 					} else {
 						m.content.WriteString(tools.RenderToolUseToString(pending.Block))
 					}
-					delete(m.pendingTools, content.ToolUseID)
+					m.pendingTools.Remove(content.ToolUseID)
 				}
 			}
 		}
 		// Clear tool state if no more pending tools
-		if len(m.pendingTools) == 0 {
+		if m.pendingTools.Len() == 0 {
 			m.state.ClearCurrentTool()
 		}
 		// Render the tool result (with nested prefix if applicable)
@@ -267,12 +258,12 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 
 	case ResultEventMsg:
 		// Flush any orphaned pending tools before rendering result
-		for id, pending := range m.pendingTools {
+		m.pendingTools.ForEach(func(id string, pending tools.PendingTool) {
 			// Write with bullet (not spinner) since we're done
 			m.content.WriteString(tools.RenderToolUseToString(pending.Block))
 			m.content.WriteString(style.OutputPrefix + style.Muted.Render("(no result)") + "\n")
-			delete(m.pendingTools, id)
-		}
+		})
+		m.pendingTools.Clear()
 		m.state.ClearCurrentTool()
 		m.state.UpdateFromResultEvent(msg.Event)
 		rendered := m.resultRenderer.RenderToString(msg.Event)
@@ -292,22 +283,16 @@ func (m Model) View() string {
 	return m.renderLayout()
 }
 
-// isParentPending checks if a parent tool_use is still pending (waiting for result)
-func (m *Model) isParentPending(parentID string) bool {
-	_, ok := m.pendingTools[parentID]
-	return ok
-}
-
 // updateViewportWithPendingTools updates the viewport content, rendering pending tools with spinner
 func (m *Model) updateViewportWithPendingTools() {
 	content := m.content.String()
 	// Render pending tools with spinner instead of bullet
-	for _, pending := range m.pendingTools {
+	m.pendingTools.ForEach(func(id string, pending tools.PendingTool) {
 		// Check if this is a nested child tool
-		isNested := pending.ParentToolUseID != nil && m.isParentPending(*pending.ParentToolUseID)
+		isNested := m.pendingTools.IsNested(pending)
 		// Render tool header with spinner instead of bullet
 		content += m.renderToolHeaderWithSpinner(pending.Block, isNested)
-	}
+	})
 	m.viewport.SetContent(content)
 }
 

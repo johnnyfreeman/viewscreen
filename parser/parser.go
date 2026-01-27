@@ -20,19 +20,13 @@ import (
 // EventHandler is called for each parsed event
 type EventHandler func(eventType string, line []byte) error
 
-// PendingTool holds a tool_use block waiting for its result
-type PendingTool struct {
-	Block           types.ContentBlock
-	ParentToolUseID *string // ID of parent tool if this is a nested child
-}
-
 // Parser handles reading and dispatching events from an input source
 type Parser struct {
 	input          io.Reader
 	errOutput      io.Writer
 	streamRenderer *stream.Renderer
 	eventHandler   EventHandler
-	pendingTools   map[string]PendingTool // keyed by tool_use id
+	pendingTools   *tools.ToolUseTracker
 	dispatcher     *EventDispatcher
 }
 
@@ -78,7 +72,7 @@ func NewParserWithOptions(opts ...Option) *Parser {
 		input:          os.Stdin,
 		errOutput:      os.Stderr,
 		streamRenderer: stream.NewRenderer(),
-		pendingTools:   make(map[string]PendingTool),
+		pendingTools:   tools.NewToolUseTracker(),
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -87,11 +81,6 @@ func NewParserWithOptions(opts ...Option) *Parser {
 	return p
 }
 
-// isParentPending checks if a parent tool_use is still pending (waiting for result)
-func (p *Parser) isParentPending(parentID string) bool {
-	_, ok := p.pendingTools[parentID]
-	return ok
-}
 
 // buildDispatcher creates and configures the event dispatcher with all handlers.
 func (p *Parser) buildDispatcher() *EventDispatcher {
@@ -123,10 +112,7 @@ func (p *Parser) handleAssistant(line []byte) error {
 	for _, block := range event.Message.Content {
 		if block.Type == "tool_use" && block.ID != "" {
 			if !p.streamRenderer.InToolUseBlock {
-				p.pendingTools[block.ID] = PendingTool{
-					Block:           block,
-					ParentToolUseID: event.ParentToolUseID,
-				}
+				p.pendingTools.Add(block.ID, block, event.ParentToolUseID)
 			}
 		}
 	}
@@ -145,15 +131,15 @@ func (p *Parser) handleUser(line []byte) error {
 	var isNested bool
 	for _, content := range event.Message.Content {
 		if content.Type == "tool_result" && content.ToolUseID != "" {
-			if pending, ok := p.pendingTools[content.ToolUseID]; ok {
+			if pending, ok := p.pendingTools.Get(content.ToolUseID); ok {
 				// Check if this is a nested tool (parent is still pending)
-				isNested = pending.ParentToolUseID != nil && p.isParentPending(*pending.ParentToolUseID)
+				isNested = p.pendingTools.IsNested(pending)
 				if isNested {
 					tools.RenderNestedToolUse(pending.Block)
 				} else {
 					tools.RenderToolUse(pending.Block)
 				}
-				delete(p.pendingTools, content.ToolUseID)
+				p.pendingTools.Remove(content.ToolUseID)
 			}
 		}
 	}
@@ -177,11 +163,11 @@ func (p *Parser) handleStream(line []byte) error {
 
 func (p *Parser) handleResult(line []byte) error {
 	// Flush any orphaned pending tools before rendering result
-	for id, pending := range p.pendingTools {
+	p.pendingTools.ForEach(func(id string, pending tools.PendingTool) {
 		tools.RenderToolUse(pending.Block)
 		fmt.Println(style.OutputPrefix + style.Muted.Render("(no result)"))
-		delete(p.pendingTools, id)
-	}
+	})
+	p.pendingTools.Clear()
 	var event result.Event
 	if err := json.Unmarshal(line, &event); err != nil {
 		return err
