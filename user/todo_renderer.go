@@ -3,15 +3,17 @@ package user
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/johnnyfreeman/viewscreen/render"
 )
 
 // TodoRenderer handles rendering of todo results with visual status indicators.
 type TodoRenderer struct {
-	styleApplier StyleApplier
+	styleApplier render.StyleApplier
 }
 
 // NewTodoRenderer creates a new TodoRenderer with the given dependencies.
-func NewTodoRenderer(styleApplier StyleApplier) *TodoRenderer {
+func NewTodoRenderer(styleApplier render.StyleApplier) *TodoRenderer {
 	return &TodoRenderer{
 		styleApplier: styleApplier,
 	}

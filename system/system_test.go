@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/johnnyfreeman/viewscreen/render"
 )
 
-// mockStyleApplier is a test double for StyleApplier
+// mockStyleApplier is a test double for render.StyleApplier
 type mockStyleApplier struct {
-	noColor                bool
-	gradientCalls          []string
-	sessionHeaderCalls     []string
-	mutedCalls             []string
+	noColor            bool
+	gradientCalls      []string
+	sessionHeaderCalls []string
+	mutedCalls         []string
 }
 
 func (m *mockStyleApplier) NoColor() bool { return m.noColor }
@@ -32,9 +35,22 @@ func (m *mockStyleApplier) MutedRender(text string) string {
 	return "[muted]" + text + "[/muted]"
 }
 
-func (m *mockStyleApplier) Bullet() string       { return "● " }
-func (m *mockStyleApplier) OutputPrefix() string { return "  ⎿  " }
+func (m *mockStyleApplier) Bullet() string         { return "● " }
+func (m *mockStyleApplier) OutputPrefix() string   { return "  ⎿  " }
 func (m *mockStyleApplier) OutputContinue() string { return "     " }
+
+// Additional methods required by render.StyleApplier
+func (m *mockStyleApplier) ErrorRender(text string) string   { return "[error]" + text + "[/error]" }
+func (m *mockStyleApplier) SuccessRender(text string) string { return "[success]" + text + "[/success]" }
+func (m *mockStyleApplier) WarningRender(text string) string { return "[warning]" + text + "[/warning]" }
+func (m *mockStyleApplier) LineNumberRender(text string) string    { return "[ln]" + text + "[/ln]" }
+func (m *mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
+func (m *mockStyleApplier) DiffAddRender(text string) string       { return "[add]" + text + "[/add]" }
+func (m *mockStyleApplier) DiffRemoveRender(text string) string    { return "[rem]" + text + "[/rem]" }
+func (m *mockStyleApplier) DiffAddBg() lipgloss.Color              { return lipgloss.Color("#00ff00") }
+func (m *mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipgloss.Color("#ff0000") }
+func (m *mockStyleApplier) ApplySuccessGradient(text string) string { return "[success_grad]" + text + "[/success_grad]" }
+func (m *mockStyleApplier) ApplyErrorGradient(text string) string   { return "[error_grad]" + text + "[/error_grad]" }
 
 // mockVerboseChecker is a test double for VerboseChecker
 type mockVerboseChecker struct {
@@ -516,7 +532,7 @@ func TestGetDefaultRenderer(t *testing.T) {
 }
 
 func TestDefaultStyleApplier(t *testing.T) {
-	dsa := DefaultStyleApplier{}
+	dsa := render.DefaultStyleApplier{}
 
 	// Test that the methods don't panic and return expected types
 	_ = dsa.NoColor()

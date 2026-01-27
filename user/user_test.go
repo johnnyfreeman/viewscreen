@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/johnnyfreeman/viewscreen/render"
 )
 
 func TestToolResultContent_Content(t *testing.T) {
@@ -422,14 +423,20 @@ func (m mockStyleApplier) ErrorRender(text string) string   { return "[ERROR:" +
 func (m mockStyleApplier) MutedRender(text string) string   { return "[MUTED:" + text + "]" }
 func (m mockStyleApplier) SuccessRender(text string) string { return "[SUCCESS:" + text + "]" }
 func (m mockStyleApplier) WarningRender(text string) string { return "[WARNING:" + text + "]" }
-func (m mockStyleApplier) OutputPrefix() string                   { return "  ⎿  " }
-func (m mockStyleApplier) OutputContinue() string                 { return "     " }
+func (m mockStyleApplier) OutputPrefix() string             { return "  ⎿  " }
+func (m mockStyleApplier) OutputContinue() string           { return "     " }
+func (m mockStyleApplier) Bullet() string                   { return "● " }
 func (m mockStyleApplier) LineNumberRender(text string) string    { return "[LN:" + text + "]" }
 func (m mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
 func (m mockStyleApplier) DiffAddRender(text string) string       { return "[ADD:" + text + "]" }
 func (m mockStyleApplier) DiffRemoveRender(text string) string    { return "[REM:" + text + "]" }
 func (m mockStyleApplier) DiffAddBg() lipgloss.Color              { return lipgloss.Color("#00ff00") }
 func (m mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipgloss.Color("#ff0000") }
+func (m mockStyleApplier) SessionHeaderRender(text string) string { return "[HEADER:" + text + "]" }
+func (m mockStyleApplier) ApplyThemeBoldGradient(text string) string { return "[GRADIENT:" + text + "]" }
+func (m mockStyleApplier) ApplySuccessGradient(text string) string   { return "[SUCCESS_GRAD:" + text + "]" }
+func (m mockStyleApplier) ApplyErrorGradient(text string) string     { return "[ERROR_GRAD:" + text + "]" }
+func (m mockStyleApplier) NoColor() bool                             { return true }
 
 type mockCodeHighlighter struct{}
 
@@ -1326,7 +1333,7 @@ func TestDefaultConfigChecker(t *testing.T) {
 }
 
 func TestDefaultStyleApplier(t *testing.T) {
-	sa := DefaultStyleApplier{}
+	sa := render.DefaultStyleApplier{}
 
 	// Verify all methods exist and return strings
 	_ = sa.ErrorRender("test")
@@ -1335,12 +1342,18 @@ func TestDefaultStyleApplier(t *testing.T) {
 	_ = sa.WarningRender("test")
 	_ = sa.OutputPrefix()
 	_ = sa.OutputContinue()
+	_ = sa.Bullet()
 	_ = sa.LineNumberRender("test")
 	_ = sa.LineNumberSepRender("│")
 	_ = sa.DiffAddRender("test")
 	_ = sa.DiffRemoveRender("test")
 	_ = sa.DiffAddBg()
 	_ = sa.DiffRemoveBg()
+	_ = sa.SessionHeaderRender("test")
+	_ = sa.ApplyThemeBoldGradient("test")
+	_ = sa.ApplySuccessGradient("test")
+	_ = sa.ApplyErrorGradient("test")
+	_ = sa.NoColor()
 }
 
 func TestRenderer_Render_TodoResult(t *testing.T) {

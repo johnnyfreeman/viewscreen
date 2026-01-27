@@ -56,9 +56,9 @@ type Event struct {
 
 // Renderer handles rendering of result events with configurable output and options
 type Renderer struct {
-	output    io.Writer
-	showUsage func() bool
-	noColor   func() bool
+	output       io.Writer
+	showUsage    func() bool
+	styleApplier render.StyleApplier
 }
 
 // RendererOption is a functional option for configuring a Renderer
@@ -78,19 +78,19 @@ func WithShowUsage(fn func() bool) RendererOption {
 	}
 }
 
-// WithNoColor sets the function to check if color is disabled
-func WithNoColor(fn func() bool) RendererOption {
+// WithStyleApplier sets a custom style applier
+func WithStyleApplier(sa render.StyleApplier) RendererOption {
 	return func(r *Renderer) {
-		r.noColor = fn
+		r.styleApplier = sa
 	}
 }
 
 // NewRenderer creates a new Renderer with the given options
 func NewRenderer(opts ...RendererOption) *Renderer {
 	r := &Renderer{
-		output:    os.Stdout,
-		showUsage: func() bool { return config.ShowUsage },
-		noColor:   style.NoColor,
+		output:       os.Stdout,
+		showUsage:    func() bool { return config.ShowUsage },
+		styleApplier: render.DefaultStyleApplier{},
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -100,24 +100,25 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 
 // renderTo writes the result event to the given output
 func (r *Renderer) renderTo(out *render.Output, event Event) {
+	sa := r.styleApplier
 	fmt.Fprintln(out)
 	if event.IsError {
 		// Error header with gradient
-		header := fmt.Sprintf("%sSession Error", style.Bullet)
-		if !r.noColor() {
-			header = style.ApplyErrorGradient(header)
+		header := fmt.Sprintf("%sSession Error", sa.Bullet())
+		if !sa.NoColor() {
+			header = sa.ApplyErrorGradient(header)
 		} else {
 			header = style.Error.Bold(true).Render(header)
 		}
 		fmt.Fprintln(out, header)
 		for _, err := range event.Errors {
-			fmt.Fprintf(out, "%s%s\n", style.OutputPrefix, style.Error.Render(err))
+			fmt.Fprintf(out, "%s%s\n", sa.OutputPrefix(), sa.ErrorRender(err))
 		}
 	} else {
 		// Success header with gradient
-		header := fmt.Sprintf("%sSession Complete", style.Bullet)
-		if !r.noColor() {
-			header = style.ApplySuccessGradient(header)
+		header := fmt.Sprintf("%sSession Complete", sa.Bullet())
+		if !sa.NoColor() {
+			header = sa.ApplySuccessGradient(header)
 		} else {
 			header = style.Success.Bold(true).Render(header)
 		}
@@ -125,27 +126,27 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 	}
 
 	fmt.Fprintf(out, "%s%s %.2fs (API: %.2fs)\n",
-		style.OutputPrefix,
-		style.Muted.Render("Duration:"),
+		sa.OutputPrefix(),
+		sa.MutedRender("Duration:"),
 		float64(event.DurationMS)/1000, float64(event.DurationAPIMS)/1000)
-	fmt.Fprintf(out, "%s%s %d\n", style.OutputContinue, style.Muted.Render("Turns:"), event.NumTurns)
-	fmt.Fprintf(out, "%s%s $%.4f\n", style.OutputContinue, style.Muted.Render("Cost:"), event.TotalCostUSD)
+	fmt.Fprintf(out, "%s%s %d\n", sa.OutputContinue(), sa.MutedRender("Turns:"), event.NumTurns)
+	fmt.Fprintf(out, "%s%s $%.4f\n", sa.OutputContinue(), sa.MutedRender("Cost:"), event.TotalCostUSD)
 
 	if r.showUsage() {
 		fmt.Fprintf(out, "%s%s in=%d out=%d (cache: created=%d read=%d)\n",
-			style.OutputContinue,
-			style.Muted.Render("Tokens:"),
+			sa.OutputContinue(),
+			sa.MutedRender("Tokens:"),
 			event.Usage.InputTokens, event.Usage.OutputTokens,
 			event.Usage.CacheCreationInputTokens, event.Usage.CacheReadInputTokens)
 	}
 
 	if len(event.PermissionDenials) > 0 {
 		fmt.Fprintf(out, "%s%s %d\n",
-			style.OutputContinue,
-			style.Warning.Render("Permission Denials:"),
+			sa.OutputContinue(),
+			sa.WarningRender("Permission Denials:"),
 			len(event.PermissionDenials))
 		for _, denial := range event.PermissionDenials {
-			fmt.Fprintf(out, "%s  - %s (%s)\n", style.OutputContinue, denial.ToolName, denial.ToolUseID)
+			fmt.Fprintf(out, "%s  - %s (%s)\n", sa.OutputContinue(), denial.ToolName, denial.ToolUseID)
 		}
 	}
 }

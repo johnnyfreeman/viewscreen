@@ -127,38 +127,6 @@ type DefaultConfigChecker struct{}
 func (d DefaultConfigChecker) IsVerbose() bool { return config.Verbose }
 func (d DefaultConfigChecker) NoColor() bool   { return config.NoColor }
 
-// StyleApplier abstracts style application for testability
-type StyleApplier interface {
-	ErrorRender(text string) string
-	MutedRender(text string) string
-	SuccessRender(text string) string
-	WarningRender(text string) string
-	OutputPrefix() string
-	OutputContinue() string
-	LineNumberRender(text string) string
-	LineNumberSepRender(text string) string
-	DiffAddRender(text string) string
-	DiffRemoveRender(text string) string
-	DiffAddBg() lipgloss.Color
-	DiffRemoveBg() lipgloss.Color
-}
-
-// DefaultStyleApplier uses the actual style package
-type DefaultStyleApplier struct{}
-
-func (d DefaultStyleApplier) ErrorRender(text string) string   { return style.Error.Render(text) }
-func (d DefaultStyleApplier) MutedRender(text string) string   { return style.Muted.Render(text) }
-func (d DefaultStyleApplier) SuccessRender(text string) string { return style.Success.Render(text) }
-func (d DefaultStyleApplier) WarningRender(text string) string { return style.Warning.Render(text) }
-func (d DefaultStyleApplier) OutputPrefix() string                   { return style.OutputPrefix }
-func (d DefaultStyleApplier) OutputContinue() string                 { return style.OutputContinue }
-func (d DefaultStyleApplier) LineNumberRender(text string) string    { return style.LineNumber.Render(text) }
-func (d DefaultStyleApplier) LineNumberSepRender(text string) string { return style.LineNumberSep.Render("│") }
-func (d DefaultStyleApplier) DiffAddRender(text string) string       { return style.DiffAdd.Render(text) }
-func (d DefaultStyleApplier) DiffRemoveRender(text string) string    { return style.DiffRemove.Render(text) }
-func (d DefaultStyleApplier) DiffAddBg() lipgloss.Color              { return style.DiffAddBg }
-func (d DefaultStyleApplier) DiffRemoveBg() lipgloss.Color           { return style.DiffRemoveBg }
-
 // CodeHighlighter abstracts code highlighting for testability
 type CodeHighlighter interface {
 	Highlight(code, language string) string
@@ -204,7 +172,7 @@ type MarkdownRenderer interface {
 type Renderer struct {
 	output           io.Writer
 	configChecker    ConfigChecker
-	styleApplier     StyleApplier
+	styleApplier     render.StyleApplier
 	highlighter      CodeHighlighter
 	markdownRenderer MarkdownRenderer
 	toolContext      *ToolContext
@@ -230,7 +198,7 @@ func WithConfigChecker(cc ConfigChecker) RendererOption {
 }
 
 // WithStyleApplier sets a custom style applier
-func WithStyleApplier(sa StyleApplier) RendererOption {
+func WithStyleApplier(sa render.StyleApplier) RendererOption {
 	return func(r *Renderer) {
 		r.styleApplier = sa
 	}
@@ -260,7 +228,7 @@ func WithMarkdownRenderer(mr MarkdownRenderer) RendererOption {
 // NewRenderer creates a new user Renderer with default dependencies
 func NewRenderer() *Renderer {
 	cc := DefaultConfigChecker{}
-	sa := DefaultStyleApplier{}
+	sa := render.DefaultStyleApplier{}
 	ch := NewDefaultCodeHighlighter(cc.NoColor())
 	width := 80
 	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {

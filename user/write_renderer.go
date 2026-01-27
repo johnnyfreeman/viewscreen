@@ -4,15 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/johnnyfreeman/viewscreen/render"
 )
 
 // WriteRenderer handles rendering of write/create results.
 type WriteRenderer struct {
-	styleApplier StyleApplier
+	styleApplier render.StyleApplier
 }
 
 // NewWriteRenderer creates a new WriteRenderer with the given dependencies.
-func NewWriteRenderer(styleApplier StyleApplier) *WriteRenderer {
+func NewWriteRenderer(styleApplier render.StyleApplier) *WriteRenderer {
 	return &WriteRenderer{
 		styleApplier: styleApplier,
 	}

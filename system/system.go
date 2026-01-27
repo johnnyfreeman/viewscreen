@@ -8,7 +8,6 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
-	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
@@ -24,27 +23,6 @@ type Event struct {
 	Agents            []string `json:"agents"`
 }
 
-// StyleApplier abstracts style application for testability
-type StyleApplier interface {
-	NoColor() bool
-	ApplyThemeBoldGradient(text string) string
-	SessionHeaderRender(text string) string
-	MutedRender(text string) string
-	Bullet() string
-	OutputPrefix() string
-	OutputContinue() string
-}
-
-// DefaultStyleApplier uses the actual style package
-type DefaultStyleApplier struct{}
-
-func (d DefaultStyleApplier) NoColor() bool                         { return style.NoColor() }
-func (d DefaultStyleApplier) ApplyThemeBoldGradient(text string) string { return style.ApplyThemeBoldGradient(text) }
-func (d DefaultStyleApplier) SessionHeaderRender(text string) string    { return style.SessionHeader.Render(text) }
-func (d DefaultStyleApplier) MutedRender(text string) string            { return style.Muted.Render(text) }
-func (d DefaultStyleApplier) Bullet() string                            { return style.Bullet }
-func (d DefaultStyleApplier) OutputPrefix() string                      { return style.OutputPrefix }
-func (d DefaultStyleApplier) OutputContinue() string                    { return style.OutputContinue }
 
 // VerboseChecker abstracts verbose flag checking for testability
 type VerboseChecker interface {
@@ -59,7 +37,7 @@ func (d DefaultVerboseChecker) IsVerbose() bool { return config.Verbose }
 // Renderer handles rendering system events
 type Renderer struct {
 	output         io.Writer
-	styleApplier   StyleApplier
+	styleApplier   render.StyleApplier
 	verboseChecker VerboseChecker
 }
 
@@ -74,7 +52,7 @@ func WithOutput(w io.Writer) RendererOption {
 }
 
 // WithStyleApplier sets a custom style applier
-func WithStyleApplier(sa StyleApplier) RendererOption {
+func WithStyleApplier(sa render.StyleApplier) RendererOption {
 	return func(r *Renderer) {
 		r.styleApplier = sa
 	}
@@ -91,7 +69,7 @@ func WithVerboseChecker(vc VerboseChecker) RendererOption {
 func NewRenderer() *Renderer {
 	return &Renderer{
 		output:         os.Stdout,
-		styleApplier:   DefaultStyleApplier{},
+		styleApplier:   render.DefaultStyleApplier{},
 		verboseChecker: DefaultVerboseChecker{},
 	}
 }

@@ -4,7 +4,33 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
 )
+
+// mockStyleApplier implements render.StyleApplier for testing
+type mockStyleApplier struct {
+	noColor bool
+}
+
+func (m mockStyleApplier) ErrorRender(text string) string            { return "[error]" + text + "[/error]" }
+func (m mockStyleApplier) MutedRender(text string) string            { return "[muted]" + text + "[/muted]" }
+func (m mockStyleApplier) SuccessRender(text string) string          { return "[success]" + text + "[/success]" }
+func (m mockStyleApplier) WarningRender(text string) string          { return "[warning]" + text + "[/warning]" }
+func (m mockStyleApplier) OutputPrefix() string                      { return "  ⎿  " }
+func (m mockStyleApplier) OutputContinue() string                    { return "     " }
+func (m mockStyleApplier) Bullet() string                            { return "● " }
+func (m mockStyleApplier) LineNumberRender(text string) string       { return "[ln]" + text + "[/ln]" }
+func (m mockStyleApplier) LineNumberSepRender(text string) string    { return "│" }
+func (m mockStyleApplier) DiffAddRender(text string) string          { return "[add]" + text + "[/add]" }
+func (m mockStyleApplier) DiffRemoveRender(text string) string       { return "[rem]" + text + "[/rem]" }
+func (m mockStyleApplier) DiffAddBg() lipgloss.Color                 { return lipgloss.Color("#00ff00") }
+func (m mockStyleApplier) DiffRemoveBg() lipgloss.Color              { return lipgloss.Color("#ff0000") }
+func (m mockStyleApplier) SessionHeaderRender(text string) string    { return "[header]" + text + "[/header]" }
+func (m mockStyleApplier) ApplyThemeBoldGradient(text string) string { return "[gradient]" + text + "[/gradient]" }
+func (m mockStyleApplier) ApplySuccessGradient(text string) string   { return "[success_grad]" + text + "[/success_grad]" }
+func (m mockStyleApplier) ApplyErrorGradient(text string) string     { return "[error_grad]" + text + "[/error_grad]" }
+func (m mockStyleApplier) NoColor() bool                             { return m.noColor }
 
 func TestNewRenderer(t *testing.T) {
 	r := NewRenderer()
@@ -21,8 +47,8 @@ func TestNewRenderer(t *testing.T) {
 		t.Error("expected showUsage to be non-nil")
 	}
 
-	if r.noColor == nil {
-		t.Error("expected noColor to be non-nil")
+	if r.styleApplier == nil {
+		t.Error("expected styleApplier to be non-nil")
 	}
 }
 
@@ -50,24 +76,18 @@ func TestNewRendererWithOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("with custom noColor", func(t *testing.T) {
-		called := false
-		fn := func() bool {
-			called = true
-			return true
-		}
-		r := NewRenderer(WithNoColor(fn))
+	t.Run("with custom styleApplier", func(t *testing.T) {
+		sa := mockStyleApplier{noColor: true}
+		r := NewRenderer(WithStyleApplier(sa))
 
-		r.noColor()
-		if !called {
-			t.Error("expected custom noColor to be called")
+		if r.styleApplier == nil {
+			t.Error("expected custom styleApplier to be set")
 		}
 	})
 
 	t.Run("with multiple options", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		showUsageCalled := false
-		noColorCalled := false
 
 		r := NewRenderer(
 			WithOutput(buf),
@@ -75,10 +95,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 				showUsageCalled = true
 				return true
 			}),
-			WithNoColor(func() bool {
-				noColorCalled = true
-				return true
-			}),
+			WithStyleApplier(mockStyleApplier{noColor: true}),
 		)
 
 		if r.output != buf {
@@ -90,9 +107,8 @@ func TestNewRendererWithOptions(t *testing.T) {
 			t.Error("expected showUsage to be called")
 		}
 
-		r.noColor()
-		if !noColorCalled {
-			t.Error("expected noColor to be called")
+		if r.styleApplier == nil {
+			t.Error("expected styleApplier to be set")
 		}
 	})
 }
@@ -102,7 +118,7 @@ func TestRenderer_Render_Success(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return false }),
-		WithNoColor(func() bool { return true }),
+		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
 	event := Event{
@@ -146,7 +162,7 @@ func TestRenderer_Render_Error(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return false }),
-		WithNoColor(func() bool { return true }),
+		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
 	event := Event{
@@ -181,7 +197,7 @@ func TestRenderer_Render_WithUsage(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return true }),
-		WithNoColor(func() bool { return true }),
+		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
 	event := Event{
@@ -222,7 +238,7 @@ func TestRenderer_Render_WithoutUsage(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return false }),
-		WithNoColor(func() bool { return true }),
+		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
 	event := Event{
@@ -252,7 +268,7 @@ func TestRenderer_Render_WithPermissionDenials(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return false }),
-		WithNoColor(func() bool { return true }),
+		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
 	event := Event{
@@ -305,7 +321,7 @@ func TestRenderer_Render_NoPermissionDenials(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return false }),
-		WithNoColor(func() bool { return true }),
+		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
 	event := Event{
@@ -332,7 +348,7 @@ func TestRenderer_Render_ZeroValues(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return true }),
-		WithNoColor(func() bool { return true }),
+		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
 	event := Event{
@@ -370,7 +386,7 @@ func TestRenderer_Render_LargeCost(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return false }),
-		WithNoColor(func() bool { return true }),
+		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
 	event := Event{
@@ -510,7 +526,7 @@ func TestRenderer_Render_WithColor(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return false }),
-		WithNoColor(func() bool { return false }), // Color enabled
+		WithStyleApplier(mockStyleApplier{noColor: false}), // Color enabled
 	)
 
 	event := Event{
@@ -536,7 +552,7 @@ func TestRenderer_Render_ErrorWithColor(t *testing.T) {
 	r := NewRenderer(
 		WithOutput(buf),
 		WithShowUsage(func() bool { return false }),
-		WithNoColor(func() bool { return false }), // Color enabled
+		WithStyleApplier(mockStyleApplier{noColor: false}), // Color enabled
 	)
 
 	event := Event{
@@ -575,7 +591,7 @@ func TestDefaultRenderer(t *testing.T) {
 		t.Error("defaultRenderer.showUsage should not be nil")
 	}
 
-	if defaultRenderer.noColor == nil {
-		t.Error("defaultRenderer.noColor should not be nil")
+	if defaultRenderer.styleApplier == nil {
+		t.Error("defaultRenderer.styleApplier should not be nil")
 	}
 }

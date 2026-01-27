@@ -4,18 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/johnnyfreeman/viewscreen/render" // for DetectLanguageFromPath
+	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/terminal"
 )
 
 // EditRenderer handles rendering of edit results with syntax-highlighted diffs.
 type EditRenderer struct {
-	styleApplier StyleApplier
+	styleApplier render.StyleApplier
 	highlighter  CodeHighlighter
 }
 
 // NewEditRenderer creates a new EditRenderer with the given dependencies.
-func NewEditRenderer(styleApplier StyleApplier, highlighter CodeHighlighter) *EditRenderer {
+func NewEditRenderer(styleApplier render.StyleApplier, highlighter CodeHighlighter) *EditRenderer {
 	return &EditRenderer{
 		styleApplier: styleApplier,
 		highlighter:  highlighter,
