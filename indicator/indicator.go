@@ -1,4 +1,7 @@
-package render
+// Package indicator provides streaming progress indicators for terminal output.
+// These are interactive UI components that show real-time feedback during
+// streaming operations, separate from the content rendering utilities.
+package indicator
 
 import (
 	"fmt"
@@ -10,7 +13,7 @@ import (
 	"github.com/lucasb-eyer/go-colorful"
 )
 
-// Spinner provides visual feedback during streaming
+// Spinner provides visual feedback during streaming with cycling braille characters.
 type Spinner struct {
 	frames    []string
 	index     int
@@ -102,25 +105,25 @@ func (s *Spinner) Reset() {
 	s.mu.Unlock()
 }
 
-// StreamingIndicator provides a simpler streaming indicator
+// StreamingIndicator provides a simpler streaming indicator (a single dot or ellipsis).
 type StreamingIndicator struct {
 	shown   bool
 	noColor bool
 	output  io.Writer
 }
 
-// IndicatorOption is a functional option for configuring a StreamingIndicator
-type IndicatorOption func(*StreamingIndicator)
+// StreamingOption is a functional option for configuring a StreamingIndicator
+type StreamingOption func(*StreamingIndicator)
 
-// WithIndicatorOutput sets a custom output writer for the StreamingIndicator
-func WithIndicatorOutput(w io.Writer) IndicatorOption {
+// WithStreamingOutput sets a custom output writer for the StreamingIndicator
+func WithStreamingOutput(w io.Writer) StreamingOption {
 	return func(i *StreamingIndicator) {
 		i.output = w
 	}
 }
 
 // NewStreamingIndicator creates a new streaming indicator
-func NewStreamingIndicator(noColor bool, opts ...IndicatorOption) *StreamingIndicator {
+func NewStreamingIndicator(noColor bool, opts ...StreamingOption) *StreamingIndicator {
 	i := &StreamingIndicator{
 		noColor: noColor,
 		output:  os.Stdout,
@@ -139,15 +142,15 @@ func (i *StreamingIndicator) Show() {
 		return
 	}
 
-	var indicator string
+	var ind string
 	if i.noColor {
-		indicator = "..."
+		ind = "..."
 	} else {
 		// Subtle pulsing dot
 		style := lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7"))
-		indicator = style.Render("●")
+		ind = style.Render("●")
 	}
-	fmt.Fprint(i.output, indicator)
+	fmt.Fprint(i.output, ind)
 	i.shown = true
 }
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/indicator"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/terminal"
@@ -85,7 +86,7 @@ func NewRenderer() *Renderer {
 	return &Renderer{
 		CurrentBlockIndex: -1,
 		markdownRenderer:  render.NewMarkdownRenderer(config.NoColor, width),
-		indicator:         render.NewStreamingIndicator(config.NoColor),
+		indicator:         indicator.NewStreamingIndicator(config.NoColor),
 		toolHeaderRender:  tools.RenderToolHeaderToString,
 		output:            os.Stdout,
 		width:             width,

@@ -1,4 +1,4 @@
-package render
+package indicator
 
 import (
 	"bytes"
@@ -282,9 +282,9 @@ func TestNewStreamingIndicator(t *testing.T) {
 }
 
 func TestStreamingIndicator_WithOptions(t *testing.T) {
-	t.Run("WithIndicatorOutput", func(t *testing.T) {
+	t.Run("WithStreamingOutput", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 		if i.output != buf {
 			t.Error("output should be set to custom buffer")
@@ -295,7 +295,7 @@ func TestStreamingIndicator_WithOptions(t *testing.T) {
 func TestStreamingIndicator_Show(t *testing.T) {
 	t.Run("shows dots in noColor mode", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 		i.Show()
 
@@ -307,7 +307,7 @@ func TestStreamingIndicator_Show(t *testing.T) {
 
 	t.Run("shows styled indicator with color", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(false, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(false, WithStreamingOutput(buf))
 
 		i.Show()
 
@@ -320,7 +320,7 @@ func TestStreamingIndicator_Show(t *testing.T) {
 
 	t.Run("only shows once", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 		i.Show()
 		i.Show()
@@ -334,7 +334,7 @@ func TestStreamingIndicator_Show(t *testing.T) {
 
 	t.Run("sets shown flag", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 		if i.IsShown() {
 			t.Error("IsShown() should be false before Show()")
@@ -351,7 +351,7 @@ func TestStreamingIndicator_Show(t *testing.T) {
 func TestStreamingIndicator_Clear(t *testing.T) {
 	t.Run("clears dots in noColor mode", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 		i.Show()
 		buf.Reset() // Clear the Show output
@@ -366,7 +366,7 @@ func TestStreamingIndicator_Clear(t *testing.T) {
 
 	t.Run("clears single character with color", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(false, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(false, WithStreamingOutput(buf))
 
 		i.Show()
 		buf.Reset() // Clear the Show output
@@ -381,7 +381,7 @@ func TestStreamingIndicator_Clear(t *testing.T) {
 
 	t.Run("does nothing if not shown", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 		i.Clear()
 
@@ -393,7 +393,7 @@ func TestStreamingIndicator_Clear(t *testing.T) {
 
 	t.Run("resets shown flag", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 		i.Show()
 		if !i.IsShown() {
@@ -410,7 +410,7 @@ func TestStreamingIndicator_Clear(t *testing.T) {
 func TestStreamingIndicator_ShowClearCycle(t *testing.T) {
 	t.Run("can show, clear, and show again", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+		i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 		i.Show()
 		if !i.IsShown() {
@@ -466,7 +466,7 @@ func TestStreamingIndicator_IsShown(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			i := NewStreamingIndicator(true, WithIndicatorOutput(buf))
+			i := NewStreamingIndicator(true, WithStreamingOutput(buf))
 
 			tt.actions(i)
 
