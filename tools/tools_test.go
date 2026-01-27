@@ -376,54 +376,6 @@ func TestRenderToolUseToString(t *testing.T) {
 	}
 }
 
-func TestRenderNestedToolHeaderToString(t *testing.T) {
-	tests := []struct {
-		name         string
-		toolName     string
-		input        map[string]any
-		wantContains []string
-	}{
-		{
-			name:     "nested Bash with command",
-			toolName: "Bash",
-			input:    map[string]any{"command": "git status"},
-			wantContains: []string{
-				style.NestedPrefix,
-				style.Bullet,
-				"Bash",
-				"git status",
-			},
-		},
-		{
-			name:     "nested Read with file path",
-			toolName: "Read",
-			input:    map[string]any{"file_path": "/path/to/file.go"},
-			wantContains: []string{
-				style.NestedPrefix,
-				style.Bullet,
-				"Read",
-				"/path/to/file.go",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			output := RenderNestedToolHeaderToString(tt.toolName, tt.input)
-
-			for _, want := range tt.wantContains {
-				if !strings.Contains(output, want) {
-					t.Errorf("RenderNestedToolHeaderToString() output missing %q\nGot: %q", want, output)
-				}
-			}
-
-			if !strings.HasSuffix(output, "\n") {
-				t.Errorf("RenderNestedToolHeaderToString() output should end with newline, got: %q", output)
-			}
-		})
-	}
-}
-
 func TestRenderNestedToolUseToString(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -496,13 +448,6 @@ func TestFunctionSignatures(t *testing.T) {
 		var fn func(types.ContentBlock) = RenderNestedToolUse
 		if fn == nil {
 			t.Error("RenderNestedToolUse should not be nil")
-		}
-	})
-
-	t.Run("RenderNestedToolHeader signature", func(t *testing.T) {
-		var fn func(string, map[string]any) = RenderNestedToolHeader
-		if fn == nil {
-			t.Error("RenderNestedToolHeader should not be nil")
 		}
 	})
 }

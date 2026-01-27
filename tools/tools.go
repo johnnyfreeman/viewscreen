@@ -88,15 +88,3 @@ func RenderNestedToolUseToString(block types.ContentBlock) string {
 	renderToolUseTo(out, style.NestedPrefix, block)
 	return out.String()
 }
-
-// RenderNestedToolHeader renders a nested tool header with indentation.
-func RenderNestedToolHeader(toolName string, input map[string]any) {
-	renderToolHeaderTo(render.WriterOutput(os.Stdout), style.NestedPrefix, toolName, input)
-}
-
-// RenderNestedToolHeaderToString renders a nested tool header to a string.
-func RenderNestedToolHeaderToString(toolName string, input map[string]any) string {
-	out := render.StringOutput()
-	renderToolHeaderTo(out, style.NestedPrefix, toolName, input)
-	return out.String()
-}
