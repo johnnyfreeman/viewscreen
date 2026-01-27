@@ -387,7 +387,7 @@ func TestFlushOrphanedTools_NestedDetection(t *testing.T) {
 	orphaned := FlushOrphanedTools(tracker)
 
 	// Find parent and child in results
-	var parentOrphan, childOrphan *OrphanedTool
+	var parentOrphan, childOrphan *tools.OrphanedTool
 	for i := range orphaned {
 		if orphaned[i].ID == "parent" {
 			parentOrphan = &orphaned[i]

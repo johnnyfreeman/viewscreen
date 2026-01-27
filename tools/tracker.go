@@ -68,3 +68,51 @@ func (t *ToolUseTracker) ForEach(fn func(id string, pending PendingTool)) {
 func (t *ToolUseTracker) Clear() {
 	t.pending = make(map[string]PendingTool)
 }
+
+// MatchedTool represents a tool_use block matched with its result.
+type MatchedTool struct {
+	Block    types.ContentBlock
+	IsNested bool
+}
+
+// MatchAndRemove finds pending tools by their IDs, removes them from the tracker,
+// and returns information about each matched tool.
+// This is the core matching logic used when processing tool results.
+func (t *ToolUseTracker) MatchAndRemove(toolUseIDs []string) []MatchedTool {
+	var matched []MatchedTool
+
+	for _, id := range toolUseIDs {
+		if pending, ok := t.Get(id); ok {
+			isNested := t.IsNested(pending)
+			matched = append(matched, MatchedTool{
+				Block:    pending.Block,
+				IsNested: isNested,
+			})
+			t.Remove(id)
+		}
+	}
+
+	return matched
+}
+
+// OrphanedTool represents a pending tool that has no matching result.
+type OrphanedTool struct {
+	ID       string
+	Block    types.ContentBlock
+	IsNested bool
+}
+
+// FlushAll removes all pending tools and returns them as orphaned.
+// Call this when processing a result event to handle any tools that didn't get results.
+func (t *ToolUseTracker) FlushAll() []OrphanedTool {
+	var orphaned []OrphanedTool
+	t.ForEach(func(id string, pending PendingTool) {
+		orphaned = append(orphaned, OrphanedTool{
+			ID:       id,
+			Block:    pending.Block,
+			IsNested: t.IsNested(pending),
+		})
+	})
+	t.Clear()
+	return orphaned
+}

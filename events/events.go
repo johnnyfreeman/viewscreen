@@ -114,31 +114,16 @@ func Parse(line string) Event {
 	}
 }
 
-// MatchedTool represents a tool_use block matched with its result.
-type MatchedTool struct {
-	Block    types.ContentBlock
-	IsNested bool
-}
-
 // MatchToolResults matches tool_result content blocks with pending tool_use blocks.
-// It returns matched tools and removes them from the tracker.
-func MatchToolResults(event user.Event, tracker *tools.ToolUseTracker) []MatchedTool {
-	var matched []MatchedTool
-
+// It extracts tool_use IDs from the event and delegates to the tracker's MatchAndRemove.
+func MatchToolResults(event user.Event, tracker *tools.ToolUseTracker) []tools.MatchedTool {
+	var toolUseIDs []string
 	for _, content := range event.Message.Content {
 		if content.Type == "tool_result" && content.ToolUseID != "" {
-			if pending, ok := tracker.Get(content.ToolUseID); ok {
-				isNested := tracker.IsNested(pending)
-				matched = append(matched, MatchedTool{
-					Block:    pending.Block,
-					IsNested: isNested,
-				})
-				tracker.Remove(content.ToolUseID)
-			}
+			toolUseIDs = append(toolUseIDs, content.ToolUseID)
 		}
 	}
-
-	return matched
+	return tracker.MatchAndRemove(toolUseIDs)
 }
 
 // BufferToolUse buffers a tool_use block from an assistant event if it's not already in a tool_use block.
@@ -156,24 +141,8 @@ func BufferToolUse(event assistant.Event, tracker *tools.ToolUseTracker, streamR
 	return buffered
 }
 
-// OrphanedTool represents a pending tool that has no matching result.
-type OrphanedTool struct {
-	ID       string
-	Block    types.ContentBlock
-	IsNested bool
-}
-
 // FlushOrphanedTools returns all pending tools and clears the tracker.
 // Call this when processing a result event to handle any tools that didn't get results.
-func FlushOrphanedTools(tracker *tools.ToolUseTracker) []OrphanedTool {
-	var orphaned []OrphanedTool
-	tracker.ForEach(func(id string, pending tools.PendingTool) {
-		orphaned = append(orphaned, OrphanedTool{
-			ID:       id,
-			Block:    pending.Block,
-			IsNested: tracker.IsNested(pending),
-		})
-	})
-	tracker.Clear()
-	return orphaned
+func FlushOrphanedTools(tracker *tools.ToolUseTracker) []tools.OrphanedTool {
+	return tracker.FlushAll()
 }
