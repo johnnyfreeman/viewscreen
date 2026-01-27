@@ -434,10 +434,8 @@ func (m mockStyleApplier) Bullet() string         { return "● " }
 // Diff-related styles
 func (m mockStyleApplier) LineNumberRender(text string) string    { return "[LN:" + text + "]" }
 func (m mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
-func (m mockStyleApplier) DiffAddRender(text string) string       { return "[ADD:" + text + "]" }
-func (m mockStyleApplier) DiffRemoveRender(text string) string    { return "[REM:" + text + "]" }
-func (m mockStyleApplier) DiffAddBg() style.Color    { return "#00ff00" }
-func (m mockStyleApplier) DiffRemoveBg() style.Color { return "#ff0000" }
+func (m mockStyleApplier) DiffAddBg() style.Color                 { return "#00ff00" }
+func (m mockStyleApplier) DiffRemoveBg() style.Color              { return "#ff0000" }
 
 // Session/header styles
 func (m mockStyleApplier) SessionHeaderRender(text string) string    { return "[HEADER:" + text + "]" }
@@ -1358,8 +1356,6 @@ func TestDefaultStyleApplier(t *testing.T) {
 	_ = sa.Bullet()
 	_ = sa.LineNumberRender("test")
 	_ = sa.LineNumberSepRender("│")
-	_ = sa.DiffAddRender("test")
-	_ = sa.DiffRemoveRender("test")
 	_ = sa.DiffAddBg()
 	_ = sa.DiffRemoveBg()
 	_ = sa.SessionHeaderRender("test")

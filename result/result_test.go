@@ -40,10 +40,8 @@ func (m mockStyleApplier) Bullet() string         { return "● " }
 // Diff-related styles
 func (m mockStyleApplier) LineNumberRender(text string) string    { return "[ln]" + text + "[/ln]" }
 func (m mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
-func (m mockStyleApplier) DiffAddRender(text string) string       { return "[add]" + text + "[/add]" }
-func (m mockStyleApplier) DiffRemoveRender(text string) string    { return "[rem]" + text + "[/rem]" }
-func (m mockStyleApplier) DiffAddBg() style.Color    { return "#00ff00" }
-func (m mockStyleApplier) DiffRemoveBg() style.Color { return "#ff0000" }
+func (m mockStyleApplier) DiffAddBg() style.Color                 { return "#00ff00" }
+func (m mockStyleApplier) DiffRemoveBg() style.Color              { return "#ff0000" }
 
 // Session/header styles
 func (m mockStyleApplier) SessionHeaderRender(text string) string    { return "[header]" + text + "[/header]" }

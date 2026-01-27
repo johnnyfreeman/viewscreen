@@ -443,10 +443,12 @@ func TestInitStylesColorEnabled(t *testing.T) {
 		t.Error("SuccessText should apply formatting when color is enabled")
 	}
 
-	// DiffAdd (Lipgloss background style) should produce colored output
-	diffResult := DiffAdd.Render(testText)
-	if diffResult == testText {
-		t.Error("DiffAdd style should apply formatting when color is enabled")
+	// DiffAddBg and DiffRemoveBg should be set to theme colors
+	if DiffAddBg == "" {
+		t.Error("DiffAddBg should be set when color is enabled")
+	}
+	if DiffRemoveBg == "" {
+		t.Error("DiffRemoveBg should be set when color is enabled")
 	}
 }
 
@@ -474,9 +476,11 @@ func TestInitStylesColorDisabled(t *testing.T) {
 		t.Errorf("BoldText should be a no-op when color is disabled, got %q", boldResult)
 	}
 
-	// DiffAdd (Lipgloss background style) should also be a no-op
-	diffResult := DiffAdd.Render(testText)
-	if diffResult != testText {
-		t.Errorf("DiffAdd style should be a no-op when color is disabled, got %q", diffResult)
+	// DiffAddBg and DiffRemoveBg should be empty when color is disabled
+	if DiffAddBg != "" {
+		t.Errorf("DiffAddBg should be empty when color is disabled, got %q", DiffAddBg)
+	}
+	if DiffRemoveBg != "" {
+		t.Errorf("DiffRemoveBg should be empty when color is disabled, got %q", DiffRemoveBg)
 	}
 }

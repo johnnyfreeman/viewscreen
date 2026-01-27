@@ -1,8 +1,9 @@
 package style
 
 import (
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
+
+	"charm.land/lipgloss/v2"
 )
 
 const (
@@ -20,10 +21,8 @@ const (
 )
 
 var (
-	// Diff styles (Lipgloss for backgrounds, Ultraviolet for foregrounds)
-	// These are valid Lipgloss use cases - background colors for diff highlighting.
-	DiffAdd      lipgloss.Style
-	DiffRemove   lipgloss.Style
+	// Diff background colors used by Ultraviolet for composition-safe styling.
+	// These are passed to HighlightFileWithBg() for syntax-highlighted diffs.
 	DiffAddBg    Color
 	DiffRemoveBg Color
 
@@ -48,22 +47,14 @@ func Init(disableColor bool) {
 	}
 
 	if noColor {
-		// Diff styles are no-ops when color is disabled
-		DiffAdd = lipgloss.NewStyle()
-		DiffRemove = lipgloss.NewStyle()
 		DiffAddBg = ""
 		DiffRemoveBg = ""
 		return
 	}
 
 	t := CurrentTheme
-
-	// Diff styles (delta-like with subtle backgrounds)
-	// These are the only Lipgloss styles remaining - backgrounds are a valid use case.
 	DiffAddBg = t.DiffAddBg
 	DiffRemoveBg = t.DiffRemoveBg
-	DiffAdd = lipgloss.NewStyle().Background(lipgloss.Color(string(DiffAddBg)))
-	DiffRemove = lipgloss.NewStyle().Background(lipgloss.Color(string(DiffRemoveBg)))
 }
 
 // NoColor returns whether color output is disabled
