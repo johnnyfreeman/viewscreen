@@ -64,7 +64,7 @@ func applyGradientCore(text string, from, to Color, bold bool) string {
 		// with surrounding escape codes when gradient text is further
 		// processed or wrapped in other styles.
 		style := &uv.Style{
-			Fg:    colorfulToRGBA(blended),
+			Fg:    ColorfulToRGBA(blended),
 			Attrs: attrs,
 		}
 		b.WriteString(style.Styled(string(r)))
@@ -73,8 +73,10 @@ func applyGradientCore(text string, from, to Color, bold bool) string {
 	return b.String()
 }
 
-// colorfulToRGBA converts a colorful.Color to color.RGBA.
-func colorfulToRGBA(c colorful.Color) color.RGBA {
+// ColorfulToRGBA converts a colorful.Color to color.RGBA.
+// This is exported so other packages (like indicator) can use it for
+// gradient calculations without duplicating the conversion logic.
+func ColorfulToRGBA(c colorful.Color) color.RGBA {
 	return color.RGBA{
 		R: uint8(c.R * 255),
 		G: uint8(c.G * 255),

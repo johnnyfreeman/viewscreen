@@ -39,6 +39,10 @@ type Theme struct {
 	// Error gradient (for session error)
 	ErrorGradientStart Color
 	ErrorGradientEnd   Color
+
+	// Spinner gradient (for animated spinners)
+	SpinnerGradientStart Color
+	SpinnerGradientEnd   Color
 }
 
 // DefaultTheme is the default color theme using TrueColor hex values
@@ -75,6 +79,10 @@ var DefaultTheme = Theme{
 	// Error gradient (red to orange)
 	ErrorGradientStart: "#F87171", // Red-400
 	ErrorGradientEnd:   "#FB923C", // Orange-400
+
+	// Spinner gradient (purple to cyan)
+	SpinnerGradientStart: "#A855F7", // Purple-500
+	SpinnerGradientEnd:   "#22D3EE", // Cyan-400
 }
 
 // NoColorTheme is used when color output is disabled
@@ -98,6 +106,8 @@ var NoColorTheme = Theme{
 	SuccessGradientEnd:   "",
 	ErrorGradientStart:   "",
 	ErrorGradientEnd:     "",
+	SpinnerGradientStart: "",
+	SpinnerGradientEnd:   "",
 }
 
 // CurrentTheme holds the active theme

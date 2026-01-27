@@ -5,13 +5,13 @@ package indicator
 
 import (
 	"fmt"
-	"image/color"
 	"io"
 	"os"
 	"sync"
 
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/lucasb-eyer/go-colorful"
+	"github.com/johnnyfreeman/viewscreen/style"
 )
 
 // Spinner provides visual feedback during streaming with cycling braille characters.
@@ -47,11 +47,11 @@ func WithSpinnerFrames(frames []string) SpinnerOption {
 	}
 }
 
-// NewSpinner creates a new spinner
+// NewSpinner creates a new spinner using theme gradient colors.
 func NewSpinner(noColor bool, opts ...SpinnerOption) *Spinner {
-	// Gradient colors: purple to cyan
-	start, _ := colorful.Hex("#A855F7")
-	end, _ := colorful.Hex("#22D3EE")
+	// Use theme colors for the spinner gradient
+	start, _ := colorful.Hex(string(style.CurrentTheme.SpinnerGradientStart))
+	end, _ := colorful.Hex(string(style.CurrentTheme.SpinnerGradientEnd))
 
 	s := &Spinner{
 		frames:    defaultFrames,
@@ -91,20 +91,10 @@ func (s *Spinner) Frame() string {
 	// This produces cleaner ANSI sequences that won't conflict
 	// with surrounding escape codes when spinner frames are
 	// composed with other styled text.
-	style := &uv.Style{
-		Fg: colorfulToRGBA(blended),
+	uvStyle := &uv.Style{
+		Fg: style.ColorfulToRGBA(blended),
 	}
-	return style.Styled(frame)
-}
-
-// colorfulToRGBA converts a colorful.Color to color.RGBA.
-func colorfulToRGBA(c colorful.Color) color.RGBA {
-	return color.RGBA{
-		R: uint8(c.R * 255),
-		G: uint8(c.G * 255),
-		B: uint8(c.B * 255),
-		A: 255,
-	}
+	return uvStyle.Styled(frame)
 }
 
 // Show writes the current spinner frame to output (overwrites previous)
@@ -167,12 +157,12 @@ func (i *StreamingIndicator) Show() {
 	if i.noColor {
 		ind = "..."
 	} else {
-		// Subtle pulsing dot - use Ultraviolet for consistent styling
-		purple, _ := colorful.Hex("#A855F7")
-		style := &uv.Style{
-			Fg: colorfulToRGBA(purple),
+		// Subtle pulsing dot - use theme accent color via Ultraviolet for consistent styling
+		accent, _ := colorful.Hex(string(style.CurrentTheme.Accent))
+		uvStyle := &uv.Style{
+			Fg: style.ColorfulToRGBA(accent),
 		}
-		ind = style.Styled("●")
+		ind = uvStyle.Styled("●")
 	}
 	fmt.Fprint(i.output, ind)
 	i.shown = true
