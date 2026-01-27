@@ -110,7 +110,7 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 func (r *Renderer) renderTo(out *render.Output, event Event, inTextBlock, inToolUseBlock bool) {
 	if event.Error != "" {
 		fmt.Fprintln(out, style.ApplyErrorGradient(style.Bullet+"Error"))
-		fmt.Fprintf(out, "%s%s\n", style.OutputPrefix, style.Error.Render(event.Error))
+		fmt.Fprintf(out, "%s%s\n", style.OutputPrefix, style.ErrorText(event.Error))
 	}
 
 	for _, block := range event.Message.Content {

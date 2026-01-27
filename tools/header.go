@@ -116,7 +116,7 @@ func (r *HeaderRenderer) renderTo(out *render.Output, toolName string, input map
 		if IsFilePathTool(toolName) {
 			fmt.Fprint(out, " "+style.MutedDottedUnderline(args))
 		} else {
-			fmt.Fprint(out, " "+style.Muted.Render(args))
+			fmt.Fprint(out, " "+style.MutedText(args))
 		}
 	}
 	fmt.Fprintln(out)

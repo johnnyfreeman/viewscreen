@@ -196,7 +196,7 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 	for _, o := range orphaned {
 		str, _ := o.RenderToString()
 		content.WriteString(str)
-		content.WriteString(style.OutputPrefix + style.Muted.Render("(no result)") + "\n")
+		content.WriteString(style.OutputPrefix + style.MutedText("(no result)") + "\n")
 	}
 
 	p.state.ClearCurrentTool()
