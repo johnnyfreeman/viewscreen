@@ -208,6 +208,10 @@ type Renderer struct {
 	highlighter      CodeHighlighter
 	markdownRenderer MarkdownRenderer
 	toolContext      *ToolContext
+	// Sub-renderers for specific result types
+	editRenderer  *EditRenderer
+	todoRenderer  *TodoRenderer
+	writeRenderer *WriteRenderer
 }
 
 // RendererOption is a functional option for configuring a Renderer
@@ -258,6 +262,8 @@ func WithMarkdownRenderer(mr MarkdownRenderer) RendererOption {
 // NewRenderer creates a new user Renderer with default dependencies
 func NewRenderer() *Renderer {
 	cc := DefaultConfigChecker{}
+	sa := DefaultStyleApplier{}
+	ch := NewDefaultCodeHighlighter(cc.NoColor())
 	width := 80
 	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
 		width = w
@@ -265,10 +271,13 @@ func NewRenderer() *Renderer {
 	return &Renderer{
 		output:           os.Stdout,
 		configChecker:    cc,
-		styleApplier:     DefaultStyleApplier{},
-		highlighter:      NewDefaultCodeHighlighter(cc.NoColor()),
+		styleApplier:     sa,
+		highlighter:      ch,
 		markdownRenderer: render.NewMarkdownRenderer(cc.NoColor(), width),
 		toolContext:      &ToolContext{},
+		editRenderer:     NewEditRenderer(sa, ch),
+		todoRenderer:     NewTodoRenderer(sa),
+		writeRenderer:    NewWriteRenderer(sa),
 	}
 }
 
@@ -278,6 +287,10 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 	for _, opt := range opts {
 		opt(r)
 	}
+	// Rebuild sub-renderers with potentially updated dependencies
+	r.editRenderer = NewEditRenderer(r.styleApplier, r.highlighter)
+	r.todoRenderer = NewTodoRenderer(r.styleApplier)
+	r.writeRenderer = NewWriteRenderer(r.styleApplier)
 	return r
 }
 
@@ -289,38 +302,41 @@ func (r *Renderer) SetToolContext(toolName, path string) {
 
 // Render outputs the user event to the terminal
 func (r *Renderer) Render(event Event) {
-	r.renderWithPrefix(event, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
+	out := render.WriterOutput(r.output)
+	r.renderTo(out, event, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
 }
 
 // RenderNested outputs the user event with nested indentation for sub-agent tools
 func (r *Renderer) RenderNested(event Event) {
-	r.renderWithPrefix(event, style.NestedOutputPrefix, style.NestedOutputContinue)
+	out := render.WriterOutput(r.output)
+	r.renderTo(out, event, style.NestedOutputPrefix, style.NestedOutputContinue)
 }
 
-// renderWithPrefix outputs the user event with custom prefixes
-func (r *Renderer) renderWithPrefix(event Event, outputPrefix, outputContinue string) {
+// renderTo is the unified rendering method that writes to any output.
+// This eliminates duplication between Render and RenderToString.
+func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outputContinue string) {
 	// Handle synthetic messages (e.g., skill content) in verbose mode
 	if event.IsSynthetic {
 		if r.configChecker.IsVerbose() {
-			r.renderSyntheticMessage(event)
+			r.renderSyntheticMessageTo(out, event)
 		}
 		return
 	}
 
 	// Try to render as edit result with diff first
 	// Always show edit diffs by default - developers want to see what changed
-	if r.tryRenderEditResultWithPrefix(event.ToolUseResult, outputPrefix, outputContinue) {
+	if r.editRenderer.TryRender(out, event.ToolUseResult, outputPrefix, outputContinue) {
 		return
 	}
 
 	// Try to render as write result (new file creation)
 	// Show a concise summary instead of misleading "Read N lines"
-	if r.tryRenderWriteResultWithPrefix(event.ToolUseResult, outputPrefix) {
+	if r.writeRenderer.TryRender(out, event.ToolUseResult, outputPrefix) {
 		return
 	}
 
 	// Try to render as todo result with visual todo list
-	if r.tryRenderTodoResultWithPrefix(event.ToolUseResult, outputPrefix, outputContinue) {
+	if r.todoRenderer.TryRender(out, event.ToolUseResult, outputPrefix, outputContinue) {
 		return
 	}
 
@@ -330,7 +346,7 @@ func (r *Renderer) renderWithPrefix(event Event, outputPrefix, outputContinue st
 			// Show error with output prefix
 			errMsg := terminal.StripSystemReminders(contentStr)
 			errMsg = terminal.Truncate(errMsg, 200)
-			fmt.Fprintf(r.output, "%s%s\n", outputPrefix, r.styleApplier.ErrorRender(errMsg))
+			fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.ErrorRender(errMsg))
 		} else if contentStr != "" {
 			// Clean up the content
 			cleaned := terminal.StripSystemReminders(contentStr)
@@ -349,28 +365,28 @@ func (r *Renderer) renderWithPrefix(event Event, outputPrefix, outputContinue st
 
 				for i, line := range resultLines {
 					if i == 0 {
-						fmt.Fprintf(r.output, "%s%s\n", outputPrefix, line)
+						fmt.Fprintf(out, "%s%s\n", outputPrefix, line)
 					} else {
-						fmt.Fprintf(r.output, "%s%s\n", outputContinue, line)
+						fmt.Fprintf(out, "%s%s\n", outputContinue, line)
 					}
 				}
 
 				// Show truncation indicator if content was truncated
 				if remaining > 0 {
 					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Fprintf(r.output, "%s%s\n", outputContinue, r.styleApplier.MutedRender(indicator))
+					fmt.Fprintf(out, "%s%s\n", outputContinue, r.styleApplier.MutedRender(indicator))
 				}
 			} else {
 				// Show summary in non-verbose mode
 				summary := fmt.Sprintf("Read %d lines", lineCount)
-				fmt.Fprintf(r.output, "%s%s\n", outputPrefix, r.styleApplier.MutedRender(summary))
+				fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.MutedRender(summary))
 			}
 		}
 	}
 }
 
-// renderSyntheticMessage renders a synthetic user message (e.g., skill content)
-func (r *Renderer) renderSyntheticMessage(event Event) {
+// renderSyntheticMessageTo renders a synthetic user message to any output.
+func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 	for _, content := range event.Message.Content {
 		// Synthetic messages have type "text" with Text field populated
 		if content.Type == "text" && content.Text != "" {
@@ -380,9 +396,9 @@ func (r *Renderer) renderSyntheticMessage(event Event) {
 			// Render as markdown if renderer is available
 			if r.markdownRenderer != nil {
 				rendered := r.markdownRenderer.Render(cleaned)
-				fmt.Fprint(r.output, rendered)
+				fmt.Fprint(out, rendered)
 				if !strings.HasSuffix(rendered, "\n") {
-					fmt.Fprintln(r.output)
+					fmt.Fprintln(out)
 				}
 			} else {
 				// Fallback to plain text with truncation
@@ -391,15 +407,15 @@ func (r *Renderer) renderSyntheticMessage(event Event) {
 
 				for i, line := range resultLines {
 					if i == 0 {
-						fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputPrefix(), line)
+						fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputPrefix(), line)
 					} else {
-						fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), line)
+						fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputContinue(), line)
 					}
 				}
 
 				if remaining > 0 {
 					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator))
+					fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator))
 					return
 				}
 			}
@@ -407,7 +423,7 @@ func (r *Renderer) renderSyntheticMessage(event Event) {
 			// Show line count summary
 			if len(lines) > 0 {
 				summary := fmt.Sprintf("(%d lines)", len(lines))
-				fmt.Fprintf(r.output, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(summary))
+				fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(summary))
 			}
 		}
 	}
@@ -429,225 +445,6 @@ func (r *Renderer) highlightContent(content string) string {
 		path = r.toolContext.ToolPath
 	}
 	return r.highlighter.HighlightFile(content, path)
-}
-
-// tryRenderEditResult attempts to render an edit result with delta-style diff
-// Returns true if it rendered, false if not an edit result
-func (r *Renderer) tryRenderEditResult(toolUseResult json.RawMessage) bool {
-	return r.tryRenderEditResultWithPrefix(toolUseResult, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
-}
-
-// tryRenderEditResultWithPrefix attempts to render an edit result with custom prefixes
-func (r *Renderer) tryRenderEditResultWithPrefix(toolUseResult json.RawMessage, outputPrefix, outputContinue string) bool {
-	if len(toolUseResult) == 0 {
-		return false
-	}
-
-	var editResult EditResult
-	if err := json.Unmarshal(toolUseResult, &editResult); err != nil {
-		return false
-	}
-
-	// Check if this is an edit result with a structured patch
-	if editResult.FilePath == "" || len(editResult.StructuredPatch) == 0 {
-		return false
-	}
-
-	// Calculate max line number for column width
-	maxLine := 0
-	for _, hunk := range editResult.StructuredPatch {
-		if endOld := hunk.OldStart + hunk.OldLines; endOld > maxLine {
-			maxLine = endOld
-		}
-		if endNew := hunk.NewStart + hunk.NewLines; endNew > maxLine {
-			maxLine = endNew
-		}
-	}
-	numWidth := len(fmt.Sprintf("%d", maxLine))
-
-	// Get language for syntax highlighting
-	lang := render.DetectLanguageFromPath(editResult.FilePath)
-
-	// Separator character for line numbers
-	sep := r.styleApplier.LineNumberSepRender("│")
-
-	first := true
-	lineCount := 0
-	for _, hunk := range editResult.StructuredPatch {
-		oldLine := hunk.OldStart
-		newLine := hunk.NewStart
-
-		for _, line := range hunk.Lines {
-			if len(line) == 0 {
-				continue
-			}
-
-			// Check truncation limit
-			if lineCount >= terminal.DefaultMaxLines {
-				// Count remaining lines
-				remaining := 0
-				for _, h := range editResult.StructuredPatch {
-					remaining += len(h.Lines)
-				}
-				remaining -= lineCount
-				if remaining > 0 {
-					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Fprintf(r.output, "%s%s\n", outputContinue, r.styleApplier.MutedRender(indicator))
-				}
-				return true
-			}
-
-			prefix := line[0]
-			content := line[1:] // Strip the +/- prefix
-
-			// Format line number and operation indicator
-			var lineNum string
-			var op string
-			switch prefix {
-			case '+':
-				// Added line: show new line number with + indicator
-				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
-				op = r.styleApplier.SuccessRender("+")
-				newLine++
-			case '-':
-				// Removed line: show old line number with - indicator
-				lineNum = fmt.Sprintf("%*d", numWidth, oldLine)
-				op = r.styleApplier.ErrorRender("-")
-				oldLine++
-			default:
-				// Context line: show new line number with space
-				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
-				op = " "
-				oldLine++
-				newLine++
-			}
-			lineNums := r.styleApplier.LineNumberRender(lineNum)
-
-			// Syntax highlight with appropriate background for diff lines
-			var styled string
-			switch prefix {
-			case '+':
-				if lang != "" {
-					styled = r.highlighter.HighlightWithBg(content, lang, r.styleApplier.DiffAddBg())
-				} else {
-					styled = r.styleApplier.DiffAddRender(content)
-				}
-			case '-':
-				if lang != "" {
-					styled = r.highlighter.HighlightWithBg(content, lang, r.styleApplier.DiffRemoveBg())
-				} else {
-					styled = r.styleApplier.DiffRemoveRender(content)
-				}
-			default:
-				if lang != "" {
-					styled = r.highlighter.Highlight(content, lang)
-				} else {
-					styled = content
-				}
-			}
-
-			// Output with separators: ⎿ 123 │ + code
-			if first {
-				fmt.Fprintf(r.output, "%s%s %s %s %s\n", outputPrefix, lineNums, sep, op, styled)
-				first = false
-			} else {
-				fmt.Fprintf(r.output, "%s%s %s %s %s\n", outputContinue, lineNums, sep, op, styled)
-			}
-			lineCount++
-		}
-	}
-	return true
-}
-
-// tryRenderTodoResult attempts to render a TodoWrite result with visual todo list
-// Returns true if it rendered, false if not a todo result
-func (r *Renderer) tryRenderTodoResult(toolUseResult json.RawMessage) bool {
-	return r.tryRenderTodoResultWithPrefix(toolUseResult, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
-}
-
-// tryRenderTodoResultWithPrefix renders todo results with custom prefixes
-func (r *Renderer) tryRenderTodoResultWithPrefix(toolUseResult json.RawMessage, outputPrefix, outputContinue string) bool {
-	if len(toolUseResult) == 0 {
-		return false
-	}
-
-	var todoResult TodoResult
-	if err := json.Unmarshal(toolUseResult, &todoResult); err != nil {
-		return false
-	}
-
-	// Check if this looks like a todo result (has newTodos array)
-	if len(todoResult.NewTodos) == 0 {
-		return false
-	}
-
-	// Render each todo with status indicator
-	for i, todo := range todoResult.NewTodos {
-		var statusIndicator string
-		var contentRenderer func(string) string
-
-		switch todo.Status {
-		case "completed":
-			statusIndicator = r.styleApplier.SuccessRender("✓")
-			contentRenderer = r.styleApplier.MutedRender
-		case "in_progress":
-			statusIndicator = r.styleApplier.WarningRender("→")
-			contentRenderer = func(s string) string { return s } // No special styling
-		default: // "pending"
-			statusIndicator = r.styleApplier.MutedRender("○")
-			contentRenderer = r.styleApplier.MutedRender
-		}
-
-		// Use OutputPrefix for first line, OutputContinue for rest
-		prefix := outputContinue
-		if i == 0 {
-			prefix = outputPrefix
-		}
-
-		content := todo.Content
-		if todo.Status == "in_progress" && todo.ActiveForm != "" {
-			content = todo.ActiveForm
-		}
-
-		fmt.Fprintf(r.output, "%s%s %s\n", prefix, statusIndicator, contentRenderer(content))
-	}
-
-	return true
-}
-
-// tryRenderWriteResult attempts to render a write/create result
-// Returns true if it rendered, false if not a write result
-func (r *Renderer) tryRenderWriteResult(toolUseResult json.RawMessage) bool {
-	return r.tryRenderWriteResultWithPrefix(toolUseResult, r.styleApplier.OutputPrefix())
-}
-
-// tryRenderWriteResultWithPrefix renders write results with custom prefix
-func (r *Renderer) tryRenderWriteResultWithPrefix(toolUseResult json.RawMessage, outputPrefix string) bool {
-	if len(toolUseResult) == 0 {
-		return false
-	}
-
-	var writeResult WriteResult
-	if err := json.Unmarshal(toolUseResult, &writeResult); err != nil {
-		return false
-	}
-
-	// Check if this is a write/create result
-	if writeResult.Type != "create" || writeResult.FilePath == "" {
-		return false
-	}
-
-	// Count lines in the created file
-	lineCount := 1
-	if writeResult.Content != "" {
-		lineCount = len(strings.Split(writeResult.Content, "\n"))
-	}
-
-	// Show a summary of the created file
-	summary := fmt.Sprintf("Created (%d lines)", lineCount)
-	fmt.Fprintf(r.output, "%s%s\n", outputPrefix, r.styleApplier.MutedRender(summary))
-
-	return true
 }
 
 // Package-level state for backward compatibility
@@ -689,329 +486,16 @@ func RenderNested(event Event) {
 
 // RenderNestedToString renders the user event with nested indentation
 func (r *Renderer) RenderNestedToString(event Event) string {
-	return r.renderToStringWithPrefix(event, style.NestedOutputPrefix, style.NestedOutputContinue)
+	out := render.StringOutput()
+	r.renderTo(out, event, style.NestedOutputPrefix, style.NestedOutputContinue)
+	return out.String()
 }
 
 // RenderToString renders the user event to a string
 func (r *Renderer) RenderToString(event Event) string {
-	return r.renderToStringWithPrefix(event, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
-}
-
-// renderToStringWithPrefix renders the user event to a string with custom prefixes
-func (r *Renderer) renderToStringWithPrefix(event Event, outputPrefix, outputContinue string) string {
-	var sb strings.Builder
-
-	// Handle synthetic messages (e.g., skill content) in verbose mode
-	if event.IsSynthetic {
-		if r.configChecker.IsVerbose() {
-			sb.WriteString(r.renderSyntheticMessageToString(event))
-		}
-		return sb.String()
-	}
-
-	// Try to render as edit result with diff first
-	if result, ok := r.tryRenderEditResultToStringWithPrefix(event.ToolUseResult, outputPrefix, outputContinue); ok {
-		return result
-	}
-
-	// Try to render as write result (new file creation)
-	if result, ok := r.tryRenderWriteResultToStringWithPrefix(event.ToolUseResult, outputPrefix); ok {
-		return result
-	}
-
-	// Try to render as todo result with visual todo list
-	if result, ok := r.tryRenderTodoResultToStringWithPrefix(event.ToolUseResult, outputPrefix, outputContinue); ok {
-		return result
-	}
-
-	for _, content := range event.Message.Content {
-		contentStr := content.Content()
-		if content.IsError {
-			// Show error with output prefix
-			errMsg := terminal.StripSystemReminders(contentStr)
-			errMsg = terminal.Truncate(errMsg, 200)
-			sb.WriteString(fmt.Sprintf("%s%s\n", outputPrefix, r.styleApplier.ErrorRender(errMsg)))
-		} else if contentStr != "" {
-			// Clean up the content
-			cleaned := terminal.StripSystemReminders(contentStr)
-			cleaned = terminal.StripLineNumbers(cleaned)
-
-			lines := strings.Split(cleaned, "\n")
-			lineCount := len(lines)
-
-			if r.configChecker.IsVerbose() {
-				// Apply syntax highlighting first
-				highlighted := r.highlightContent(cleaned)
-
-				// Truncate to max lines
-				truncated, remaining := terminal.TruncateLines(highlighted, terminal.DefaultMaxLines)
-				resultLines := strings.Split(truncated, "\n")
-
-				for i, line := range resultLines {
-					if i == 0 {
-						sb.WriteString(fmt.Sprintf("%s%s\n", outputPrefix, line))
-					} else {
-						sb.WriteString(fmt.Sprintf("%s%s\n", outputContinue, line))
-					}
-				}
-
-				// Show truncation indicator if content was truncated
-				if remaining > 0 {
-					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					sb.WriteString(fmt.Sprintf("%s%s\n", outputContinue, r.styleApplier.MutedRender(indicator)))
-				}
-			} else {
-				// Show summary in non-verbose mode
-				summary := fmt.Sprintf("Read %d lines", lineCount)
-				sb.WriteString(fmt.Sprintf("%s%s\n", outputPrefix, r.styleApplier.MutedRender(summary)))
-			}
-		}
-	}
-	return sb.String()
-}
-
-// renderSyntheticMessageToString renders a synthetic user message to a string
-func (r *Renderer) renderSyntheticMessageToString(event Event) string {
-	var sb strings.Builder
-	for _, content := range event.Message.Content {
-		if content.Type == "text" && content.Text != "" {
-			cleaned := terminal.StripSystemReminders(content.Text)
-			lines := strings.Split(cleaned, "\n")
-
-			// Render as markdown if renderer is available
-			if r.markdownRenderer != nil {
-				rendered := r.markdownRenderer.Render(cleaned)
-				sb.WriteString(rendered)
-				if !strings.HasSuffix(rendered, "\n") {
-					sb.WriteString("\n")
-				}
-			} else {
-				// Fallback to plain text with truncation
-				truncated, remaining := terminal.TruncateLines(cleaned, terminal.DefaultMaxLines)
-				resultLines := strings.Split(truncated, "\n")
-
-				for i, line := range resultLines {
-					if i == 0 {
-						sb.WriteString(fmt.Sprintf("%s%s\n", r.styleApplier.OutputPrefix(), line))
-					} else {
-						sb.WriteString(fmt.Sprintf("%s%s\n", r.styleApplier.OutputContinue(), line))
-					}
-				}
-
-				if remaining > 0 {
-					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					sb.WriteString(fmt.Sprintf("%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator)))
-					continue
-				}
-			}
-
-			// Show line count summary
-			if len(lines) > 0 {
-				summary := fmt.Sprintf("(%d lines)", len(lines))
-				sb.WriteString(fmt.Sprintf("%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(summary)))
-			}
-		}
-	}
-	return sb.String()
-}
-
-// tryRenderEditResultToString renders an edit result to a string
-func (r *Renderer) tryRenderEditResultToString(toolUseResult json.RawMessage) (string, bool) {
-	return r.tryRenderEditResultToStringWithPrefix(toolUseResult, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
-}
-
-// tryRenderEditResultToStringWithPrefix renders an edit result to a string with custom prefixes
-func (r *Renderer) tryRenderEditResultToStringWithPrefix(toolUseResult json.RawMessage, outputPrefix, outputContinue string) (string, bool) {
-	if len(toolUseResult) == 0 {
-		return "", false
-	}
-
-	var editResult EditResult
-	if err := json.Unmarshal(toolUseResult, &editResult); err != nil {
-		return "", false
-	}
-
-	if editResult.FilePath == "" || len(editResult.StructuredPatch) == 0 {
-		return "", false
-	}
-
-	var sb strings.Builder
-
-	// Calculate max line number for column width
-	maxLine := 0
-	for _, hunk := range editResult.StructuredPatch {
-		if endOld := hunk.OldStart + hunk.OldLines; endOld > maxLine {
-			maxLine = endOld
-		}
-		if endNew := hunk.NewStart + hunk.NewLines; endNew > maxLine {
-			maxLine = endNew
-		}
-	}
-	numWidth := len(fmt.Sprintf("%d", maxLine))
-
-	// Get language for syntax highlighting
-	lang := render.DetectLanguageFromPath(editResult.FilePath)
-	sep := r.styleApplier.LineNumberSepRender("│")
-
-	first := true
-	lineCount := 0
-	for _, hunk := range editResult.StructuredPatch {
-		oldLine := hunk.OldStart
-		newLine := hunk.NewStart
-
-		for _, line := range hunk.Lines {
-			if len(line) == 0 {
-				continue
-			}
-
-			if lineCount >= terminal.DefaultMaxLines {
-				remaining := 0
-				for _, h := range editResult.StructuredPatch {
-					remaining += len(h.Lines)
-				}
-				remaining -= lineCount
-				if remaining > 0 {
-					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					sb.WriteString(fmt.Sprintf("%s%s\n", outputContinue, r.styleApplier.MutedRender(indicator)))
-				}
-				return sb.String(), true
-			}
-
-			prefix := line[0]
-			content := line[1:]
-
-			var lineNum string
-			var op string
-			switch prefix {
-			case '+':
-				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
-				op = r.styleApplier.SuccessRender("+")
-				newLine++
-			case '-':
-				lineNum = fmt.Sprintf("%*d", numWidth, oldLine)
-				op = r.styleApplier.ErrorRender("-")
-				oldLine++
-			default:
-				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
-				op = " "
-				oldLine++
-				newLine++
-			}
-			lineNums := r.styleApplier.LineNumberRender(lineNum)
-
-			var styled string
-			switch prefix {
-			case '+':
-				if lang != "" {
-					styled = r.highlighter.HighlightWithBg(content, lang, r.styleApplier.DiffAddBg())
-				} else {
-					styled = r.styleApplier.DiffAddRender(content)
-				}
-			case '-':
-				if lang != "" {
-					styled = r.highlighter.HighlightWithBg(content, lang, r.styleApplier.DiffRemoveBg())
-				} else {
-					styled = r.styleApplier.DiffRemoveRender(content)
-				}
-			default:
-				if lang != "" {
-					styled = r.highlighter.Highlight(content, lang)
-				} else {
-					styled = content
-				}
-			}
-
-			if first {
-				sb.WriteString(fmt.Sprintf("%s%s %s %s %s\n", outputPrefix, lineNums, sep, op, styled))
-				first = false
-			} else {
-				sb.WriteString(fmt.Sprintf("%s%s %s %s %s\n", outputContinue, lineNums, sep, op, styled))
-			}
-			lineCount++
-		}
-	}
-	return sb.String(), true
-}
-
-// tryRenderTodoResultToString renders a todo result to a string
-func (r *Renderer) tryRenderTodoResultToString(toolUseResult json.RawMessage) (string, bool) {
-	return r.tryRenderTodoResultToStringWithPrefix(toolUseResult, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
-}
-
-// tryRenderTodoResultToStringWithPrefix renders a todo result to a string with custom prefixes
-func (r *Renderer) tryRenderTodoResultToStringWithPrefix(toolUseResult json.RawMessage, outputPrefix, outputContinue string) (string, bool) {
-	if len(toolUseResult) == 0 {
-		return "", false
-	}
-
-	var todoResult TodoResult
-	if err := json.Unmarshal(toolUseResult, &todoResult); err != nil {
-		return "", false
-	}
-
-	if len(todoResult.NewTodos) == 0 {
-		return "", false
-	}
-
-	var sb strings.Builder
-	for i, todo := range todoResult.NewTodos {
-		var statusIndicator string
-		var contentRenderer func(string) string
-
-		switch todo.Status {
-		case "completed":
-			statusIndicator = r.styleApplier.SuccessRender("✓")
-			contentRenderer = r.styleApplier.MutedRender
-		case "in_progress":
-			statusIndicator = r.styleApplier.WarningRender("→")
-			contentRenderer = func(s string) string { return s }
-		default:
-			statusIndicator = r.styleApplier.MutedRender("○")
-			contentRenderer = r.styleApplier.MutedRender
-		}
-
-		prefix := outputContinue
-		if i == 0 {
-			prefix = outputPrefix
-		}
-
-		content := todo.Content
-		if todo.Status == "in_progress" && todo.ActiveForm != "" {
-			content = todo.ActiveForm
-		}
-
-		sb.WriteString(fmt.Sprintf("%s%s %s\n", prefix, statusIndicator, contentRenderer(content)))
-	}
-	return sb.String(), true
-}
-
-// tryRenderWriteResultToString renders a write result to a string
-func (r *Renderer) tryRenderWriteResultToString(toolUseResult json.RawMessage) (string, bool) {
-	return r.tryRenderWriteResultToStringWithPrefix(toolUseResult, r.styleApplier.OutputPrefix())
-}
-
-// tryRenderWriteResultToStringWithPrefix renders a write result to a string with custom prefix
-func (r *Renderer) tryRenderWriteResultToStringWithPrefix(toolUseResult json.RawMessage, outputPrefix string) (string, bool) {
-	if len(toolUseResult) == 0 {
-		return "", false
-	}
-
-	var writeResult WriteResult
-	if err := json.Unmarshal(toolUseResult, &writeResult); err != nil {
-		return "", false
-	}
-
-	if writeResult.Type != "create" || writeResult.FilePath == "" {
-		return "", false
-	}
-
-	lineCount := 1
-	if writeResult.Content != "" {
-		lineCount = len(strings.Split(writeResult.Content, "\n"))
-	}
-
-	summary := fmt.Sprintf("Created (%d lines)", lineCount)
-	return fmt.Sprintf("%s%s\n", outputPrefix, r.styleApplier.MutedRender(summary)), true
+	out := render.StringOutput()
+	r.renderTo(out, event, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
+	return out.String()
 }
 
 // RenderToString is a package-level convenience function for backward compatibility

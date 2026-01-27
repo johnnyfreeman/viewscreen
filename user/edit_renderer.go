@@ -1,0 +1,146 @@
+package user
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/terminal"
+)
+
+// EditRenderer handles rendering of edit results with syntax-highlighted diffs.
+type EditRenderer struct {
+	styleApplier StyleApplier
+	highlighter  CodeHighlighter
+}
+
+// NewEditRenderer creates a new EditRenderer with the given dependencies.
+func NewEditRenderer(styleApplier StyleApplier, highlighter CodeHighlighter) *EditRenderer {
+	return &EditRenderer{
+		styleApplier: styleApplier,
+		highlighter:  highlighter,
+	}
+}
+
+// TryRender attempts to render an edit result to the given output.
+// Returns true if it was an edit result and was rendered, false otherwise.
+func (er *EditRenderer) TryRender(out *render.Output, toolUseResult json.RawMessage, outputPrefix, outputContinue string) bool {
+	if len(toolUseResult) == 0 {
+		return false
+	}
+
+	var editResult EditResult
+	if err := json.Unmarshal(toolUseResult, &editResult); err != nil {
+		return false
+	}
+
+	// Check if this is an edit result with a structured patch
+	if editResult.FilePath == "" || len(editResult.StructuredPatch) == 0 {
+		return false
+	}
+
+	// Calculate max line number for column width
+	maxLine := 0
+	for _, hunk := range editResult.StructuredPatch {
+		if endOld := hunk.OldStart + hunk.OldLines; endOld > maxLine {
+			maxLine = endOld
+		}
+		if endNew := hunk.NewStart + hunk.NewLines; endNew > maxLine {
+			maxLine = endNew
+		}
+	}
+	numWidth := len(fmt.Sprintf("%d", maxLine))
+
+	// Get language for syntax highlighting
+	lang := render.DetectLanguageFromPath(editResult.FilePath)
+
+	// Separator character for line numbers
+	sep := er.styleApplier.LineNumberSepRender("│")
+
+	first := true
+	lineCount := 0
+	for _, hunk := range editResult.StructuredPatch {
+		oldLine := hunk.OldStart
+		newLine := hunk.NewStart
+
+		for _, line := range hunk.Lines {
+			if len(line) == 0 {
+				continue
+			}
+
+			// Check truncation limit
+			if lineCount >= terminal.DefaultMaxLines {
+				// Count remaining lines
+				remaining := 0
+				for _, h := range editResult.StructuredPatch {
+					remaining += len(h.Lines)
+				}
+				remaining -= lineCount
+				if remaining > 0 {
+					indicator := fmt.Sprintf("… (%d more lines)", remaining)
+					fmt.Fprintf(out, "%s%s\n", outputContinue, er.styleApplier.MutedRender(indicator))
+				}
+				return true
+			}
+
+			prefix := line[0]
+			content := line[1:] // Strip the +/- prefix
+
+			// Format line number and operation indicator
+			var lineNum string
+			var op string
+			switch prefix {
+			case '+':
+				// Added line: show new line number with + indicator
+				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
+				op = er.styleApplier.SuccessRender("+")
+				newLine++
+			case '-':
+				// Removed line: show old line number with - indicator
+				lineNum = fmt.Sprintf("%*d", numWidth, oldLine)
+				op = er.styleApplier.ErrorRender("-")
+				oldLine++
+			default:
+				// Context line: show new line number with space
+				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
+				op = " "
+				oldLine++
+				newLine++
+			}
+			lineNums := er.styleApplier.LineNumberRender(lineNum)
+
+			// Syntax highlight with appropriate background for diff lines
+			var styled string
+			switch prefix {
+			case '+':
+				if lang != "" {
+					styled = er.highlighter.HighlightWithBg(content, lang, er.styleApplier.DiffAddBg())
+				} else {
+					styled = er.styleApplier.DiffAddRender(content)
+				}
+			case '-':
+				if lang != "" {
+					styled = er.highlighter.HighlightWithBg(content, lang, er.styleApplier.DiffRemoveBg())
+				} else {
+					styled = er.styleApplier.DiffRemoveRender(content)
+				}
+			default:
+				if lang != "" {
+					styled = er.highlighter.Highlight(content, lang)
+				} else {
+					styled = content
+				}
+			}
+
+			// Output with separators: ⎿ 123 │ + code
+			if first {
+				fmt.Fprintf(out, "%s%s %s %s %s\n", outputPrefix, lineNums, sep, op, styled)
+				first = false
+			} else {
+				fmt.Fprintf(out, "%s%s %s %s %s\n", outputContinue, lineNums, sep, op, styled)
+			}
+			lineCount++
+		}
+	}
+	return true
+}
