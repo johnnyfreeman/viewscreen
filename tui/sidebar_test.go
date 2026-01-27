@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/spinner"
+	"charm.land/bubbles/v2/spinner"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
 )
@@ -17,10 +17,10 @@ func init() {
 }
 
 func newTestSpinner() spinner.Model {
-	s := spinner.New()
-	// Set a simple static frame for testing
-	s.Spinner = spinner.Spinner{Frames: []string{"⠋"}, FPS: 1}
-	return s
+	// Use v2 functional options API
+	return spinner.New(
+		spinner.WithSpinner(spinner.Spinner{Frames: []string{"⠋"}, FPS: 1}),
+	)
 }
 
 func TestNewSidebarRenderer(t *testing.T) {

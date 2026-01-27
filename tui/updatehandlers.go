@@ -1,9 +1,9 @@
 package tui
 
 import (
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
 )
@@ -12,7 +12,7 @@ import (
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
-		return m, tea.Quit
+		return m, tea.Quit // tea.Quit is a func() Msg, which is a Cmd
 	case "up", "k":
 		m.viewport.ScrollUp(1)
 	case "down", "j":
@@ -38,13 +38,16 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 	contentWidth := max(m.width-sidebarWidth-3, 20)
 
 	if !m.ready {
-		// First time setup
-		m.viewport = viewport.New(contentWidth, m.height-2)
+		// First time setup - use functional options for v2 API
+		m.viewport = viewport.New(
+			viewport.WithWidth(contentWidth),
+			viewport.WithHeight(m.height-2),
+		)
 		m.viewport.YPosition = 0
 		m.ready = true
 	} else {
-		m.viewport.Width = contentWidth
-		m.viewport.Height = m.height - 2
+		m.viewport.SetWidth(contentWidth)
+		m.viewport.SetHeight(m.height - 2)
 	}
 
 	// Update viewport content

@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/render"
@@ -33,10 +33,11 @@ type Model struct {
 
 // NewModel creates a new TUI model
 func NewModel() Model {
-	// Initialize spinner
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	// Initialize spinner with Dot spinner and orange color
+	s := spinner.New(
+		spinner.WithSpinner(spinner.Dot),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("214"))),
+	)
 
 	// Create scanner for stdin with large buffer
 	scanner := bufio.NewScanner(os.Stdin)
@@ -134,11 +135,17 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 // View renders the TUI
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	v := tea.NewView("")
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+
 	if !m.ready {
-		return "Initializing..."
+		v.SetContent("Initializing...")
+		return v
 	}
-	return m.renderLayout()
+	v.SetContent(m.renderLayout())
+	return v
 }
 
 // updateViewportWithPendingTools updates the viewport content, rendering pending tools with spinner
@@ -169,11 +176,8 @@ func Run() error {
 	cfg := config.DefaultProvider{}
 	render.NewMarkdownRenderer(cfg.NoColor(), 80)
 
-	p := tea.NewProgram(
-		NewModel(),
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
+	// AltScreen and MouseMode are now set declaratively in View()
+	p := tea.NewProgram(NewModel())
 
 	_, err := p.Run()
 	return err

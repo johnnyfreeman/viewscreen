@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
 	"github.com/johnnyfreeman/viewscreen/events"
 )
 
@@ -21,7 +21,8 @@ func newTestModel() Model {
 func TestHandleKeyMsg(t *testing.T) {
 	t.Run("quit on q", func(t *testing.T) {
 		m := newTestModel()
-		_, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+		// In v2, KeyPressMsg is used with Text field for printable characters
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
 
 		if cmd == nil {
 			t.Error("expected quit command on 'q' key")
@@ -30,7 +31,8 @@ func TestHandleKeyMsg(t *testing.T) {
 
 	t.Run("quit on ctrl+c", func(t *testing.T) {
 		m := newTestModel()
-		_, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyCtrlC})
+		// In v2, ctrl+c uses Code 'c' with ModCtrl modifier
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 
 		if cmd == nil {
 			t.Error("expected quit command on ctrl+c")
@@ -42,10 +44,10 @@ func TestHandleKeyMsg(t *testing.T) {
 		m.viewport.SetContent(strings.Repeat("line\n", 100))
 		m.viewport.GotoBottom()
 
-		initialY := m.viewport.YOffset
-		m, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+		initialY := m.viewport.YOffset()
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "k"})
 
-		if m.viewport.YOffset >= initialY {
+		if m.viewport.YOffset() >= initialY {
 			t.Error("expected viewport to scroll up on 'k' key")
 		}
 	})
@@ -54,10 +56,10 @@ func TestHandleKeyMsg(t *testing.T) {
 		m := newTestModel()
 		m.viewport.SetContent(strings.Repeat("line\n", 100))
 
-		initialY := m.viewport.YOffset
-		m, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+		initialY := m.viewport.YOffset()
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
 
-		if m.viewport.YOffset <= initialY {
+		if m.viewport.YOffset() <= initialY {
 			t.Error("expected viewport to scroll down on 'j' key")
 		}
 	})
@@ -67,9 +69,9 @@ func TestHandleKeyMsg(t *testing.T) {
 		m.viewport.SetContent(strings.Repeat("line\n", 100))
 		m.viewport.GotoBottom()
 
-		m, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}})
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "g"})
 
-		if m.viewport.YOffset != 0 {
+		if m.viewport.YOffset() != 0 {
 			t.Error("expected viewport to go to top on 'g' key")
 		}
 	})
@@ -78,16 +80,16 @@ func TestHandleKeyMsg(t *testing.T) {
 		m := newTestModel()
 		m.viewport.SetContent(strings.Repeat("line\n", 100))
 
-		m, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "G"})
 
-		if m.viewport.YOffset == 0 {
+		if m.viewport.YOffset() == 0 {
 			t.Error("expected viewport to go to bottom on 'G' key")
 		}
 	})
 
 	t.Run("no command on other keys", func(t *testing.T) {
 		m := newTestModel()
-		_, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "x"})
 
 		if cmd != nil {
 			t.Error("expected no command on unknown key")
@@ -134,8 +136,8 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 
 		// Content width should be total - sidebar - border
 		expectedWidth := 120 - sidebarWidth - 3
-		if m.viewport.Width != expectedWidth {
-			t.Errorf("viewport width = %d, want %d", m.viewport.Width, expectedWidth)
+		if m.viewport.Width() != expectedWidth {
+			t.Errorf("viewport width = %d, want %d", m.viewport.Width(), expectedWidth)
 		}
 	})
 }
