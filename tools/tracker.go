@@ -90,15 +90,28 @@ func (t *ToolUseTracker) Clear() {
 	t.pending = make(map[string]PendingTool)
 }
 
-// MatchedTool represents a tool_use block matched with its result.
-type MatchedTool struct {
+// ResolvedTool contains the common fields and rendering logic for tools
+// that have been matched or orphaned. This consolidates the shared behavior
+// between MatchedTool and OrphanedTool.
+type ResolvedTool struct {
 	Block    types.ContentBlock
 	IsNested bool
 }
 
-// RenderToString renders the matched tool header with appropriate nesting.
-func (m MatchedTool) RenderToString() (string, ToolContext) {
-	return NewHeaderRenderer().RenderBlockToStringWithNesting(m.Block, m.IsNested)
+// RenderToString renders the tool header with appropriate nesting.
+func (r ResolvedTool) RenderToString() (string, ToolContext) {
+	return NewHeaderRenderer().RenderBlockToStringWithNesting(r.Block, r.IsNested)
+}
+
+// MatchedTool represents a tool_use block matched with its result.
+type MatchedTool struct {
+	ResolvedTool
+}
+
+// OrphanedTool represents a pending tool that has no matching result.
+type OrphanedTool struct {
+	ResolvedTool
+	ID string
 }
 
 // MatchAndRemove finds pending tools by their IDs, removes them from the tracker,
@@ -111,8 +124,10 @@ func (t *ToolUseTracker) MatchAndRemove(toolUseIDs []string) []MatchedTool {
 		if pending, ok := t.Get(id); ok {
 			isNested := t.IsNested(pending)
 			matched = append(matched, MatchedTool{
-				Block:    pending.Block,
-				IsNested: isNested,
+				ResolvedTool: ResolvedTool{
+					Block:    pending.Block,
+					IsNested: isNested,
+				},
 			})
 			t.Remove(id)
 		}
@@ -121,27 +136,17 @@ func (t *ToolUseTracker) MatchAndRemove(toolUseIDs []string) []MatchedTool {
 	return matched
 }
 
-// OrphanedTool represents a pending tool that has no matching result.
-type OrphanedTool struct {
-	ID       string
-	Block    types.ContentBlock
-	IsNested bool
-}
-
-// RenderToString renders the orphaned tool header with appropriate nesting.
-func (o OrphanedTool) RenderToString() (string, ToolContext) {
-	return NewHeaderRenderer().RenderBlockToStringWithNesting(o.Block, o.IsNested)
-}
-
 // FlushAll removes all pending tools and returns them as orphaned.
 // Call this when processing a result event to handle any tools that didn't get results.
 func (t *ToolUseTracker) FlushAll() []OrphanedTool {
 	var orphaned []OrphanedTool
 	t.ForEach(func(id string, pending PendingTool) {
 		orphaned = append(orphaned, OrphanedTool{
-			ID:       id,
-			Block:    pending.Block,
-			IsNested: t.IsNested(pending),
+			ResolvedTool: ResolvedTool{
+				Block:    pending.Block,
+				IsNested: t.IsNested(pending),
+			},
+			ID: id,
 		})
 	})
 	t.Clear()

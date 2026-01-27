@@ -679,8 +679,10 @@ func TestToolUseTracker_MatchFromUserMessage_MultipleResults(t *testing.T) {
 
 func TestMatchedTool_RenderToString_NonNested(t *testing.T) {
 	matched := MatchedTool{
-		Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
-		IsNested: false,
+		ResolvedTool: ResolvedTool{
+			Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
+			IsNested: false,
+		},
 	}
 
 	str, ctx := matched.RenderToString()
@@ -699,8 +701,10 @@ func TestMatchedTool_RenderToString_NonNested(t *testing.T) {
 
 func TestMatchedTool_RenderToString_Nested(t *testing.T) {
 	matched := MatchedTool{
-		Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
-		IsNested: true,
+		ResolvedTool: ResolvedTool{
+			Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
+			IsNested: true,
+		},
 	}
 
 	str, ctx := matched.RenderToString()
@@ -721,9 +725,11 @@ func TestMatchedTool_RenderToString_Nested(t *testing.T) {
 
 func TestOrphanedTool_RenderToString_NonNested(t *testing.T) {
 	orphaned := OrphanedTool{
-		ID:       "tool-123",
-		Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
-		IsNested: false,
+		ResolvedTool: ResolvedTool{
+			Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
+			IsNested: false,
+		},
+		ID: "tool-123",
 	}
 
 	str, ctx := orphaned.RenderToString()
@@ -742,9 +748,11 @@ func TestOrphanedTool_RenderToString_NonNested(t *testing.T) {
 
 func TestOrphanedTool_RenderToString_Nested(t *testing.T) {
 	orphaned := OrphanedTool{
-		ID:       "tool-123",
-		Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
-		IsNested: true,
+		ResolvedTool: ResolvedTool{
+			Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
+			IsNested: true,
+		},
+		ID: "tool-123",
 	}
 
 	str, ctx := orphaned.RenderToString()

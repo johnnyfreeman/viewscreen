@@ -70,10 +70,11 @@ func WithToolUseRenderer(tr ToolUseRenderer) RendererOption {
 	}
 }
 
-// defaultToolUseRenderer renders a tool_use block to an Output using HeaderRenderer
+// defaultToolUseRenderer renders a tool_use block to an Output using HeaderRenderer.
+// It uses HeaderRenderer.RenderBlockToOutput which writes directly to the output,
+// avoiding string allocation.
 func defaultToolUseRenderer(out *render.Output, block types.ContentBlock) {
-	str, _ := tools.NewHeaderRenderer().RenderBlockToString(block)
-	out.WriteString(str)
+	tools.NewHeaderRenderer().RenderBlockToOutput(out, block)
 }
 
 // NewRenderer creates a new assistant Renderer with default dependencies

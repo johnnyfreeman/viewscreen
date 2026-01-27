@@ -148,3 +148,10 @@ func ParseBlockInput(block types.ContentBlock) map[string]any {
 	}
 	return input
 }
+
+// RenderBlockToOutput writes a tool header to a render.Output.
+// This is an adapter method for use with assistant.ToolUseRenderer.
+func (r *HeaderRenderer) RenderBlockToOutput(out *render.Output, block types.ContentBlock) {
+	input := ParseBlockInput(block)
+	r.renderTo(out, block.Name, input)
+}
