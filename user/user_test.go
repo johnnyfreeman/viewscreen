@@ -502,8 +502,8 @@ func TestRenderer_Render_NonVerbose(t *testing.T) {
 	if !strings.Contains(output, "Read 3 lines") {
 		t.Errorf("Expected 'Read 3 lines' in output, got: %q", output)
 	}
-	if !strings.Contains(output, "[MUTED:") {
-		t.Errorf("Expected muted style in output, got: %q", output)
+	if !strings.Contains(output, "[UV_MUTED:") {
+		t.Errorf("Expected UV muted style in output, got: %q", output)
 	}
 }
 
@@ -569,9 +569,9 @@ func TestRenderer_Render_Error(t *testing.T) {
 	r.Render(event)
 	output := buf.String()
 
-	// Should show error styled
-	if !strings.Contains(output, "[ERROR:") {
-		t.Errorf("Expected error style in output, got: %q", output)
+	// Should show error styled (using Ultraviolet for composition-safe styling)
+	if !strings.Contains(output, "[UV_ERROR:") {
+		t.Errorf("Expected UV error style in output, got: %q", output)
 	}
 	if !strings.Contains(output, "Something went wrong") {
 		t.Errorf("Expected error message in output, got: %q", output)

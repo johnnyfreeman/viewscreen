@@ -236,7 +236,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 			// Show error with output prefix
 			errMsg := r.contentCleaner.Clean(contentStr)
 			errMsg = textutil.Truncate(errMsg, 200)
-			fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.ErrorRender(errMsg))
+			fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.UVErrorText(errMsg))
 		} else if contentStr != "" {
 			// Clean up the content using the content cleaner pipeline
 			cleaned := r.contentCleaner.Clean(contentStr)
@@ -259,12 +259,12 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 
 				// Show truncation indicator if content was truncated
 				if remaining > 0 {
-					pw.WriteLinef("%s", r.styleApplier.MutedRender(textutil.TruncationIndicator(remaining)))
+					pw.WriteLinef("%s", r.styleApplier.UVMutedText(textutil.TruncationIndicator(remaining)))
 				}
 			} else {
 				// Show summary in non-verbose mode
 				summary := fmt.Sprintf("Read %d lines", lineCount)
-				fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.MutedRender(summary))
+				fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.UVMutedText(summary))
 			}
 		}
 	}
@@ -296,7 +296,7 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 				}
 
 				if remaining > 0 {
-					pw.WriteLinef("%s", r.styleApplier.MutedRender(textutil.TruncationIndicator(remaining)))
+					pw.WriteLinef("%s", r.styleApplier.UVMutedText(textutil.TruncationIndicator(remaining)))
 					return
 				}
 			}
@@ -304,7 +304,7 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 			// Show line count summary
 			if len(lines) > 0 {
 				summary := fmt.Sprintf("(%d lines)", len(lines))
-				fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(summary))
+				fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.UVMutedText(summary))
 			}
 		}
 	}
