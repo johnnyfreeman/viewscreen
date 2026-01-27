@@ -151,7 +151,7 @@ func (p *Parser) handleUser(line []byte) error {
 					ctx = tools.RenderToolUse(pending.Block)
 				}
 				// Set tool context on the user renderer for syntax highlighting
-				p.userRenderer.SetToolContext(ctx.ToolName, ctx.FilePath)
+				p.userRenderer.SetToolContext(ctx)
 				p.pendingTools.Remove(content.ToolUseID)
 			}
 		}

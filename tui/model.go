@@ -226,7 +226,7 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 					}
 					m.content.WriteString(str)
 					// Set tool context for syntax highlighting of results
-					m.userRenderer.SetToolContext(ctx.ToolName, ctx.FilePath)
+					m.userRenderer.SetToolContext(ctx)
 					m.pendingTools.Remove(content.ToolUseID)
 				}
 			}

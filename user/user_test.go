@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/tools"
 )
 
 func TestToolResultContent_Content(t *testing.T) {
@@ -119,13 +120,13 @@ func TestToolResultContent_ContentWithFields(t *testing.T) {
 func TestRendererSetToolContext(t *testing.T) {
 	r := NewRenderer()
 
-	r.SetToolContext("Read", "/path/to/file.go")
+	r.SetToolContext(tools.ToolContext{ToolName: "Read", FilePath: "/path/to/file.go"})
 
 	if r.toolContext.ToolName != "Read" {
 		t.Errorf("ToolName = %q, expected %q", r.toolContext.ToolName, "Read")
 	}
-	if r.toolContext.ToolPath != "/path/to/file.go" {
-		t.Errorf("ToolPath = %q, expected %q", r.toolContext.ToolPath, "/path/to/file.go")
+	if r.toolContext.FilePath != "/path/to/file.go" {
+		t.Errorf("FilePath = %q, expected %q", r.toolContext.FilePath, "/path/to/file.go")
 	}
 }
 
@@ -447,13 +448,13 @@ func TestRenderer_SetToolContext(t *testing.T) {
 		WithConfigChecker(mockConfigChecker{noColor: true}),
 	)
 
-	r.SetToolContext("Read", "/path/to/file.go")
+	r.SetToolContext(tools.ToolContext{ToolName: "Read", FilePath: "/path/to/file.go"})
 
 	if r.toolContext.ToolName != "Read" {
 		t.Errorf("ToolName = %q, expected %q", r.toolContext.ToolName, "Read")
 	}
-	if r.toolContext.ToolPath != "/path/to/file.go" {
-		t.Errorf("ToolPath = %q, expected %q", r.toolContext.ToolPath, "/path/to/file.go")
+	if r.toolContext.FilePath != "/path/to/file.go" {
+		t.Errorf("FilePath = %q, expected %q", r.toolContext.FilePath, "/path/to/file.go")
 	}
 }
 
@@ -853,7 +854,7 @@ func TestRenderer_highlightContent_WithToolContext(t *testing.T) {
 	r := NewRendererWithOptions(
 		WithConfigChecker(mockConfigChecker{noColor: true}),
 		WithCodeHighlighter(mockHighlighter),
-		WithToolContext(&ToolContext{ToolPath: "/path/to/file.go"}),
+		WithToolContext(&tools.ToolContext{FilePath: "/path/to/file.go"}),
 	)
 
 	r.highlightContent("package main")
@@ -902,7 +903,7 @@ func TestRenderer_highlightContent_FallsBackToHighlightFile(t *testing.T) {
 	r := NewRendererWithOptions(
 		WithConfigChecker(mockConfigChecker{noColor: true}),
 		WithCodeHighlighter(mockHighlighter),
-		WithToolContext(&ToolContext{ToolPath: "/path/to/file.unknown"}), // Unknown extension
+		WithToolContext(&tools.ToolContext{FilePath: "/path/to/file.unknown"}), // Unknown extension
 	)
 
 	r.highlightContent("some content")
@@ -937,7 +938,7 @@ func TestNewRendererWithOptions_AllOptions(t *testing.T) {
 	cc := mockConfigChecker{verbose: true}
 	sa := mockStyleApplier{}
 	ch := mockCodeHighlighter{}
-	tc := &ToolContext{ToolName: "Test", ToolPath: "/test"}
+	tc := &tools.ToolContext{ToolName: "Test", FilePath: "/test"}
 
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
@@ -1291,23 +1292,23 @@ func TestRendererSetToolContextMultiple(t *testing.T) {
 	r := NewRenderer()
 
 	// Set initial context
-	r.SetToolContext("Bash", "/script.sh")
+	r.SetToolContext(tools.ToolContext{ToolName: "Bash", FilePath: "/script.sh"})
 
 	if r.toolContext.ToolName != "Bash" {
 		t.Errorf("ToolName = %q, expected %q", r.toolContext.ToolName, "Bash")
 	}
-	if r.toolContext.ToolPath != "/script.sh" {
-		t.Errorf("ToolPath = %q, expected %q", r.toolContext.ToolPath, "/script.sh")
+	if r.toolContext.FilePath != "/script.sh" {
+		t.Errorf("FilePath = %q, expected %q", r.toolContext.FilePath, "/script.sh")
 	}
 
 	// Update context
-	r.SetToolContext("Read", "/file.go")
+	r.SetToolContext(tools.ToolContext{ToolName: "Read", FilePath: "/file.go"})
 
 	if r.toolContext.ToolName != "Read" {
 		t.Errorf("ToolName = %q, expected %q", r.toolContext.ToolName, "Read")
 	}
-	if r.toolContext.ToolPath != "/file.go" {
-		t.Errorf("ToolPath = %q, expected %q", r.toolContext.ToolPath, "/file.go")
+	if r.toolContext.FilePath != "/file.go" {
+		t.Errorf("FilePath = %q, expected %q", r.toolContext.FilePath, "/file.go")
 	}
 }
 

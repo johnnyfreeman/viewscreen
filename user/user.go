@@ -12,6 +12,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/terminal"
+	"github.com/johnnyfreeman/viewscreen/tools"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
@@ -156,12 +157,6 @@ func (d *DefaultCodeHighlighter) HighlightWithBg(code, language string, bgColor 
 	return d.renderer.HighlightWithBg(code, language, bgColor)
 }
 
-// ToolContext holds information about the last tool used
-type ToolContext struct {
-	ToolName string
-	ToolPath string
-}
-
 // MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
 type MarkdownRenderer = types.MarkdownRenderer
 
@@ -172,7 +167,7 @@ type Renderer struct {
 	styleApplier     render.StyleApplier
 	highlighter      CodeHighlighter
 	markdownRenderer MarkdownRenderer
-	toolContext      *ToolContext
+	toolContext      *tools.ToolContext
 	// Registry for result-specific renderers
 	resultRegistry *ResultRegistry
 }
@@ -209,7 +204,7 @@ func WithCodeHighlighter(ch CodeHighlighter) RendererOption {
 }
 
 // WithToolContext sets the tool context for syntax highlighting hints
-func WithToolContext(tc *ToolContext) RendererOption {
+func WithToolContext(tc *tools.ToolContext) RendererOption {
 	return func(r *Renderer) {
 		r.toolContext = tc
 	}
@@ -240,7 +235,7 @@ func NewRenderer() *Renderer {
 		styleApplier:     sa,
 		highlighter:      ch,
 		markdownRenderer: render.NewMarkdownRenderer(cc.NoColor(), terminal.Width()),
-		toolContext:      &ToolContext{},
+		toolContext:      &tools.ToolContext{},
 		resultRegistry:   registry,
 	}
 }
@@ -260,9 +255,8 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 }
 
 // SetToolContext sets the tool context for syntax highlighting
-func (r *Renderer) SetToolContext(toolName, path string) {
-	r.toolContext.ToolName = toolName
-	r.toolContext.ToolPath = path
+func (r *Renderer) SetToolContext(ctx tools.ToolContext) {
+	*r.toolContext = ctx
 }
 
 // Render outputs the user event to the terminal
@@ -390,8 +384,8 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 // highlightContent applies syntax highlighting based on context
 func (r *Renderer) highlightContent(content string) string {
 	// Try to detect language from the last tool's file path
-	if r.toolContext != nil && r.toolContext.ToolPath != "" {
-		lang := render.DetectLanguageFromPath(r.toolContext.ToolPath)
+	if r.toolContext != nil && r.toolContext.FilePath != "" {
+		lang := render.DetectLanguageFromPath(r.toolContext.FilePath)
 		if lang != "" {
 			return r.highlighter.Highlight(content, lang)
 		}
@@ -400,7 +394,7 @@ func (r *Renderer) highlightContent(content string) string {
 	// Try to auto-detect from content
 	path := ""
 	if r.toolContext != nil {
-		path = r.toolContext.ToolPath
+		path = r.toolContext.FilePath
 	}
 	return r.highlighter.HighlightFile(content, path)
 }
