@@ -27,7 +27,7 @@ func TestTruncate(t *testing.T) {
 		{
 			name:     "string longer than max",
 			input:    "hello world",
-			maxLen:   5,
+			maxLen:   8,
 			expected: "hello...",
 		},
 		{
@@ -40,7 +40,13 @@ func TestTruncate(t *testing.T) {
 			name:     "max length zero",
 			input:    "hello",
 			maxLen:   0,
-			expected: "...",
+			expected: "",
+		},
+		{
+			name:     "max length small (<=3) truncates without ellipsis",
+			input:    "hello",
+			maxLen:   3,
+			expected: "hel",
 		},
 		{
 			name:     "string with leading/trailing spaces",
@@ -51,7 +57,7 @@ func TestTruncate(t *testing.T) {
 		{
 			name:     "string with spaces truncated",
 			input:    "  hello world  ",
-			maxLen:   5,
+			maxLen:   8,
 			expected: "hello...",
 		},
 		{
@@ -67,9 +73,9 @@ func TestTruncate(t *testing.T) {
 			expected: "hello 世界",
 		},
 		{
-			name:     "unicode truncated at byte boundary",
+			name:     "unicode truncated with ellipsis",
 			input:    "hello 世界 test",
-			maxLen:   6, // truncate right after "hello "
+			maxLen:   9, // "hello " (6) + "..." (3)
 			expected: "hello ...",
 		},
 	}
@@ -330,5 +336,78 @@ func TestTruncateLines(t *testing.T) {
 func TestDefaultMaxLines(t *testing.T) {
 	if DefaultMaxLines != 15 {
 		t.Errorf("DefaultMaxLines = %d, expected 15", DefaultMaxLines)
+	}
+}
+
+func TestWrapText(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxWidth int
+		expected string
+	}{
+		{
+			name:     "short text no wrap needed",
+			input:    "hello",
+			maxWidth: 20,
+			expected: "hello",
+		},
+		{
+			name:     "text exactly at max width",
+			input:    "hello world",
+			maxWidth: 11,
+			expected: "hello world",
+		},
+		{
+			name:     "simple wrap to two lines",
+			input:    "hello world test",
+			maxWidth: 11,
+			expected: "hello world\ntest",
+		},
+		{
+			name:     "wrap to three lines",
+			input:    "one two three four",
+			maxWidth: 5,
+			expected: "one\ntwo\nthree...",
+		},
+		{
+			name:     "truncates after three lines",
+			input:    "a b c d e f g h i j",
+			maxWidth: 3,
+			expected: "a b\nc d\ne...",
+		},
+		{
+			name:     "very long word gets truncated",
+			input:    "supercalifragilisticexpialidocious",
+			maxWidth: 10,
+			expected: "superca...",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			maxWidth: 10,
+			expected: "",
+		},
+		{
+			name:     "single word shorter than max",
+			input:    "hi",
+			maxWidth: 10,
+			expected: "hi",
+		},
+		{
+			name:     "short text with spaces not processed",
+			input:    "hello world",
+			maxWidth: 20,
+			expected: "hello world",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := WrapText(tt.input, tt.maxWidth)
+			if result != tt.expected {
+				t.Errorf("WrapText(%q, %d) = %q, expected %q", tt.input, tt.maxWidth, result, tt.expected)
+			}
+		})
 	}
 }

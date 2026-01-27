@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/textutil"
 )
 
 // Logo - "viewscreen" in big ASCII art
@@ -75,7 +76,7 @@ func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles Sid
 	// Prompt (if available)
 	if s.Prompt != "" {
 		// Word-wrap the prompt to fit sidebar
-		wrapped := wrapText(s.Prompt, sidebarWidth-4)
+		wrapped := textutil.WrapText(s.Prompt, sidebarWidth-4)
 		sb.WriteString(styles.Prompt.Render("\""+wrapped+"\""))
 		sb.WriteString("\n\n")
 	}
@@ -112,7 +113,7 @@ func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles Sid
 		}
 		sb.WriteString(spinner.View())
 		sb.WriteString(" ")
-		sb.WriteString(styles.TodoActive.Render(truncate(toolText, sidebarWidth-6)))
+		sb.WriteString(styles.TodoActive.Render(textutil.Truncate(toolText, sidebarWidth-6)))
 		sb.WriteString("\n\n")
 	}
 
@@ -129,21 +130,21 @@ func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles Sid
 				if text == "" {
 					text = todo.ActiveForm
 				}
-				sb.WriteString(styles.TodoDone.Render(truncate(text, sidebarWidth-6)))
+				sb.WriteString(styles.TodoDone.Render(textutil.Truncate(text, sidebarWidth-6)))
 			case "in_progress":
 				sb.WriteString(spinner.View())
 				text := todo.ActiveForm
 				if text == "" {
 					text = todo.Subject
 				}
-				sb.WriteString(styles.TodoActive.Render(truncate(text, sidebarWidth-6)))
+				sb.WriteString(styles.TodoActive.Render(textutil.Truncate(text, sidebarWidth-6)))
 			default: // pending
 				sb.WriteString(styles.TodoPending.Render("○ "))
 				text := todo.Subject
 				if text == "" {
 					text = todo.ActiveForm
 				}
-				sb.WriteString(styles.TodoPending.Render(truncate(text, sidebarWidth-6)))
+				sb.WriteString(styles.TodoPending.Render(textutil.Truncate(text, sidebarWidth-6)))
 			}
 			sb.WriteString("\n")
 		}
@@ -183,59 +184,4 @@ func renderLogo() string {
 	sb.WriteString("\n")
 
 	return sb.String()
-}
-
-// truncate shortens a string if it exceeds maxLen
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	if maxLen <= 3 {
-		return s[:maxLen]
-	}
-	return s[:maxLen-3] + "..."
-}
-
-// wrapText wraps text to fit within maxWidth, breaking on word boundaries
-func wrapText(s string, maxWidth int) string {
-	if len(s) <= maxWidth {
-		return s
-	}
-
-	var result strings.Builder
-	words := strings.Fields(s)
-	lineLen := 0
-
-	for i, word := range words {
-		wordLen := len(word)
-
-		if lineLen+wordLen+1 > maxWidth && lineLen > 0 {
-			result.WriteString("\n")
-			lineLen = 0
-		}
-
-		if lineLen > 0 {
-			result.WriteString(" ")
-			lineLen++
-		}
-
-		// Truncate very long words
-		if wordLen > maxWidth {
-			word = word[:maxWidth-3] + "..."
-			wordLen = maxWidth
-		}
-
-		result.WriteString(word)
-		lineLen += wordLen
-
-		// Limit to 3 lines
-		if i > 0 && strings.Count(result.String(), "\n") >= 2 && lineLen > 0 {
-			if len(s) > result.Len() {
-				result.WriteString("...")
-			}
-			break
-		}
-	}
-
-	return result.String()
 }
