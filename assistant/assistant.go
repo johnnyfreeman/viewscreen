@@ -70,9 +70,9 @@ func WithToolUseRenderer(tr ToolUseRenderer) RendererOption {
 	}
 }
 
-// defaultToolUseRenderer wraps tools.RenderToolUse to write to an Output
+// defaultToolUseRenderer renders a tool_use block to an Output using HeaderRenderer
 func defaultToolUseRenderer(out *render.Output, block types.ContentBlock) {
-	str, _ := tools.RenderToolUseToString(block)
+	str, _ := tools.NewHeaderRenderer().RenderBlockToString(block)
 	out.WriteString(str)
 }
 

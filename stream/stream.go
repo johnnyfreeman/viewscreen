@@ -72,6 +72,11 @@ type Renderer struct {
 	width            int
 }
 
+// defaultToolHeaderRenderer adapts HeaderRenderer to the ToolHeaderRenderer interface
+func defaultToolHeaderRenderer(toolName string, input map[string]any) (string, tools.ToolContext) {
+	return tools.NewHeaderRenderer().RenderToString(toolName, input)
+}
+
 // NewRenderer creates a new stream Renderer
 func NewRenderer() *Renderer {
 	width := terminal.Width()
@@ -80,7 +85,7 @@ func NewRenderer() *Renderer {
 		block:            NewBlockState(),
 		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, width),
 		indicator:        indicator.NewStreamingIndicator(config.NoColor),
-		toolHeaderRender: tools.RenderToolHeaderToString,
+		toolHeaderRender: defaultToolHeaderRenderer,
 		output:           os.Stdout,
 		width:            width,
 	}

@@ -126,6 +126,16 @@ func (r *HeaderRenderer) renderTo(out *render.Output, toolName string, input map
 	}
 }
 
+// RenderBlockToStringWithNesting renders a tool header from a ContentBlock to a string,
+// applying the nested prefix if isNested is true. This is a convenience method that
+// consolidates the common "if nested then X else Y" pattern.
+func (r *HeaderRenderer) RenderBlockToStringWithNesting(block types.ContentBlock, isNested bool) (string, ToolContext) {
+	if isNested {
+		return NewHeaderRenderer(WithNested()).RenderBlockToString(block)
+	}
+	return r.RenderBlockToString(block)
+}
+
 // ParseBlockInput parses the JSON input from a ContentBlock into a map.
 // Returns nil if input is empty or parsing fails.
 func ParseBlockInput(block types.ContentBlock) map[string]any {
