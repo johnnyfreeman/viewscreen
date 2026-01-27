@@ -65,123 +65,174 @@ func NewSidebarStyles() SidebarStyles {
 	}
 }
 
-// RenderSidebar renders the sidebar with session info and todos
-func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles) string {
-	var sb strings.Builder
-
-	// Logo with gradient
-	sb.WriteString(renderLogo())
-	sb.WriteString("\n")
-
-	// Prompt (if available)
-	if s.Prompt != "" {
-		// Word-wrap the prompt to fit sidebar
-		wrapped := textutil.WrapText(s.Prompt, sidebarWidth-4)
-		sb.WriteString(styles.Prompt.Render("\""+wrapped+"\""))
-		sb.WriteString("\n\n")
-	}
-
-	// Model name (truncate if needed)
-	modelName := s.Model
-	if len(modelName) > sidebarWidth-4 {
-		modelName = modelName[:sidebarWidth-7] + "..."
-	}
-	sb.WriteString(styles.Label.Render("Model"))
-	sb.WriteString("\n")
-	sb.WriteString(styles.Value.Render(modelName))
-	sb.WriteString("\n\n")
-
-	// Turn count
-	sb.WriteString(styles.Label.Render("Turns"))
-	sb.WriteString("\n")
-	sb.WriteString(styles.Value.Render(fmt.Sprintf("%d", s.TurnCount)))
-	sb.WriteString("\n\n")
-
-	// Cost
-	sb.WriteString(styles.Label.Render("Cost"))
-	sb.WriteString("\n")
-	sb.WriteString(styles.Value.Render(fmt.Sprintf("$%.4f", s.TotalCost)))
-	sb.WriteString("\n\n")
-
-	// Current tool (if any)
-	if s.ToolInProgress {
-		sb.WriteString(styles.Header.Render("Running"))
-		sb.WriteString("\n")
-		toolText := s.CurrentTool
-		if s.CurrentToolInput != "" && len(s.CurrentToolInput) < 20 {
-			toolText += " " + s.CurrentToolInput
-		}
-		sb.WriteString(spinner.View())
-		sb.WriteString(" ")
-		sb.WriteString(styles.TodoActive.Render(textutil.Truncate(toolText, sidebarWidth-6)))
-		sb.WriteString("\n\n")
-	}
-
-	// Tasks Header
-	if len(s.Todos) > 0 {
-		sb.WriteString(styles.Header.Render("Tasks"))
-		sb.WriteString("\n")
-
-		for _, todo := range s.Todos {
-			switch todo.Status {
-			case "completed":
-				sb.WriteString(style.Success.Render("✓ "))
-				text := todo.Subject
-				if text == "" {
-					text = todo.ActiveForm
-				}
-				sb.WriteString(styles.TodoDone.Render(textutil.Truncate(text, sidebarWidth-6)))
-			case "in_progress":
-				sb.WriteString(spinner.View())
-				text := todo.ActiveForm
-				if text == "" {
-					text = todo.Subject
-				}
-				sb.WriteString(styles.TodoActive.Render(textutil.Truncate(text, sidebarWidth-6)))
-			default: // pending
-				sb.WriteString(styles.TodoPending.Render("○ "))
-				text := todo.Subject
-				if text == "" {
-					text = todo.ActiveForm
-				}
-				sb.WriteString(styles.TodoPending.Render(textutil.Truncate(text, sidebarWidth-6)))
-			}
-			sb.WriteString("\n")
-		}
-	}
-
-	content := sb.String()
-
-	// Apply container style with fixed width and height
-	return styles.Container.Height(height - 2).Render(content)
+// SidebarRenderer renders individual sidebar sections.
+// Each method is independent and testable.
+type SidebarRenderer struct {
+	styles  SidebarStyles
+	width   int
+	spinner spinner.Model
 }
 
-// renderLogo renders the ASCII logo with a gradient and decorations
-func renderLogo() string {
+// NewSidebarRenderer creates a new sidebar renderer
+func NewSidebarRenderer(styles SidebarStyles, spinner spinner.Model) *SidebarRenderer {
+	return &SidebarRenderer{
+		styles:  styles,
+		width:   sidebarWidth,
+		spinner: spinner,
+	}
+}
+
+// RenderLogo renders the ASCII logo with gradient and decorations
+func (r *SidebarRenderer) RenderLogo() string {
 	var sb strings.Builder
 
-	// Subtle decoration style
 	darkDeco := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	deco := "· · · · · · · · · · · · ·"
 
-	// Top decoration (dots)
-	topDeco := "· · · · · · · · · · · · ·"
-	sb.WriteString(darkDeco.Render(topDeco))
+	sb.WriteString(darkDeco.Render(deco))
 	sb.WriteString("\n")
-
-	// "claude" in small text, left-aligned
 	sb.WriteString(style.Muted.Render("claude"))
 	sb.WriteString("\n")
 
-	// "viewscreen" logo with gradient
 	for _, line := range logoLines {
 		sb.WriteString(style.ApplyThemeBoldGradient(line))
 		sb.WriteString("\n")
 	}
 
-	// Bottom decoration (dots)
-	botDeco := "· · · · · · · · · · · · ·"
-	sb.WriteString(darkDeco.Render(botDeco))
+	sb.WriteString(darkDeco.Render(deco))
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// RenderPrompt renders the user's prompt if available
+func (r *SidebarRenderer) RenderPrompt(prompt string) string {
+	if prompt == "" {
+		return ""
+	}
+	wrapped := textutil.WrapText(prompt, r.width-4)
+	return r.styles.Prompt.Render("\""+wrapped+"\"") + "\n\n"
+}
+
+// RenderLabelValue renders a label/value pair (used for model, turns, cost)
+func (r *SidebarRenderer) RenderLabelValue(label, value string) string {
+	return r.styles.Label.Render(label) + "\n" +
+		r.styles.Value.Render(value) + "\n\n"
+}
+
+// RenderSessionInfo renders model, turns, and cost
+func (r *SidebarRenderer) RenderSessionInfo(model string, turns int, cost float64) string {
+	var sb strings.Builder
+
+	// Truncate model name if needed
+	modelName := model
+	if len(modelName) > r.width-4 {
+		modelName = modelName[:r.width-7] + "..."
+	}
+
+	sb.WriteString(r.RenderLabelValue("Model", modelName))
+	sb.WriteString(r.RenderLabelValue("Turns", fmt.Sprintf("%d", turns)))
+	sb.WriteString(r.RenderLabelValue("Cost", fmt.Sprintf("$%.4f", cost)))
+
+	return sb.String()
+}
+
+// RenderCurrentTool renders the currently running tool with spinner
+func (r *SidebarRenderer) RenderCurrentTool(toolName, toolInput string) string {
+	if toolName == "" {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(r.styles.Header.Render("Running"))
+	sb.WriteString("\n")
+
+	toolText := toolName
+	if toolInput != "" && len(toolInput) < 20 {
+		toolText += " " + toolInput
+	}
+
+	sb.WriteString(r.spinner.View())
+	sb.WriteString(" ")
+	sb.WriteString(r.styles.TodoActive.Render(textutil.Truncate(toolText, r.width-6)))
+	sb.WriteString("\n\n")
+
+	return sb.String()
+}
+
+// RenderTodo renders a single todo item
+func (r *SidebarRenderer) RenderTodo(todo state.Todo) string {
+	var sb strings.Builder
+	maxWidth := r.width - 6
+
+	switch todo.Status {
+	case "completed":
+		sb.WriteString(style.Success.Render("✓ "))
+		text := todo.Subject
+		if text == "" {
+			text = todo.ActiveForm
+		}
+		sb.WriteString(r.styles.TodoDone.Render(textutil.Truncate(text, maxWidth)))
+
+	case "in_progress":
+		sb.WriteString(r.spinner.View())
+		text := todo.ActiveForm
+		if text == "" {
+			text = todo.Subject
+		}
+		sb.WriteString(r.styles.TodoActive.Render(textutil.Truncate(text, maxWidth)))
+
+	default: // pending
+		sb.WriteString(r.styles.TodoPending.Render("○ "))
+		text := todo.Subject
+		if text == "" {
+			text = todo.ActiveForm
+		}
+		sb.WriteString(r.styles.TodoPending.Render(textutil.Truncate(text, maxWidth)))
+	}
+
+	sb.WriteString("\n")
+	return sb.String()
+}
+
+// RenderTodos renders the todo list section
+func (r *SidebarRenderer) RenderTodos(todos []state.Todo) string {
+	if len(todos) == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(r.styles.Header.Render("Tasks"))
+	sb.WriteString("\n")
+
+	for _, todo := range todos {
+		sb.WriteString(r.RenderTodo(todo))
+	}
+
+	return sb.String()
+}
+
+// Render renders the complete sidebar
+func (r *SidebarRenderer) Render(s *state.State, height int) string {
+	var sb strings.Builder
+
+	sb.WriteString(r.RenderLogo())
+	sb.WriteString("\n")
+	sb.WriteString(r.RenderPrompt(s.Prompt))
+	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+
+	if s.ToolInProgress {
+		sb.WriteString(r.RenderCurrentTool(s.CurrentTool, s.CurrentToolInput))
+	}
+
+	sb.WriteString(r.RenderTodos(s.Todos))
+
+	return r.styles.Container.Height(height - 2).Render(sb.String())
+}
+
+// RenderSidebar renders the sidebar with session info and todos.
+// This is the main entry point, kept for backward compatibility.
+func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles) string {
+	r := NewSidebarRenderer(styles, spinner)
+	return r.Render(s, height)
 }
