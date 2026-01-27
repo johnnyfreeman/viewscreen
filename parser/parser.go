@@ -6,14 +6,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/johnnyfreeman/viewscreen/assistant"
 	"github.com/johnnyfreeman/viewscreen/events"
-	"github.com/johnnyfreeman/viewscreen/result"
-	"github.com/johnnyfreeman/viewscreen/stream"
 	"github.com/johnnyfreeman/viewscreen/style"
-	"github.com/johnnyfreeman/viewscreen/system"
 	"github.com/johnnyfreeman/viewscreen/tools"
-	"github.com/johnnyfreeman/viewscreen/user"
 )
 
 // EventHandler is called for each parsed event
@@ -21,17 +16,10 @@ type EventHandler func(eventType string, line []byte) error
 
 // Parser handles reading and dispatching events from an input source
 type Parser struct {
-	input          io.Reader
-	errOutput      io.Writer
-	streamRenderer *stream.Renderer
-	eventHandler   EventHandler
-	pendingTools   *tools.ToolUseTracker
-
-	// Renderers for each event type
-	systemRenderer    *system.Renderer
-	assistantRenderer *assistant.Renderer
-	userRenderer      *user.Renderer
-	resultRenderer    *result.Renderer
+	input        io.Reader
+	errOutput    io.Writer
+	eventHandler EventHandler
+	renderers    *events.RendererSet
 }
 
 // Option configures a Parser
@@ -51,17 +39,17 @@ func WithErrOutput(w io.Writer) Option {
 	}
 }
 
-// WithStreamRenderer sets a custom stream renderer
-func WithStreamRenderer(r *stream.Renderer) Option {
-	return func(p *Parser) {
-		p.streamRenderer = r
-	}
-}
-
 // WithEventHandler sets a custom event handler for testing
 func WithEventHandler(h EventHandler) Option {
 	return func(p *Parser) {
 		p.eventHandler = h
+	}
+}
+
+// WithRendererSet sets a custom renderer set
+func WithRendererSet(rs *events.RendererSet) Option {
+	return func(p *Parser) {
+		p.renderers = rs
 	}
 }
 
@@ -73,14 +61,9 @@ func NewParser() *Parser {
 // NewParserWithOptions creates a new Parser with custom options
 func NewParserWithOptions(opts ...Option) *Parser {
 	p := &Parser{
-		input:             os.Stdin,
-		errOutput:         os.Stderr,
-		streamRenderer:    stream.NewRenderer(),
-		pendingTools:      tools.NewToolUseTracker(),
-		systemRenderer:    system.NewRenderer(),
-		assistantRenderer: assistant.NewRenderer(),
-		userRenderer:      user.NewRenderer(),
-		resultRenderer:    result.NewRenderer(),
+		input:     os.Stdin,
+		errOutput: os.Stderr,
+		renderers: events.NewRendererSet(),
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -144,20 +127,22 @@ func (p *Parser) Run() error {
 
 // processEvent handles a parsed event
 func (p *Parser) processEvent(event events.Event) error {
+	r := p.renderers
+
 	switch e := event.(type) {
 	case events.SystemEvent:
-		p.systemRenderer.Render(e.Data)
+		r.System.Render(e.Data)
 
 	case events.AssistantEvent:
 		// Buffer tool_use blocks using the events package helper
-		events.BufferToolUse(e.Data, p.pendingTools, p.streamRenderer)
+		events.BufferToolUse(e.Data, r.PendingTools, r.Stream)
 		// Render text blocks (tool_use rendering is always suppressed)
-		p.assistantRenderer.Render(e.Data, p.streamRenderer.InTextBlock(), true)
-		p.streamRenderer.ResetBlockState()
+		r.Assistant.Render(e.Data, r.Stream.InTextBlock(), true)
+		r.Stream.ResetBlockState()
 
 	case events.UserEvent:
 		// Match tool results with pending tool_use blocks
-		matched := events.MatchToolResults(e.Data, p.pendingTools)
+		matched := events.MatchToolResults(e.Data, r.PendingTools)
 
 		// Render matched tool headers and set context
 		var isNested bool
@@ -169,27 +154,27 @@ func (p *Parser) processEvent(event events.Event) error {
 			} else {
 				ctx = tools.RenderToolUse(m.Block)
 			}
-			p.userRenderer.SetToolContext(ctx)
+			r.User.SetToolContext(ctx)
 		}
 
 		// Render the tool result
 		if isNested {
-			p.userRenderer.RenderNested(e.Data)
+			r.User.RenderNested(e.Data)
 		} else {
-			p.userRenderer.Render(e.Data)
+			r.User.Render(e.Data)
 		}
 
 	case events.StreamEvent:
-		p.streamRenderer.Render(e.Data)
+		r.Stream.Render(e.Data)
 
 	case events.ResultEvent:
 		// Flush any orphaned pending tools
-		orphaned := events.FlushOrphanedTools(p.pendingTools)
+		orphaned := events.FlushOrphanedTools(r.PendingTools)
 		for _, o := range orphaned {
 			tools.RenderToolUse(o.Block)
 			fmt.Println(style.OutputPrefix + style.Muted.Render("(no result)"))
 		}
-		p.resultRenderer.Render(e.Data)
+		r.Result.Render(e.Data)
 	}
 
 	return nil

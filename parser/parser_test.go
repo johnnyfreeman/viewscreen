@@ -7,9 +7,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/stream"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
+
+// rendererSetWithStream creates a RendererSet with a custom stream renderer
+func rendererSetWithStream(sr *stream.Renderer) *events.RendererSet {
+	rs := events.NewRendererSet()
+	rs.Stream = sr
+	return rs
+}
 
 func TestNewParser(t *testing.T) {
 	p := NewParser()
@@ -18,8 +26,11 @@ func TestNewParser(t *testing.T) {
 		t.Fatal("NewParser returned nil")
 	}
 
-	if p.streamRenderer == nil {
-		t.Error("expected streamRenderer to be non-nil")
+	if p.renderers == nil {
+		t.Error("expected renderers to be non-nil")
+	}
+	if p.renderers.Stream == nil {
+		t.Error("expected renderers.Stream to be non-nil")
 	}
 }
 
@@ -42,12 +53,12 @@ func TestNewParserWithOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("with custom stream renderer", func(t *testing.T) {
-		sr := stream.NewRenderer()
-		p := NewParserWithOptions(WithStreamRenderer(sr))
+	t.Run("with custom renderer set", func(t *testing.T) {
+		rs := events.NewRendererSet()
+		p := NewParserWithOptions(WithRendererSet(rs))
 
-		if p.streamRenderer != sr {
-			t.Error("expected custom stream renderer")
+		if p.renderers != rs {
+			t.Error("expected custom renderer set")
 		}
 	})
 
@@ -216,7 +227,7 @@ func TestParser_Run_EventHandlerCalled(t *testing.T) {
 			p := NewParserWithOptions(
 				WithInput(strings.NewReader(string(eventJSON))),
 				WithErrOutput(io.Discard),
-				WithStreamRenderer(sr),
+				WithRendererSet(rendererSetWithStream(sr)),
 				WithEventHandler(func(eventType string, line []byte) error {
 					capturedType = eventType
 					capturedLine = line
@@ -368,7 +379,7 @@ func TestParser_Run_ParseErrorsForEachEventType(t *testing.T) {
 			p := NewParserWithOptions(
 				WithInput(strings.NewReader(tt.invalidJSON)),
 				WithErrOutput(errOut),
-				WithStreamRenderer(sr),
+				WithRendererSet(rendererSetWithStream(sr)),
 			)
 
 			err := p.Run()
@@ -385,7 +396,7 @@ func TestParser_Run_ParseErrorsForEachEventType(t *testing.T) {
 
 func TestParser_Run_StreamRendererIntegration(t *testing.T) {
 	// Test that stream events properly update stream renderer state
-	events := []map[string]any{
+	evts := []map[string]any{
 		{
 			"type": "stream_event",
 			"event": map[string]any{
@@ -399,7 +410,7 @@ func TestParser_Run_StreamRendererIntegration(t *testing.T) {
 	}
 
 	var lines []string
-	for _, e := range events {
+	for _, e := range evts {
 		j, _ := json.Marshal(e)
 		lines = append(lines, string(j))
 	}
@@ -407,11 +418,12 @@ func TestParser_Run_StreamRendererIntegration(t *testing.T) {
 
 	outputBuf := &bytes.Buffer{}
 	sr := stream.NewRendererWithOptions(stream.WithOutput(outputBuf))
+	rs := rendererSetWithStream(sr)
 
 	p := NewParserWithOptions(
 		WithInput(strings.NewReader(input)),
 		WithErrOutput(io.Discard),
-		WithStreamRenderer(sr),
+		WithRendererSet(rs),
 	)
 
 	err := p.Run()
@@ -420,7 +432,7 @@ func TestParser_Run_StreamRendererIntegration(t *testing.T) {
 	}
 
 	// After processing content_block_start for text, InTextBlock should be true
-	if !sr.InTextBlock() {
+	if !rs.Stream.InTextBlock() {
 		t.Error("expected InTextBlock to be true after text block start")
 	}
 }
@@ -428,6 +440,7 @@ func TestParser_Run_StreamRendererIntegration(t *testing.T) {
 func TestParser_Run_AssistantResetsBlockState(t *testing.T) {
 	outputBuf := &bytes.Buffer{}
 	sr := stream.NewRendererWithOptions(stream.WithOutput(outputBuf))
+	rs := rendererSetWithStream(sr)
 
 	// First send a stream event to start a text block
 	streamEvent := map[string]any{
@@ -460,7 +473,7 @@ func TestParser_Run_AssistantResetsBlockState(t *testing.T) {
 	p := NewParserWithOptions(
 		WithInput(strings.NewReader(input)),
 		WithErrOutput(io.Discard),
-		WithStreamRenderer(sr),
+		WithRendererSet(rs),
 	)
 
 	err := p.Run()
@@ -469,10 +482,10 @@ func TestParser_Run_AssistantResetsBlockState(t *testing.T) {
 	}
 
 	// After assistant event, block state should be reset
-	if sr.InTextBlock() {
+	if rs.Stream.InTextBlock() {
 		t.Error("expected InTextBlock to be false after assistant event")
 	}
-	if sr.InToolUseBlock() {
+	if rs.Stream.InToolUseBlock() {
 		t.Error("expected InToolUseBlock to be false after assistant event")
 	}
 }

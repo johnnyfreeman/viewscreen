@@ -10,40 +10,28 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/johnnyfreeman/viewscreen/assistant"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/render"
-	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/state"
-	"github.com/johnnyfreeman/viewscreen/stream"
 	"github.com/johnnyfreeman/viewscreen/style"
-	"github.com/johnnyfreeman/viewscreen/system"
 	"github.com/johnnyfreeman/viewscreen/tools"
 	"github.com/johnnyfreeman/viewscreen/types"
-	"github.com/johnnyfreeman/viewscreen/user"
 )
 
 // Model is the main Bubbletea model for the TUI
 type Model struct {
-	width          int
-	height         int
-	viewport       viewport.Model
-	spinner        spinner.Model
-	state          *state.State
-	content        *strings.Builder // pointer to avoid copy issues
-	stdinDone      bool
-	scanner        *bufio.Scanner
-	sidebarStyles  SidebarStyles
-	streamRenderer *stream.Renderer
-	ready          bool
-	pendingTools   *tools.ToolUseTracker
-
-	// Renderers for events
-	systemRenderer    *system.Renderer
-	assistantRenderer *assistant.Renderer
-	userRenderer      *user.Renderer
-	resultRenderer    *result.Renderer
+	width         int
+	height        int
+	viewport      viewport.Model
+	spinner       spinner.Model
+	state         *state.State
+	content       *strings.Builder // pointer to avoid copy issues
+	stdinDone     bool
+	scanner       *bufio.Scanner
+	sidebarStyles SidebarStyles
+	ready         bool
+	renderers     *events.RendererSet
 }
 
 // NewModel creates a new TUI model
@@ -59,23 +47,13 @@ func NewModel() Model {
 	buf := make([]byte, maxCapacity)
 	scanner.Buffer(buf, maxCapacity)
 
-	// Create renderers
-	streamRenderer := stream.NewRenderer()
-
 	return Model{
-		spinner:        s,
-		state:          state.NewState(),
-		content:        &strings.Builder{},
-		scanner:        scanner,
-		sidebarStyles:  NewSidebarStyles(),
-		streamRenderer: streamRenderer,
-		pendingTools:   tools.NewToolUseTracker(),
-
-		// Initialize package-level renderers
-		systemRenderer:    system.NewRenderer(),
-		assistantRenderer: assistant.NewRenderer(),
-		userRenderer:      user.NewRenderer(),
-		resultRenderer:    result.NewRenderer(),
+		spinner:       s,
+		state:         state.NewState(),
+		content:       &strings.Builder{},
+		scanner:       scanner,
+		sidebarStyles: NewSidebarStyles(),
+		renderers:     events.NewRendererSet(),
 	}
 }
 
@@ -135,7 +113,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 		// Refresh viewport to animate spinner for pending tools
-		if m.pendingTools.Len() > 0 {
+		if m.renderers.PendingTools.Len() > 0 {
 			m.updateViewportWithPendingTools()
 		}
 
@@ -177,10 +155,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // processEvent handles a parsed event message
 func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
+	r := m.renderers
+
 	switch msg := msg.(type) {
 	case SystemEventMsg:
 		m.state.UpdateFromSystemEvent(msg.Event)
-		rendered := m.systemRenderer.RenderToString(msg.Event)
+		rendered := r.System.RenderToString(msg.Event)
 		m.content.WriteString(rendered)
 		m.viewport.SetContent(m.content.String())
 		m.viewport.GotoBottom()
@@ -188,7 +168,7 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 	case AssistantEventMsg:
 		m.state.IncrementTurnCount()
 		// Buffer tool_use blocks using the events package helper
-		if events.BufferToolUse(msg.Event, m.pendingTools, m.streamRenderer) {
+		if events.BufferToolUse(msg.Event, r.PendingTools, r.Stream) {
 			// Set sidebar state to show the first pending tool
 			for _, block := range msg.Event.Message.Content {
 				if block.Type == "tool_use" && block.ID != "" {
@@ -198,20 +178,20 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		}
 		// Render text blocks only (tools are buffered)
-		rendered := m.assistantRenderer.RenderToString(
+		rendered := r.Assistant.RenderToString(
 			msg.Event,
-			m.streamRenderer.InTextBlock(),
+			r.Stream.InTextBlock(),
 			true, // Suppress tool rendering - we handle it separately
 		)
 		m.content.WriteString(rendered)
-		m.streamRenderer.ResetBlockState()
+		r.Stream.ResetBlockState()
 		m.updateViewportWithPendingTools()
 		m.viewport.GotoBottom()
 
 	case UserEventMsg:
 		m.state.UpdateFromToolUseResult(msg.Event.ToolUseResult)
 		// Match tool results with pending tools using the events package
-		matched := events.MatchToolResults(msg.Event, m.pendingTools)
+		matched := events.MatchToolResults(msg.Event, r.PendingTools)
 
 		// Render matched tool headers and set context
 		var isNested bool
@@ -225,19 +205,19 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 				str, ctx = tools.RenderToolUseToString(match.Block)
 			}
 			m.content.WriteString(str)
-			m.userRenderer.SetToolContext(ctx)
+			r.User.SetToolContext(ctx)
 		}
 
 		// Clear tool state if no more pending tools
-		if m.pendingTools.Len() == 0 {
+		if r.PendingTools.Len() == 0 {
 			m.state.ClearCurrentTool()
 		}
 		// Render the tool result (with nested prefix if applicable)
 		if isNested {
-			rendered := m.userRenderer.RenderNestedToString(msg.Event)
+			rendered := r.User.RenderNestedToString(msg.Event)
 			m.content.WriteString(rendered)
 		} else {
-			rendered := m.userRenderer.RenderToString(msg.Event)
+			rendered := r.User.RenderToString(msg.Event)
 			m.content.WriteString(rendered)
 		}
 		m.updateViewportWithPendingTools()
@@ -245,7 +225,7 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 
 	case StreamEventMsg:
 		// Handle stream events
-		rendered := m.streamRenderer.RenderToString(msg.Event)
+		rendered := r.Stream.RenderToString(msg.Event)
 		if rendered != "" {
 			m.content.WriteString(rendered)
 			m.viewport.SetContent(m.content.String())
@@ -253,13 +233,13 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 		// Update state for tool progress tracking
-		if msg.Event.Event.Type == "content_block_start" && m.streamRenderer.InToolUseBlock() {
-			m.state.SetCurrentTool(m.streamRenderer.CurrentBlockType(), "")
+		if msg.Event.Event.Type == "content_block_start" && r.Stream.InToolUseBlock() {
+			m.state.SetCurrentTool(r.Stream.CurrentBlockType(), "")
 		}
 
 	case ResultEventMsg:
 		// Flush any orphaned pending tools using the events package
-		orphaned := events.FlushOrphanedTools(m.pendingTools)
+		orphaned := events.FlushOrphanedTools(r.PendingTools)
 		for _, o := range orphaned {
 			str, _ := tools.RenderToolUseToString(o.Block)
 			m.content.WriteString(str)
@@ -267,7 +247,7 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		}
 		m.state.ClearCurrentTool()
 		m.state.UpdateFromResultEvent(msg.Event)
-		rendered := m.resultRenderer.RenderToString(msg.Event)
+		rendered := r.Result.RenderToString(msg.Event)
 		m.content.WriteString(rendered)
 		m.viewport.SetContent(m.content.String()) // No pending tools, just set content
 		m.viewport.GotoBottom()
@@ -288,9 +268,9 @@ func (m Model) View() string {
 func (m *Model) updateViewportWithPendingTools() {
 	content := m.content.String()
 	// Render pending tools with spinner instead of bullet
-	m.pendingTools.ForEach(func(id string, pending tools.PendingTool) {
+	m.renderers.PendingTools.ForEach(func(id string, pending tools.PendingTool) {
 		// Check if this is a nested child tool
-		isNested := m.pendingTools.IsNested(pending)
+		isNested := m.renderers.PendingTools.IsNested(pending)
 		// Render tool header with spinner instead of bullet
 		content += m.renderToolHeaderWithSpinner(pending.Block, isNested)
 	})
