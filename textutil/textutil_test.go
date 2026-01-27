@@ -515,6 +515,25 @@ func TestPrefixedWriter(t *testing.T) {
 	})
 }
 
+func TestTruncationIndicator(t *testing.T) {
+	tests := []struct {
+		remaining int
+		expected  string
+	}{
+		{1, "… (1 more lines)"},
+		{5, "… (5 more lines)"},
+		{100, "… (100 more lines)"},
+		{0, "… (0 more lines)"},
+	}
+
+	for _, tt := range tests {
+		result := TruncationIndicator(tt.remaining)
+		if result != tt.expected {
+			t.Errorf("TruncationIndicator(%d) = %q, want %q", tt.remaining, result, tt.expected)
+		}
+	}
+}
+
 func TestContentCleaner(t *testing.T) {
 	t.Run("empty cleaner does nothing", func(t *testing.T) {
 		c := NewContentCleaner()

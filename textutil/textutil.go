@@ -158,6 +158,12 @@ func (p *PrefixedWriter) IsFirst() bool {
 	return p.first
 }
 
+// TruncationIndicator formats the standard "… (N more lines)" indicator.
+// This consolidates the common pattern of showing how many lines were truncated.
+func TruncationIndicator(remaining int) string {
+	return fmt.Sprintf("… (%d more lines)", remaining)
+}
+
 // ContentCleaner applies a configurable sequence of cleaning operations to text.
 // This consolidates scattered cleaning logic (like stripping system reminders
 // and line numbers) into a single, composable pipeline.

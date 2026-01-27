@@ -93,8 +93,7 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 				}
 				remaining -= lineCount
 				if remaining > 0 {
-					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					pw.WriteLinef("%s", er.styleApplier.MutedRender(indicator))
+					pw.WriteLinef("%s", er.styleApplier.MutedRender(textutil.TruncationIndicator(remaining)))
 				}
 				return true
 			}

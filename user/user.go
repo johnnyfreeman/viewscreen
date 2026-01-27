@@ -270,8 +270,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 
 				// Show truncation indicator if content was truncated
 				if remaining > 0 {
-					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					pw.WriteLinef("%s", r.styleApplier.MutedRender(indicator))
+					pw.WriteLinef("%s", r.styleApplier.MutedRender(textutil.TruncationIndicator(remaining)))
 				}
 			} else {
 				// Show summary in non-verbose mode
@@ -308,8 +307,7 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 				}
 
 				if remaining > 0 {
-					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					pw.WriteLinef("%s", r.styleApplier.MutedRender(indicator))
+					pw.WriteLinef("%s", r.styleApplier.MutedRender(textutil.TruncationIndicator(remaining)))
 					return
 				}
 			}
