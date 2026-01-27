@@ -124,6 +124,70 @@ func TestDottedUnderline(t *testing.T) {
 	}
 }
 
+func TestMutedDottedUnderline(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		disableColor bool
+		wantPlain    bool
+	}{
+		{
+			name:         "with color enabled",
+			input:        "/path/to/file.go",
+			disableColor: false,
+			wantPlain:    false,
+		},
+		{
+			name:         "with color disabled returns plain text",
+			input:        "/path/to/file.go",
+			disableColor: true,
+			wantPlain:    true,
+		},
+		{
+			name:         "empty string with color",
+			input:        "",
+			disableColor: false,
+			wantPlain:    false,
+		},
+		{
+			name:         "empty string without color",
+			input:        "",
+			disableColor: true,
+			wantPlain:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			Init(tt.disableColor)
+			result := MutedDottedUnderline(tt.input)
+
+			if tt.wantPlain {
+				if result != tt.input {
+					t.Errorf("MutedDottedUnderline(%q) = %q, want plain text", tt.input, result)
+				}
+			} else {
+				// When color is enabled, verify ANSI codes are present
+				if tt.input != "" && result == tt.input {
+					t.Errorf("MutedDottedUnderline(%q) should contain ANSI codes", tt.input)
+				}
+				// Should contain the input text
+				if tt.input != "" && !strings.Contains(result, tt.input) {
+					t.Errorf("MutedDottedUnderline(%q) = %q, should contain input text", tt.input, result)
+				}
+				// Should contain dotted underline SGR (4:4)
+				if tt.input != "" && !strings.Contains(result, "4:4") {
+					t.Errorf("MutedDottedUnderline(%q) = %q, should contain dotted underline code (4:4)", tt.input, result)
+				}
+				// Should contain foreground color (38;2 for RGB)
+				if tt.input != "" && !strings.Contains(result, "38;2") {
+					t.Errorf("MutedDottedUnderline(%q) = %q, should contain RGB foreground color code", tt.input, result)
+				}
+			}
+		})
+	}
+}
+
 func TestApplyGradient(t *testing.T) {
 	tests := []struct {
 		name         string

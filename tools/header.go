@@ -103,20 +103,21 @@ func (r *HeaderRenderer) renderTo(out *render.Output, toolName string, input map
 		args = args[:77] + "..."
 	}
 
-	// Dotted underline for file paths for emphasis
-	styledArgs := args
-	if IsFilePathTool(toolName) && args != "" {
-		styledArgs = style.DottedUnderline(args)
-	}
-
 	// Build header: [prefix][icon]ToolName args
 	icon := r.icon
 	if icon == "" {
 		icon = style.Bullet
 	}
 	fmt.Fprint(out, r.prefix+style.ApplyThemeBoldGradient(icon+toolName))
-	if styledArgs != "" {
-		fmt.Fprint(out, " "+style.Muted.Render(styledArgs))
+
+	// Style args: file paths get muted color + dotted underline (combined in single
+	// ANSI sequence via Ultraviolet), other args get just muted color
+	if args != "" {
+		if IsFilePathTool(toolName) {
+			fmt.Fprint(out, " "+style.MutedDottedUnderline(args))
+		} else {
+			fmt.Fprint(out, " "+style.Muted.Render(args))
+		}
 	}
 	fmt.Fprintln(out)
 
