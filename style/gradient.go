@@ -17,7 +17,7 @@ import (
 func applyGradientCore(text string, from, to lipgloss.Color, bold bool) string {
 	if noColor {
 		if bold {
-			return Bold.Render(text)
+			return BoldText(text)
 		}
 		return text
 	}
@@ -30,14 +30,14 @@ func applyGradientCore(text string, from, to lipgloss.Color, bold bool) string {
 	fromColor, err := colorful.Hex(string(from))
 	if err != nil {
 		if bold {
-			return Bold.Render(text)
+			return BoldText(text)
 		}
 		return text
 	}
 	toColor, err := colorful.Hex(string(to))
 	if err != nil {
 		if bold {
-			return Bold.Render(text)
+			return BoldText(text)
 		}
 		return text
 	}

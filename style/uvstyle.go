@@ -221,6 +221,18 @@ func InfoBoldText(text string) string {
 	return style.Styled(text)
 }
 
+// BoldText applies bold styling using Ultraviolet without any color.
+// Use this for bold text when styling needs to be composition-safe.
+func BoldText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Attrs: uv.AttrBold,
+	}
+	return style.Styled(text)
+}
+
 // hexToRGBA converts a hex color string to color.RGBA.
 func hexToRGBA(hex string) color.RGBA {
 	c, err := colorful.Hex(hex)
