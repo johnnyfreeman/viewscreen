@@ -77,46 +77,19 @@ func (d ToolDefinition) IsFilePathTool() bool {
 	return d.FilePathField != ""
 }
 
-// ToolRenderer defines the interface for rendering tool headers
-type ToolRenderer interface {
-	// RenderHeader returns the argument string to display in the tool header.
-	// Returns empty string if no specific argument should be shown.
-	RenderHeader(input map[string]interface{}) string
-}
-
-// ToolRendererFunc is a function adapter for ToolRenderer
-type ToolRendererFunc func(input map[string]interface{}) string
-
-func (f ToolRendererFunc) RenderHeader(input map[string]interface{}) string {
-	return f(input)
-}
-
-// definitions holds all tool definitions, keyed by name
+// definitions holds all tool definitions, keyed by name.
+// This is the single source of truth for tool metadata.
 var definitions = map[string]ToolDefinition{}
 
-// registry holds tool-specific renderers (for backwards compatibility and custom renderers)
-var registry = map[string]ToolRenderer{}
-
 // RegisterDefinition adds a tool definition to the registry.
-// This is the preferred way to register tools.
 func RegisterDefinition(def ToolDefinition) {
 	definitions[def.Name] = def
-	registry[def.Name] = def
 }
 
-// Register adds a tool renderer to the registry
-func Register(name string, r ToolRenderer) {
-	registry[name] = r
-}
-
-// RegisterFunc is a convenience method to register a function as a renderer
-func RegisterFunc(name string, f func(input map[string]interface{}) string) {
-	registry[name] = ToolRendererFunc(f)
-}
-
-// GetRenderer returns the renderer for a tool, or nil if not found
-func GetRenderer(name string) ToolRenderer {
-	return registry[name]
+// GetDefinition returns the definition for a tool, or an empty definition if not found.
+func GetDefinition(name string) (ToolDefinition, bool) {
+	def, ok := definitions[name]
+	return def, ok
 }
 
 // GetToolArg returns the display argument for a tool using the registry.
@@ -128,8 +101,8 @@ func GetToolArg(toolName string, input map[string]interface{}) string {
 // GetToolArgWithConfig returns the display argument for a tool using the provided config.
 // Falls back to JSON preview for unknown tools in verbose mode.
 func GetToolArgWithConfig(toolName string, input map[string]interface{}, cfg config.Provider) string {
-	if r := GetRenderer(toolName); r != nil {
-		return r.RenderHeader(input)
+	if def, ok := GetDefinition(toolName); ok {
+		return def.RenderHeader(input)
 	}
 
 	// Fallback: show compact JSON for unknown tools in verbose mode

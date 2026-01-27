@@ -15,39 +15,39 @@ func (m mockConfigProvider) IsVerbose() bool { return m.verbose }
 func (m mockConfigProvider) NoColor() bool   { return m.noColor }
 func (m mockConfigProvider) ShowUsage() bool { return m.showUsage }
 
-func TestGetRenderer(t *testing.T) {
+func TestGetDefinition(t *testing.T) {
 	tests := []struct {
 		name     string
 		toolName string
-		wantNil  bool
+		wantOK   bool
 	}{
-		{name: "Bash renderer exists", toolName: "Bash", wantNil: false},
-		{name: "Read renderer exists", toolName: "Read", wantNil: false},
-		{name: "Write renderer exists", toolName: "Write", wantNil: false},
-		{name: "Edit renderer exists", toolName: "Edit", wantNil: false},
-		{name: "Glob renderer exists", toolName: "Glob", wantNil: false},
-		{name: "Grep renderer exists", toolName: "Grep", wantNil: false},
-		{name: "Task renderer exists", toolName: "Task", wantNil: false},
-		{name: "WebFetch renderer exists", toolName: "WebFetch", wantNil: false},
-		{name: "WebSearch renderer exists", toolName: "WebSearch", wantNil: false},
-		{name: "TodoWrite renderer exists", toolName: "TodoWrite", wantNil: false},
-		{name: "AskUserQuestion renderer exists", toolName: "AskUserQuestion", wantNil: false},
-		{name: "Skill renderer exists", toolName: "Skill", wantNil: false},
-		{name: "NotebookEdit renderer exists", toolName: "NotebookEdit", wantNil: false},
-		{name: "TaskOutput renderer exists", toolName: "TaskOutput", wantNil: false},
-		{name: "TaskStop renderer exists", toolName: "TaskStop", wantNil: false},
-		{name: "EnterPlanMode renderer exists", toolName: "EnterPlanMode", wantNil: false},
-		{name: "ExitPlanMode renderer exists", toolName: "ExitPlanMode", wantNil: false},
-		{name: "ToolSearch renderer exists", toolName: "ToolSearch", wantNil: false},
-		{name: "unknown tool returns nil", toolName: "UnknownTool", wantNil: true},
-		{name: "empty string returns nil", toolName: "", wantNil: true},
+		{name: "Bash definition exists", toolName: "Bash", wantOK: true},
+		{name: "Read definition exists", toolName: "Read", wantOK: true},
+		{name: "Write definition exists", toolName: "Write", wantOK: true},
+		{name: "Edit definition exists", toolName: "Edit", wantOK: true},
+		{name: "Glob definition exists", toolName: "Glob", wantOK: true},
+		{name: "Grep definition exists", toolName: "Grep", wantOK: true},
+		{name: "Task definition exists", toolName: "Task", wantOK: true},
+		{name: "WebFetch definition exists", toolName: "WebFetch", wantOK: true},
+		{name: "WebSearch definition exists", toolName: "WebSearch", wantOK: true},
+		{name: "TodoWrite definition exists", toolName: "TodoWrite", wantOK: true},
+		{name: "AskUserQuestion definition exists", toolName: "AskUserQuestion", wantOK: true},
+		{name: "Skill definition exists", toolName: "Skill", wantOK: true},
+		{name: "NotebookEdit definition exists", toolName: "NotebookEdit", wantOK: true},
+		{name: "TaskOutput definition exists", toolName: "TaskOutput", wantOK: true},
+		{name: "TaskStop definition exists", toolName: "TaskStop", wantOK: true},
+		{name: "EnterPlanMode definition exists", toolName: "EnterPlanMode", wantOK: true},
+		{name: "ExitPlanMode definition exists", toolName: "ExitPlanMode", wantOK: true},
+		{name: "ToolSearch definition exists", toolName: "ToolSearch", wantOK: true},
+		{name: "unknown tool not found", toolName: "UnknownTool", wantOK: false},
+		{name: "empty string not found", toolName: "", wantOK: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := GetRenderer(tt.toolName)
-			if (r == nil) != tt.wantNil {
-				t.Errorf("GetRenderer(%q) = %v, wantNil = %v", tt.toolName, r, tt.wantNil)
+			_, ok := GetDefinition(tt.toolName)
+			if ok != tt.wantOK {
+				t.Errorf("GetDefinition(%q) ok = %v, want %v", tt.toolName, ok, tt.wantOK)
 			}
 		})
 	}
@@ -260,11 +260,11 @@ func TestToolRenderers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := GetRenderer(tt.toolName)
-			if r == nil {
-				t.Fatalf("GetRenderer(%q) returned nil", tt.toolName)
+			def, ok := GetDefinition(tt.toolName)
+			if !ok {
+				t.Fatalf("GetDefinition(%q) not found", tt.toolName)
 			}
-			result := r.RenderHeader(tt.input)
+			result := def.RenderHeader(tt.input)
 			if result != tt.expected {
 				t.Errorf("RenderHeader() = %q, expected %q", result, tt.expected)
 			}
@@ -438,69 +438,6 @@ func TestIsFilePathTool(t *testing.T) {
 	}
 }
 
-func TestRegisterAndRegisterFunc(t *testing.T) {
-	// Test registering a custom renderer
-	customName := "TestCustomTool"
-	customResult := "custom-result"
-
-	// Ensure it doesn't exist first
-	if r := GetRenderer(customName); r != nil {
-		t.Fatalf("Expected %q to not exist in registry", customName)
-	}
-
-	// Register using RegisterFunc
-	RegisterFunc(customName, func(input map[string]interface{}) string {
-		return customResult
-	})
-
-	// Verify it's registered
-	r := GetRenderer(customName)
-	if r == nil {
-		t.Fatalf("Expected %q to exist in registry after registration", customName)
-	}
-
-	result := r.RenderHeader(nil)
-	if result != customResult {
-		t.Errorf("Custom renderer returned %q, expected %q", result, customResult)
-	}
-
-	// Test overwriting with Register
-	newResult := "new-result"
-	Register(customName, ToolRendererFunc(func(input map[string]interface{}) string {
-		return newResult
-	}))
-
-	r = GetRenderer(customName)
-	result = r.RenderHeader(nil)
-	if result != newResult {
-		t.Errorf("Overwritten renderer returned %q, expected %q", result, newResult)
-	}
-
-	// Clean up - remove from registry to avoid affecting other tests
-	delete(registry, customName)
-}
-
-func TestToolRendererFuncInterface(t *testing.T) {
-	// Test that ToolRendererFunc properly implements ToolRenderer interface
-	var renderer ToolRenderer = ToolRendererFunc(func(input map[string]interface{}) string {
-		if v, ok := input["test"].(string); ok {
-			return v
-		}
-		return "default"
-	})
-
-	// Test with valid input
-	result := renderer.RenderHeader(map[string]interface{}{"test": "value"})
-	if result != "value" {
-		t.Errorf("Expected 'value', got %q", result)
-	}
-
-	// Test with nil input
-	result = renderer.RenderHeader(nil)
-	if result != "default" {
-		t.Errorf("Expected 'default', got %q", result)
-	}
-}
 
 func TestToolDefinition_RenderHeader(t *testing.T) {
 	tests := []struct {
@@ -663,7 +600,3 @@ func TestToolDefinition_IsFilePathTool(t *testing.T) {
 	}
 }
 
-func TestToolDefinition_ImplementsToolRenderer(t *testing.T) {
-	// Verify ToolDefinition implements ToolRenderer interface
-	var _ ToolRenderer = ToolDefinition{}
-}
