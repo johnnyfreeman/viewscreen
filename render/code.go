@@ -14,6 +14,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// maxCodeSize is the threshold above which syntax highlighting is skipped.
+const maxCodeSize = 1024 * 1024
+
 // bgFormatter is a custom chroma formatter that applies syntax highlighting
 // foreground colors while forcing a specific background color per token.
 type bgFormatter struct {
@@ -83,14 +86,32 @@ func NewCodeRenderer(noColor bool) *CodeRenderer {
 	}
 }
 
-// Highlight highlights code with the given language
-func (c *CodeRenderer) Highlight(code, language string) string {
-	if c.noColor || language == "" {
+// shouldSkip returns true if highlighting should be skipped for the given code.
+func (c *CodeRenderer) shouldSkip(code string) bool {
+	return c.noColor || len(code) > maxCodeSize
+}
+
+// formatWith tokenizes code using the lexer and formats it with the given formatter.
+// Returns the original code if tokenization or formatting fails.
+func (c *CodeRenderer) formatWith(code string, lexer chroma.Lexer, formatter chroma.Formatter) string {
+	lexer = chroma.Coalesce(lexer)
+
+	iterator, err := lexer.Tokenise(nil, code)
+	if err != nil {
 		return code
 	}
 
-	// Skip very large content
-	if len(code) > 1024*1024 {
+	var buf bytes.Buffer
+	if err := formatter.Format(&buf, c.style, iterator); err != nil {
+		return code
+	}
+
+	return buf.String()
+}
+
+// Highlight highlights code with the given language
+func (c *CodeRenderer) Highlight(code, language string) string {
+	if c.shouldSkip(code) || language == "" {
 		return code
 	}
 
@@ -98,53 +119,25 @@ func (c *CodeRenderer) Highlight(code, language string) string {
 	if lexer == nil {
 		lexer = lexers.Fallback
 	}
-	lexer = chroma.Coalesce(lexer)
 
-	iterator, err := lexer.Tokenise(nil, code)
-	if err != nil {
-		return code
-	}
-
-	var buf bytes.Buffer
-	if err := c.formatter.Format(&buf, c.style, iterator); err != nil {
-		return code
-	}
-
-	return buf.String()
+	return c.formatWith(code, lexer, c.formatter)
 }
 
 // HighlightFile highlights code, detecting language from filename
 func (c *CodeRenderer) HighlightFile(code, filename string) string {
-	if c.noColor {
-		return code
-	}
-
-	// Skip very large content
-	if len(code) > 1024*1024 {
+	if c.shouldSkip(code) {
 		return code
 	}
 
 	lexer := lexers.Match(filename)
 	if lexer == nil {
-		// Try to analyze content
 		lexer = lexers.Analyse(code)
 	}
 	if lexer == nil {
 		return code
 	}
-	lexer = chroma.Coalesce(lexer)
 
-	iterator, err := lexer.Tokenise(nil, code)
-	if err != nil {
-		return code
-	}
-
-	var buf bytes.Buffer
-	if err := c.formatter.Format(&buf, c.style, iterator); err != nil {
-		return code
-	}
-
-	return buf.String()
+	return c.formatWith(code, lexer, c.formatter)
 }
 
 // HighlightDiff highlights diff/patch content
@@ -156,11 +149,7 @@ func (c *CodeRenderer) HighlightDiff(diff string) string {
 // This allows syntax highlighting colors to show through while maintaining
 // a consistent background (e.g., for diff added/removed lines).
 func (c *CodeRenderer) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
-	if c.noColor || language == "" {
-		return code
-	}
-
-	if len(code) > 1024*1024 {
+	if c.shouldSkip(code) || language == "" {
 		return code
 	}
 
@@ -168,20 +157,8 @@ func (c *CodeRenderer) HighlightWithBg(code, language string, bgColor lipgloss.C
 	if lexer == nil {
 		lexer = lexers.Fallback
 	}
-	lexer = chroma.Coalesce(lexer)
 
-	iterator, err := lexer.Tokenise(nil, code)
-	if err != nil {
-		return code
-	}
-
-	formatter := bgFormatter{bgColor: bgColor}
-	var buf bytes.Buffer
-	if err := formatter.Format(&buf, c.style, iterator); err != nil {
-		return code
-	}
-
-	return buf.String()
+	return c.formatWith(code, lexer, bgFormatter{bgColor: bgColor})
 }
 
 // DetectLanguageFromPath returns a language hint from a file path
