@@ -10,11 +10,18 @@ import (
 // This unified interface replaces the individual StyleApplier interfaces that were
 // previously defined in user, system, and result packages.
 type StyleApplier interface {
-	// Text styles
+	// Text styles (lipgloss-based, for simple cases)
 	ErrorRender(text string) string
 	MutedRender(text string) string
 	SuccessRender(text string) string
 	WarningRender(text string) string
+
+	// Ultraviolet-based text styles (for composition-safe styling)
+	// Use these when styled text might be embedded in other styled content.
+	UVSuccessText(text string) string
+	UVWarningText(text string) string
+	UVMutedText(text string) string
+	UVErrorText(text string) string
 
 	// Output prefixes
 	OutputPrefix() string
@@ -43,11 +50,17 @@ type StyleApplier interface {
 // Use this as the default implementation in production code.
 type DefaultStyleApplier struct{}
 
-// Text styles
+// Text styles (lipgloss-based)
 func (d DefaultStyleApplier) ErrorRender(text string) string   { return style.Error.Render(text) }
 func (d DefaultStyleApplier) MutedRender(text string) string   { return style.Muted.Render(text) }
 func (d DefaultStyleApplier) SuccessRender(text string) string { return style.Success.Render(text) }
 func (d DefaultStyleApplier) WarningRender(text string) string { return style.Warning.Render(text) }
+
+// Ultraviolet-based text styles (composition-safe)
+func (d DefaultStyleApplier) UVSuccessText(text string) string { return style.SuccessText(text) }
+func (d DefaultStyleApplier) UVWarningText(text string) string { return style.WarningText(text) }
+func (d DefaultStyleApplier) UVMutedText(text string) string   { return style.MutedText(text) }
+func (d DefaultStyleApplier) UVErrorText(text string) string   { return style.ErrorText(text) }
 
 // Output prefixes
 func (d DefaultStyleApplier) OutputPrefix() string   { return style.OutputPrefix }

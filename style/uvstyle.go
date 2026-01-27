@@ -29,6 +29,54 @@ func MutedDottedUnderline(text string) string {
 	return style.Styled(text)
 }
 
+// SuccessText applies success (green) foreground color using Ultraviolet.
+// Use this instead of lipgloss when the text might be composed with other styles.
+func SuccessText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: hexToRGBA(string(CurrentTheme.Success)),
+	}
+	return style.Styled(text)
+}
+
+// WarningText applies warning (yellow) foreground color using Ultraviolet.
+// Use this instead of lipgloss when the text might be composed with other styles.
+func WarningText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: hexToRGBA(string(CurrentTheme.Warning)),
+	}
+	return style.Styled(text)
+}
+
+// MutedText applies muted foreground color using Ultraviolet.
+// Use this instead of lipgloss when the text might be composed with other styles.
+func MutedText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: hexToRGBA(string(CurrentTheme.FgMuted)),
+	}
+	return style.Styled(text)
+}
+
+// ErrorText applies error (red) foreground color using Ultraviolet.
+// Use this instead of lipgloss when the text might be composed with other styles.
+func ErrorText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: hexToRGBA(string(CurrentTheme.Error)),
+	}
+	return style.Styled(text)
+}
+
 // hexToRGBA converts a hex color string to color.RGBA.
 func hexToRGBA(hex string) color.RGBA {
 	c, err := colorful.Hex(hex)

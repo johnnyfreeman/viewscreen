@@ -43,6 +43,12 @@ func (m mockStyleApplier) ApplySuccessGradient(text string) string   { return "[
 func (m mockStyleApplier) ApplyErrorGradient(text string) string     { return "[error_grad]" + text + "[/error_grad]" }
 func (m mockStyleApplier) NoColor() bool                             { return m.noColor }
 
+// Ultraviolet-based style methods
+func (m mockStyleApplier) UVSuccessText(text string) string { return "[uv_success]" + text + "[/uv_success]" }
+func (m mockStyleApplier) UVWarningText(text string) string { return "[uv_warning]" + text + "[/uv_warning]" }
+func (m mockStyleApplier) UVMutedText(text string) string   { return "[uv_muted]" + text + "[/uv_muted]" }
+func (m mockStyleApplier) UVErrorText(text string) string   { return "[uv_error]" + text + "[/uv_error]" }
+
 func TestNewRenderer(t *testing.T) {
 	r := NewRenderer()
 

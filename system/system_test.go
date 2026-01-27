@@ -53,6 +53,12 @@ func (m *mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipg
 func (m *mockStyleApplier) ApplySuccessGradient(text string) string { return "[success_grad]" + text + "[/success_grad]" }
 func (m *mockStyleApplier) ApplyErrorGradient(text string) string   { return "[error_grad]" + text + "[/error_grad]" }
 
+// Ultraviolet-based style methods
+func (m *mockStyleApplier) UVSuccessText(text string) string { return "[uv_success]" + text + "[/uv_success]" }
+func (m *mockStyleApplier) UVWarningText(text string) string { return "[uv_warning]" + text + "[/uv_warning]" }
+func (m *mockStyleApplier) UVMutedText(text string) string   { return "[uv_muted]" + text + "[/uv_muted]" }
+func (m *mockStyleApplier) UVErrorText(text string) string   { return "[uv_error]" + text + "[/uv_error]" }
+
 // mockConfigProvider is a test double for config.Provider
 type mockConfigProvider struct {
 	verbose   bool

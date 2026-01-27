@@ -437,6 +437,12 @@ func (m mockStyleApplier) ApplySuccessGradient(text string) string   { return "[
 func (m mockStyleApplier) ApplyErrorGradient(text string) string     { return "[ERROR_GRAD:" + text + "]" }
 func (m mockStyleApplier) NoColor() bool                             { return true }
 
+// Ultraviolet-based style methods
+func (m mockStyleApplier) UVSuccessText(text string) string { return "[UV_SUCCESS:" + text + "]" }
+func (m mockStyleApplier) UVWarningText(text string) string { return "[UV_WARNING:" + text + "]" }
+func (m mockStyleApplier) UVMutedText(text string) string   { return "[UV_MUTED:" + text + "]" }
+func (m mockStyleApplier) UVErrorText(text string) string   { return "[UV_ERROR:" + text + "]" }
+
 type mockCodeHighlighter struct{}
 
 func (m mockCodeHighlighter) Highlight(code, language string) string { return code }
@@ -1386,28 +1392,28 @@ func TestRenderer_Render_TodoResult(t *testing.T) {
 	r.Render(event)
 	output := buf.String()
 
-	// Check completed task shows checkmark and content is muted
-	if !strings.Contains(output, "[SUCCESS:✓]") {
-		t.Errorf("Expected success-styled checkmark for completed task, got: %q", output)
+	// Check completed task shows checkmark and content is muted (using UV methods)
+	if !strings.Contains(output, "[UV_SUCCESS:✓]") {
+		t.Errorf("Expected UV success-styled checkmark for completed task, got: %q", output)
 	}
-	if !strings.Contains(output, "[MUTED:Review code]") {
-		t.Errorf("Expected muted content for completed task, got: %q", output)
+	if !strings.Contains(output, "[UV_MUTED:Review code]") {
+		t.Errorf("Expected UV muted content for completed task, got: %q", output)
 	}
 
-	// Check in_progress task shows arrow and uses activeForm
-	if !strings.Contains(output, "[WARNING:→]") {
-		t.Errorf("Expected warning-styled arrow for in_progress task, got: %q", output)
+	// Check in_progress task shows arrow and uses activeForm (using UV methods)
+	if !strings.Contains(output, "[UV_WARNING:→]") {
+		t.Errorf("Expected UV warning-styled arrow for in_progress task, got: %q", output)
 	}
 	if !strings.Contains(output, "Writing tests") {
 		t.Errorf("Expected activeForm for in_progress task, got: %q", output)
 	}
 
-	// Check pending task shows circle and content is muted
-	if !strings.Contains(output, "[MUTED:○]") {
-		t.Errorf("Expected muted circle for pending task, got: %q", output)
+	// Check pending task shows circle and content is muted (using UV methods)
+	if !strings.Contains(output, "[UV_MUTED:○]") {
+		t.Errorf("Expected UV muted circle for pending task, got: %q", output)
 	}
-	if !strings.Contains(output, "[MUTED:Update docs]") {
-		t.Errorf("Expected muted content for pending task, got: %q", output)
+	if !strings.Contains(output, "[UV_MUTED:Update docs]") {
+		t.Errorf("Expected UV muted content for pending task, got: %q", output)
 	}
 
 	// First line should have output prefix

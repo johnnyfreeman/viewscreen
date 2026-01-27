@@ -35,6 +35,11 @@ func NewTodoRenderer(styleApplier render.StyleApplier) *TodoRenderer {
 // TryRender implements ResultRenderer interface.
 // Attempts to render a todo list with visual status indicators.
 // Returns true if it was a todo result and was rendered, false otherwise.
+//
+// This renderer uses Ultraviolet-based styling methods (UV*) for proper
+// style/content separation. This ensures that styled todo items can be
+// safely composed with other styles (like the prefixed writer's output
+// formatting) without ANSI escape sequence conflicts.
 func (tr *TodoRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMessage) bool {
 	if len(toolUseResult) == 0 {
 		return false
@@ -51,6 +56,7 @@ func (tr *TodoRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 	}
 
 	// Render each todo with status indicator
+	// Uses Ultraviolet-based styling for composition-safe output
 	pw := textutil.NewPrefixedWriter(ctx.Output, ctx.OutputPrefix, ctx.OutputContinue)
 
 	for _, todo := range todoResult.NewTodos {
@@ -59,14 +65,15 @@ func (tr *TodoRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 
 		switch todo.Status {
 		case "completed":
-			statusIndicator = tr.styleApplier.SuccessRender("✓")
-			contentRenderer = tr.styleApplier.MutedRender
+			// Use UV methods for proper style/content separation
+			statusIndicator = tr.styleApplier.UVSuccessText("✓")
+			contentRenderer = tr.styleApplier.UVMutedText
 		case "in_progress":
-			statusIndicator = tr.styleApplier.WarningRender("→")
+			statusIndicator = tr.styleApplier.UVWarningText("→")
 			contentRenderer = func(s string) string { return s } // No special styling
 		default: // "pending"
-			statusIndicator = tr.styleApplier.MutedRender("○")
-			contentRenderer = tr.styleApplier.MutedRender
+			statusIndicator = tr.styleApplier.UVMutedText("○")
+			contentRenderer = tr.styleApplier.UVMutedText
 		}
 
 		content := todo.Content
