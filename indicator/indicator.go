@@ -5,11 +5,12 @@ package indicator
 
 import (
 	"fmt"
+	"image/color"
 	"io"
 	"os"
 	"sync"
 
-	"github.com/charmbracelet/lipgloss"
+	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/lucasb-eyer/go-colorful"
 )
 
@@ -67,7 +68,10 @@ func NewSpinner(noColor bool, opts ...SpinnerOption) *Spinner {
 	return s
 }
 
-// Frame returns the current spinner frame with gradient coloring
+// Frame returns the current spinner frame with gradient coloring.
+// Uses Ultraviolet for proper style/content separation - this ensures that
+// spinner frames can be safely composed with other styled content without
+// escape sequence conflicts.
 func (s *Spinner) Frame() string {
 	s.mu.Lock()
 	frame := s.frames[s.index]
@@ -81,10 +85,26 @@ func (s *Spinner) Frame() string {
 
 	// Calculate gradient color based on position
 	t := float64(idx) / float64(len(s.frames)-1)
-	color := s.gradStart.BlendHcl(s.gradEnd, t).Clamped()
+	blended := s.gradStart.BlendHcl(s.gradEnd, t).Clamped()
 
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color(color.Hex()))
-	return style.Render(frame)
+	// Use Ultraviolet for proper style/content separation.
+	// This produces cleaner ANSI sequences that won't conflict
+	// with surrounding escape codes when spinner frames are
+	// composed with other styled text.
+	style := &uv.Style{
+		Fg: colorfulToRGBA(blended),
+	}
+	return style.Styled(frame)
+}
+
+// colorfulToRGBA converts a colorful.Color to color.RGBA.
+func colorfulToRGBA(c colorful.Color) color.RGBA {
+	return color.RGBA{
+		R: uint8(c.R * 255),
+		G: uint8(c.G * 255),
+		B: uint8(c.B * 255),
+		A: 255,
+	}
 }
 
 // Show writes the current spinner frame to output (overwrites previous)
@@ -136,7 +156,8 @@ func NewStreamingIndicator(noColor bool, opts ...StreamingOption) *StreamingIndi
 	return i
 }
 
-// Show displays the streaming indicator
+// Show displays the streaming indicator.
+// Uses Ultraviolet for proper style/content separation.
 func (i *StreamingIndicator) Show() {
 	if i.shown {
 		return
@@ -146,9 +167,12 @@ func (i *StreamingIndicator) Show() {
 	if i.noColor {
 		ind = "..."
 	} else {
-		// Subtle pulsing dot
-		style := lipgloss.NewStyle().Foreground(lipgloss.Color("#A855F7"))
-		ind = style.Render("●")
+		// Subtle pulsing dot - use Ultraviolet for consistent styling
+		purple, _ := colorful.Hex("#A855F7")
+		style := &uv.Style{
+			Fg: colorfulToRGBA(purple),
+		}
+		ind = style.Styled("●")
 	}
 	fmt.Fprint(i.output, ind)
 	i.shown = true
