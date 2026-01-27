@@ -2,15 +2,9 @@ package tui
 
 import (
 	"bufio"
-	"encoding/json"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/johnnyfreeman/viewscreen/assistant"
-	"github.com/johnnyfreeman/viewscreen/result"
-	"github.com/johnnyfreeman/viewscreen/stream"
-	"github.com/johnnyfreeman/viewscreen/system"
-	"github.com/johnnyfreeman/viewscreen/types"
-	"github.com/johnnyfreeman/viewscreen/user"
+	"github.com/johnnyfreeman/viewscreen/events"
 )
 
 // ReadStdinLine returns a command that reads the next line from stdin
@@ -23,55 +17,28 @@ func ReadStdinLine(scanner *bufio.Scanner) tea.Cmd {
 	}
 }
 
-// ParseEvent parses a JSON line and returns the appropriate message
+// ParseEvent parses a JSON line and returns the appropriate tea.Msg.
+// It delegates to the events package for parsing and converts to TUI messages.
 func ParseEvent(line string) tea.Msg {
-	if line == "" {
+	parsed := events.Parse(line)
+	if parsed == nil {
 		return nil
 	}
 
-	// Parse base event to determine type
-	var base types.BaseEvent
-	if err := json.Unmarshal([]byte(line), &base); err != nil {
-		return ParseErrorMsg{Err: err, Line: line}
-	}
-
-	switch base.Type {
-	case "system":
-		var event system.Event
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			return ParseErrorMsg{Err: err, Line: line}
-		}
-		return SystemEventMsg{Event: event}
-
-	case "assistant":
-		var event assistant.Event
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			return ParseErrorMsg{Err: err, Line: line}
-		}
-		return AssistantEventMsg{Event: event}
-
-	case "user":
-		var event user.Event
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			return ParseErrorMsg{Err: err, Line: line}
-		}
-		return UserEventMsg{Event: event}
-
-	case "stream_event":
-		var event stream.Event
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			return ParseErrorMsg{Err: err, Line: line}
-		}
-		return StreamEventMsg{Event: event}
-
-	case "result":
-		var event result.Event
-		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			return ParseErrorMsg{Err: err, Line: line}
-		}
-		return ResultEventMsg{Event: event}
-
+	switch e := parsed.(type) {
+	case events.SystemEvent:
+		return SystemEventMsg{Event: e.Data}
+	case events.AssistantEvent:
+		return AssistantEventMsg{Event: e.Data}
+	case events.UserEvent:
+		return UserEventMsg{Event: e.Data}
+	case events.StreamEvent:
+		return StreamEventMsg{Event: e.Data}
+	case events.ResultEvent:
+		return ResultEventMsg{Event: e.Data}
+	case events.ParseError:
+		return ParseErrorMsg{Err: e.Err, Line: e.Line}
 	default:
-		return ParseErrorMsg{Err: nil, Line: "Unknown event type: " + base.Type}
+		return nil
 	}
 }

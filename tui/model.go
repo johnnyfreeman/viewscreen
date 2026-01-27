@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/assistant"
 	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/state"
@@ -185,14 +186,13 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 
 	case AssistantEventMsg:
 		m.state.IncrementTurnCount()
-		// Buffer tool_use blocks - don't write to content yet
-		// They'll be rendered with spinner in updateViewportWithPendingTools
-		for _, block := range msg.Event.Message.Content {
-			if block.Type == "tool_use" && block.ID != "" {
-				if !m.streamRenderer.InToolUseBlock() {
-					m.pendingTools.Add(block.ID, block, msg.Event.ParentToolUseID)
-					// Set tool state so sidebar shows spinner too
+		// Buffer tool_use blocks using the events package helper
+		if events.BufferToolUse(msg.Event, m.pendingTools, m.streamRenderer) {
+			// Set sidebar state to show the first pending tool
+			for _, block := range msg.Event.Message.Content {
+				if block.Type == "tool_use" && block.ID != "" {
 					m.state.SetCurrentTool(block.Name, tools.GetToolArgFromBlock(block))
+					break
 				}
 			}
 		}
@@ -209,28 +209,24 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 
 	case UserEventMsg:
 		m.state.UpdateFromToolUseResult(msg.Event.ToolUseResult)
-		// Match results with pending tools and render header + result together
+		// Match tool results with pending tools using the events package
+		matched := events.MatchToolResults(msg.Event, m.pendingTools)
+
+		// Render matched tool headers and set context
 		var isNested bool
-		for _, content := range msg.Event.Message.Content {
-			if content.Type == "tool_result" && content.ToolUseID != "" {
-				if pending, ok := m.pendingTools.Get(content.ToolUseID); ok {
-					// Check if this is a nested tool (parent is still pending)
-					isNested = m.pendingTools.IsNested(pending)
-					// Now write the tool header (with bullet, not spinner)
-					var str string
-					var ctx tools.ToolContext
-					if isNested {
-						str, ctx = tools.RenderNestedToolUseToString(pending.Block)
-					} else {
-						str, ctx = tools.RenderToolUseToString(pending.Block)
-					}
-					m.content.WriteString(str)
-					// Set tool context for syntax highlighting of results
-					m.userRenderer.SetToolContext(ctx)
-					m.pendingTools.Remove(content.ToolUseID)
-				}
+		for _, match := range matched {
+			isNested = match.IsNested
+			var str string
+			var ctx tools.ToolContext
+			if match.IsNested {
+				str, ctx = tools.RenderNestedToolUseToString(match.Block)
+			} else {
+				str, ctx = tools.RenderToolUseToString(match.Block)
 			}
+			m.content.WriteString(str)
+			m.userRenderer.SetToolContext(ctx)
 		}
+
 		// Clear tool state if no more pending tools
 		if m.pendingTools.Len() == 0 {
 			m.state.ClearCurrentTool()
@@ -261,14 +257,13 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case ResultEventMsg:
-		// Flush any orphaned pending tools before rendering result
-		m.pendingTools.ForEach(func(id string, pending tools.PendingTool) {
-			// Write with bullet (not spinner) since we're done
-			str, _ := tools.RenderToolUseToString(pending.Block)
+		// Flush any orphaned pending tools using the events package
+		orphaned := events.FlushOrphanedTools(m.pendingTools)
+		for _, o := range orphaned {
+			str, _ := tools.RenderToolUseToString(o.Block)
 			m.content.WriteString(str)
 			m.content.WriteString(style.OutputPrefix + style.Muted.Render("(no result)") + "\n")
-		})
-		m.pendingTools.Clear()
+		}
 		m.state.ClearCurrentTool()
 		m.state.UpdateFromResultEvent(msg.Event)
 		rendered := m.resultRenderer.RenderToString(msg.Event)

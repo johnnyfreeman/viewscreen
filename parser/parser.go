@@ -2,18 +2,17 @@ package parser
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/johnnyfreeman/viewscreen/assistant"
+	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/stream"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/system"
 	"github.com/johnnyfreeman/viewscreen/tools"
-	"github.com/johnnyfreeman/viewscreen/types"
 	"github.com/johnnyfreeman/viewscreen/user"
 )
 
@@ -27,7 +26,6 @@ type Parser struct {
 	streamRenderer *stream.Renderer
 	eventHandler   EventHandler
 	pendingTools   *tools.ToolUseTracker
-	dispatcher     *EventDispatcher
 
 	// Renderers for each event type
 	systemRenderer    *system.Renderer
@@ -87,106 +85,7 @@ func NewParserWithOptions(opts ...Option) *Parser {
 	for _, opt := range opts {
 		opt(p)
 	}
-	p.dispatcher = p.buildDispatcher()
 	return p
-}
-
-
-// buildDispatcher creates and configures the event dispatcher with all handlers.
-func (p *Parser) buildDispatcher() *EventDispatcher {
-	d := NewEventDispatcher(p.errOutput)
-	d.Register("system", p.handleSystem)
-	d.Register("assistant", p.handleAssistant)
-	d.Register("user", p.handleUser)
-	d.Register("stream_event", p.handleStream)
-	d.Register("result", p.handleResult)
-	return d
-}
-
-func (p *Parser) handleSystem(line []byte) error {
-	var event system.Event
-	if err := json.Unmarshal(line, &event); err != nil {
-		return err
-	}
-	p.systemRenderer.Render(event)
-	return nil
-}
-
-func (p *Parser) handleAssistant(line []byte) error {
-	var event assistant.Event
-	if err := json.Unmarshal(line, &event); err != nil {
-		return err
-	}
-	// Buffer tool_use blocks instead of rendering immediately
-	// They will be rendered together with their results
-	for _, block := range event.Message.Content {
-		if block.Type == "tool_use" && block.ID != "" {
-			if !p.streamRenderer.InToolUseBlock() {
-				p.pendingTools.Add(block.ID, block, event.ParentToolUseID)
-			}
-		}
-	}
-	// Render text blocks (tool_use rendering is always suppressed)
-	p.assistantRenderer.Render(event, p.streamRenderer.InTextBlock(), true)
-	p.streamRenderer.ResetBlockState()
-	return nil
-}
-
-func (p *Parser) handleUser(line []byte) error {
-	var event user.Event
-	if err := json.Unmarshal(line, &event); err != nil {
-		return err
-	}
-	// Match tool results with pending tool_use blocks
-	var isNested bool
-	for _, content := range event.Message.Content {
-		if content.Type == "tool_result" && content.ToolUseID != "" {
-			if pending, ok := p.pendingTools.Get(content.ToolUseID); ok {
-				// Check if this is a nested tool (parent is still pending)
-				isNested = p.pendingTools.IsNested(pending)
-				var ctx tools.ToolContext
-				if isNested {
-					ctx = tools.RenderNestedToolUse(pending.Block)
-				} else {
-					ctx = tools.RenderToolUse(pending.Block)
-				}
-				// Set tool context on the user renderer for syntax highlighting
-				p.userRenderer.SetToolContext(ctx)
-				p.pendingTools.Remove(content.ToolUseID)
-			}
-		}
-	}
-	// Render the tool result (with nested prefix if applicable)
-	if isNested {
-		p.userRenderer.RenderNested(event)
-	} else {
-		p.userRenderer.Render(event)
-	}
-	return nil
-}
-
-func (p *Parser) handleStream(line []byte) error {
-	var event stream.Event
-	if err := json.Unmarshal(line, &event); err != nil {
-		return err
-	}
-	p.streamRenderer.Render(event)
-	return nil
-}
-
-func (p *Parser) handleResult(line []byte) error {
-	// Flush any orphaned pending tools before rendering result
-	p.pendingTools.ForEach(func(id string, pending tools.PendingTool) {
-		tools.RenderToolUse(pending.Block)
-		fmt.Println(style.OutputPrefix + style.Muted.Render("(no result)"))
-	})
-	p.pendingTools.Clear()
-	var event result.Event
-	if err := json.Unmarshal(line, &event); err != nil {
-		return err
-	}
-	p.resultRenderer.Render(event)
-	return nil
 }
 
 // Run reads events from input and renders them
@@ -204,23 +103,33 @@ func (p *Parser) Run() error {
 			continue
 		}
 
-		// Parse base event to determine type
-		var base types.BaseEvent
-		if err := json.Unmarshal([]byte(line), &base); err != nil {
-			fmt.Fprintf(p.errOutput, "Error parsing JSON: %v\n", err)
+		// Parse the event using the events package
+		parsed := events.Parse(line)
+		if parsed == nil {
+			continue
+		}
+
+		// Handle parse errors
+		if parseErr, ok := parsed.(events.ParseError); ok {
+			if parseErr.Err != nil {
+				fmt.Fprintf(p.errOutput, "Error parsing JSON: %v\n", parseErr.Err)
+			} else {
+				fmt.Fprintf(p.errOutput, "%s\n", parseErr.Line)
+			}
 			continue
 		}
 
 		// Call event handler if set (for testing)
 		if p.eventHandler != nil {
-			if err := p.eventHandler(base.Type, []byte(line)); err != nil {
+			eventType := eventTypeName(parsed)
+			if err := p.eventHandler(eventType, []byte(line)); err != nil {
 				return err
 			}
 		}
 
-		// Dispatch to the appropriate handler
-		if !p.dispatcher.Dispatch(base.Type, []byte(line)) {
-			fmt.Fprintf(p.errOutput, "Unknown event type: %s\n", base.Type)
+		// Process the event
+		if err := p.processEvent(parsed); err != nil {
+			fmt.Fprintf(p.errOutput, "Error processing event: %v\n", err)
 		}
 	}
 
@@ -231,4 +140,75 @@ func (p *Parser) Run() error {
 	}
 
 	return nil
+}
+
+// processEvent handles a parsed event
+func (p *Parser) processEvent(event events.Event) error {
+	switch e := event.(type) {
+	case events.SystemEvent:
+		p.systemRenderer.Render(e.Data)
+
+	case events.AssistantEvent:
+		// Buffer tool_use blocks using the events package helper
+		events.BufferToolUse(e.Data, p.pendingTools, p.streamRenderer)
+		// Render text blocks (tool_use rendering is always suppressed)
+		p.assistantRenderer.Render(e.Data, p.streamRenderer.InTextBlock(), true)
+		p.streamRenderer.ResetBlockState()
+
+	case events.UserEvent:
+		// Match tool results with pending tool_use blocks
+		matched := events.MatchToolResults(e.Data, p.pendingTools)
+
+		// Render matched tool headers and set context
+		var isNested bool
+		for _, m := range matched {
+			isNested = m.IsNested
+			var ctx tools.ToolContext
+			if m.IsNested {
+				ctx = tools.RenderNestedToolUse(m.Block)
+			} else {
+				ctx = tools.RenderToolUse(m.Block)
+			}
+			p.userRenderer.SetToolContext(ctx)
+		}
+
+		// Render the tool result
+		if isNested {
+			p.userRenderer.RenderNested(e.Data)
+		} else {
+			p.userRenderer.Render(e.Data)
+		}
+
+	case events.StreamEvent:
+		p.streamRenderer.Render(e.Data)
+
+	case events.ResultEvent:
+		// Flush any orphaned pending tools
+		orphaned := events.FlushOrphanedTools(p.pendingTools)
+		for _, o := range orphaned {
+			tools.RenderToolUse(o.Block)
+			fmt.Println(style.OutputPrefix + style.Muted.Render("(no result)"))
+		}
+		p.resultRenderer.Render(e.Data)
+	}
+
+	return nil
+}
+
+// eventTypeName returns the event type name for the handler callback
+func eventTypeName(event events.Event) string {
+	switch event.(type) {
+	case events.SystemEvent:
+		return "system"
+	case events.AssistantEvent:
+		return "assistant"
+	case events.UserEvent:
+		return "user"
+	case events.StreamEvent:
+		return "stream_event"
+	case events.ResultEvent:
+		return "result"
+	default:
+		return "unknown"
+	}
 }

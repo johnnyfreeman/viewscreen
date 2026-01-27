@@ -331,31 +331,31 @@ func TestParser_Run_ParseErrorsForEachEventType(t *testing.T) {
 			name:        "invalid system event",
 			eventType:   "system",
 			invalidJSON: `{"type":"system","subtype":123}`,
-			expectedErr: "Error parsing system event",
+			expectedErr: "Error parsing JSON",
 		},
 		{
 			name:        "invalid assistant event",
 			eventType:   "assistant",
 			invalidJSON: `{"type":"assistant","message":"not_an_object"}`,
-			expectedErr: "Error parsing assistant event",
+			expectedErr: "Error parsing JSON",
 		},
 		{
 			name:        "invalid user event",
 			eventType:   "user",
 			invalidJSON: `{"type":"user","message":"not_an_object"}`,
-			expectedErr: "Error parsing user event",
+			expectedErr: "Error parsing JSON",
 		},
 		{
 			name:        "invalid stream_event",
 			eventType:   "stream_event",
 			invalidJSON: `{"type":"stream_event","event":"not_an_object"}`,
-			expectedErr: "Error parsing stream_event event",
+			expectedErr: "Error parsing JSON",
 		},
 		{
 			name:        "invalid result event",
 			eventType:   "result",
 			invalidJSON: `{"type":"result","duration_ms":"not_a_number"}`,
-			expectedErr: "Error parsing result event",
+			expectedErr: "Error parsing JSON",
 		},
 	}
 
