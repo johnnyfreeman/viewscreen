@@ -135,7 +135,7 @@ func (r *SidebarRenderer) RenderCurrentTool(toolName, toolInput string) string {
 		toolText += " " + toolInput
 	}
 
-	sb.WriteString(style.SpinnerText(r.spinner.View()))
+	sb.WriteString(r.spinner.View())
 	sb.WriteString(" ")
 	sb.WriteString(style.SidebarTodoActiveText(textutil.Truncate(toolText, r.width-6)))
 	sb.WriteString("\n\n")
@@ -159,7 +159,7 @@ func (r *SidebarRenderer) RenderTodo(todo state.Todo) string {
 		sb.WriteString(style.SidebarTodoDoneText(textutil.Truncate(text, maxWidth)))
 
 	case "in_progress":
-		sb.WriteString(style.SpinnerText(r.spinner.View()))
+		sb.WriteString(r.spinner.View())
 		text := todo.ActiveForm
 		if text == "" {
 			text = todo.Subject

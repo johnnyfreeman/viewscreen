@@ -103,12 +103,13 @@ func (r *HeaderRenderer) renderTo(out *render.Output, toolName string, input map
 		args = args[:77] + "..."
 	}
 
-	// Build header: [prefix][icon]ToolName args
+	// Build header: [prefix][icon] ToolName args
+	// Icon is printed separately since it may already have styling (e.g., spinner)
 	icon := r.icon
 	if icon == "" {
 		icon = style.Bullet
 	}
-	fmt.Fprint(out, r.prefix+style.ApplyThemeBoldGradient(icon+toolName))
+	fmt.Fprint(out, r.prefix+icon+" "+style.ApplyThemeBoldGradient(toolName))
 
 	// Style args: file paths get muted color + dotted underline (combined in single
 	// ANSI sequence via Ultraviolet), other args get just muted color

@@ -15,6 +15,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/tools"
+	"golang.org/x/term"
 )
 
 // Model is the main Bubbletea model for the TUI
@@ -34,11 +35,12 @@ type Model struct {
 
 // NewModel creates a new TUI model
 func NewModel() Model {
-	// Initialize spinner with Dot spinner.
-	// No lipgloss style is applied here - styling is done via Ultraviolet
-	// when rendering (see style.SpinnerText) to avoid escape sequence conflicts.
+	// Initialize spinner with Dot spinner and lipgloss styling.
+	// We use lipgloss here (not Ultraviolet) because the spinner output
+	// goes through bubbletea/lipgloss rendering pipeline.
 	s := spinner.New(
 		spinner.WithSpinner(spinner.Dot),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(string(style.CurrentTheme.Accent)))),
 	)
 
 	// Create scanner for stdin with large buffer
@@ -156,7 +158,7 @@ func (m *Model) updateViewportWithPendingTools() {
 	// Render pending tools with spinner instead of bullet.
 	// Apply Ultraviolet styling to the spinner for proper style/content separation.
 	m.processor.ForEachPendingTool(func(id string, pending tools.PendingTool) {
-		content += m.processor.RenderPendingTool(pending, style.SpinnerText(m.spinner.View()))
+		content += m.processor.RenderPendingTool(pending, m.spinner.View())
 	})
 	m.viewport.SetContent(content)
 }
@@ -180,8 +182,26 @@ func Run() error {
 	render.NewMarkdownRenderer(cfg.NoColor(), 80)
 
 	// AltScreen and MouseMode are now set declaratively in View()
-	p := tea.NewProgram(NewModel())
+	var opts []tea.ProgramOption
+
+	// When stdin is not a TTY (e.g., piped input), we need to read keyboard
+	// input from /dev/tty instead. Otherwise bubbletea tries to read keyboard
+	// events from the pipe, which causes terminal escape sequence issues.
+	if !isatty(os.Stdin.Fd()) {
+		tty, err := os.Open("/dev/tty")
+		if err == nil {
+			opts = append(opts, tea.WithInput(tty))
+			defer tty.Close()
+		}
+	}
+
+	p := tea.NewProgram(NewModel(), opts...)
 
 	_, err := p.Run()
 	return err
+}
+
+// isatty returns true if the file descriptor is a terminal.
+func isatty(fd uintptr) bool {
+	return term.IsTerminal(int(fd))
 }
