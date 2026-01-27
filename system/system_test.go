@@ -16,54 +16,46 @@ type mockStyleApplier struct {
 	noColor            bool
 	gradientCalls      []string
 	sessionHeaderCalls []string
-	mutedCalls         []string
-	uvMutedCalls       []string
+	mutedTextCalls     []string
 }
 
 func (m *mockStyleApplier) NoColor() bool { return m.noColor }
 
-func (m *mockStyleApplier) ApplyThemeBoldGradient(text string) string {
-	m.gradientCalls = append(m.gradientCalls, text)
-	return "[gradient]" + text + "[/gradient]"
-}
-
-func (m *mockStyleApplier) SessionHeaderRender(text string) string {
-	m.sessionHeaderCalls = append(m.sessionHeaderCalls, text)
-	return "[header]" + text + "[/header]"
-}
-
-func (m *mockStyleApplier) MutedRender(text string) string {
-	m.mutedCalls = append(m.mutedCalls, text)
+// Text styles (Ultraviolet-based)
+func (m *mockStyleApplier) SuccessText(text string) string { return "[success]" + text + "[/success]" }
+func (m *mockStyleApplier) WarningText(text string) string { return "[warning]" + text + "[/warning]" }
+func (m *mockStyleApplier) MutedText(text string) string {
+	m.mutedTextCalls = append(m.mutedTextCalls, text)
 	return "[muted]" + text + "[/muted]"
 }
+func (m *mockStyleApplier) ErrorText(text string) string       { return "[error]" + text + "[/error]" }
+func (m *mockStyleApplier) ErrorBoldText(text string) string   { return "[error_bold]" + text + "[/error_bold]" }
+func (m *mockStyleApplier) SuccessBoldText(text string) string { return "[success_bold]" + text + "[/success_bold]" }
 
+// Output prefixes
 func (m *mockStyleApplier) Bullet() string         { return "● " }
 func (m *mockStyleApplier) OutputPrefix() string   { return "  ⎿  " }
 func (m *mockStyleApplier) OutputContinue() string { return "     " }
 
-// Additional methods required by render.StyleApplier
-func (m *mockStyleApplier) ErrorRender(text string) string   { return "[error]" + text + "[/error]" }
-func (m *mockStyleApplier) SuccessRender(text string) string { return "[success]" + text + "[/success]" }
-func (m *mockStyleApplier) WarningRender(text string) string { return "[warning]" + text + "[/warning]" }
+// Diff-related styles
 func (m *mockStyleApplier) LineNumberRender(text string) string    { return "[ln]" + text + "[/ln]" }
 func (m *mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
 func (m *mockStyleApplier) DiffAddRender(text string) string       { return "[add]" + text + "[/add]" }
 func (m *mockStyleApplier) DiffRemoveRender(text string) string    { return "[rem]" + text + "[/rem]" }
 func (m *mockStyleApplier) DiffAddBg() lipgloss.Color              { return lipgloss.Color("#00ff00") }
 func (m *mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipgloss.Color("#ff0000") }
+
+// Session/header styles
+func (m *mockStyleApplier) ApplyThemeBoldGradient(text string) string {
+	m.gradientCalls = append(m.gradientCalls, text)
+	return "[gradient]" + text + "[/gradient]"
+}
+func (m *mockStyleApplier) SessionHeaderRender(text string) string {
+	m.sessionHeaderCalls = append(m.sessionHeaderCalls, text)
+	return "[header]" + text + "[/header]"
+}
 func (m *mockStyleApplier) ApplySuccessGradient(text string) string { return "[success_grad]" + text + "[/success_grad]" }
 func (m *mockStyleApplier) ApplyErrorGradient(text string) string   { return "[error_grad]" + text + "[/error_grad]" }
-
-// Ultraviolet-based style methods
-func (m *mockStyleApplier) UVSuccessText(text string) string     { return "[uv_success]" + text + "[/uv_success]" }
-func (m *mockStyleApplier) UVWarningText(text string) string     { return "[uv_warning]" + text + "[/uv_warning]" }
-func (m *mockStyleApplier) UVMutedText(text string) string {
-	m.uvMutedCalls = append(m.uvMutedCalls, text)
-	return "[uv_muted]" + text + "[/uv_muted]"
-}
-func (m *mockStyleApplier) UVErrorText(text string) string       { return "[uv_error]" + text + "[/uv_error]" }
-func (m *mockStyleApplier) UVErrorBoldText(text string) string   { return "[uv_error_bold]" + text + "[/uv_error_bold]" }
-func (m *mockStyleApplier) UVSuccessBoldText(text string) string { return "[uv_success_bold]" + text + "[/uv_success_bold]" }
 
 // mockConfigProvider is a test double for config.Provider
 type mockConfigProvider struct {
@@ -175,22 +167,22 @@ func TestRenderer_Render_BasicEvent(t *testing.T) {
 	}
 
 	// Check model line
-	if !strings.Contains(result, "[uv_muted]Model:[/uv_muted] claude-3-opus") {
+	if !strings.Contains(result, "[muted]Model:[/muted] claude-3-opus") {
 		t.Errorf("expected model line in output, got: %s", result)
 	}
 
 	// Check version line
-	if !strings.Contains(result, "[uv_muted]Version:[/uv_muted] 1.0.0") {
+	if !strings.Contains(result, "[muted]Version:[/muted] 1.0.0") {
 		t.Error("expected version line in output")
 	}
 
 	// Check CWD line
-	if !strings.Contains(result, "[uv_muted]CWD:[/uv_muted] /home/user/project") {
+	if !strings.Contains(result, "[muted]CWD:[/muted] /home/user/project") {
 		t.Error("expected CWD line in output")
 	}
 
 	// Check tools count
-	if !strings.Contains(result, "[uv_muted]Tools:[/uv_muted] 3 available") {
+	if !strings.Contains(result, "[muted]Tools:[/muted] 3 available") {
 		t.Error("expected tools count in output")
 	}
 
@@ -262,7 +254,7 @@ func TestRenderer_Render_VerboseWithAgents(t *testing.T) {
 	result := output.String()
 
 	// Check agents line is present when verbose and agents exist
-	if !strings.Contains(result, "[uv_muted]Agents:[/uv_muted] coder, reviewer, tester") {
+	if !strings.Contains(result, "[muted]Agents:[/muted] coder, reviewer, tester") {
 		t.Errorf("expected agents line in verbose mode, got: %s", result)
 	}
 }
@@ -348,7 +340,7 @@ func TestRenderer_Render_EmptyTools(t *testing.T) {
 	result := output.String()
 
 	// Should show 0 tools
-	if !strings.Contains(result, "[uv_muted]Tools:[/uv_muted] 0 available") {
+	if !strings.Contains(result, "[muted]Tools:[/muted] 0 available") {
 		t.Errorf("expected 0 tools in output, got: %s", result)
 	}
 }
@@ -525,7 +517,7 @@ func TestDefaultStyleApplier(t *testing.T) {
 	_ = dsa.NoColor()
 	_ = dsa.ApplyThemeBoldGradient("test")
 	_ = dsa.SessionHeaderRender("test")
-	_ = dsa.MutedRender("test")
+	_ = dsa.MutedText("test")
 
 	if dsa.Bullet() != "● " {
 		t.Errorf("expected bullet '● ', got %q", dsa.Bullet())
@@ -550,7 +542,7 @@ func TestDefaultConfigProvider(t *testing.T) {
 	_ = dp.ShowUsage()
 }
 
-func TestRenderer_Render_UVMutedStyleCalls(t *testing.T) {
+func TestRenderer_Render_MutedTextStyleCalls(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
 	configMock := &mockConfigProvider{verbose: true}
@@ -571,15 +563,15 @@ func TestRenderer_Render_UVMutedStyleCalls(t *testing.T) {
 
 	r.Render(event)
 
-	// Should have called UVMutedText for: Model, Version, CWD, Tools, Agents
-	expectedUVMutedCalls := []string{"Model:", "Version:", "CWD:", "Tools:", "Agents:"}
-	if len(styleMock.uvMutedCalls) != len(expectedUVMutedCalls) {
-		t.Errorf("expected %d UV muted calls, got %d: %v", len(expectedUVMutedCalls), len(styleMock.uvMutedCalls), styleMock.uvMutedCalls)
+	// Should have called MutedText for: Model, Version, CWD, Tools, Agents
+	expectedMutedTextCalls := []string{"Model:", "Version:", "CWD:", "Tools:", "Agents:"}
+	if len(styleMock.mutedTextCalls) != len(expectedMutedTextCalls) {
+		t.Errorf("expected %d MutedText calls, got %d: %v", len(expectedMutedTextCalls), len(styleMock.mutedTextCalls), styleMock.mutedTextCalls)
 	}
 
-	for i, expected := range expectedUVMutedCalls {
-		if i < len(styleMock.uvMutedCalls) && styleMock.uvMutedCalls[i] != expected {
-			t.Errorf("UV muted call %d: expected %q, got %q", i, expected, styleMock.uvMutedCalls[i])
+	for i, expected := range expectedMutedTextCalls {
+		if i < len(styleMock.mutedTextCalls) && styleMock.mutedTextCalls[i] != expected {
+			t.Errorf("MutedText call %d: expected %q, got %q", i, expected, styleMock.mutedTextCalls[i])
 		}
 	}
 }

@@ -66,14 +66,14 @@ func (tr *TodoRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 		switch todo.Status {
 		case "completed":
 			// Use UV methods for proper style/content separation
-			statusIndicator = tr.styleApplier.UVSuccessText("✓")
-			contentRenderer = tr.styleApplier.UVMutedText
+			statusIndicator = tr.styleApplier.SuccessText("✓")
+			contentRenderer = tr.styleApplier.MutedText
 		case "in_progress":
-			statusIndicator = tr.styleApplier.UVWarningText("→")
+			statusIndicator = tr.styleApplier.WarningText("→")
 			contentRenderer = func(s string) string { return s } // No special styling
 		default: // "pending"
-			statusIndicator = tr.styleApplier.UVMutedText("○")
-			contentRenderer = tr.styleApplier.UVMutedText
+			statusIndicator = tr.styleApplier.MutedText("○")
+			contentRenderer = tr.styleApplier.MutedText
 		}
 
 		content := todo.Content

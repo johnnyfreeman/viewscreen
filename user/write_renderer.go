@@ -53,7 +53,7 @@ func (wr *WriteRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMes
 
 	// Show a summary of the created file
 	summary := fmt.Sprintf("Created (%d lines)", lineCount)
-	fmt.Fprintf(ctx.Output, "%s%s\n", ctx.OutputPrefix, wr.styleApplier.UVMutedText(summary))
+	fmt.Fprintf(ctx.Output, "%s%s\n", ctx.OutputPrefix, wr.styleApplier.MutedText(summary))
 
 	return true
 }

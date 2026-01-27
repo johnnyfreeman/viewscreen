@@ -418,32 +418,35 @@ func (m mockConfigProvider) ShowUsage() bool { return m.showUsage }
 
 type mockStyleApplier struct{}
 
-func (m mockStyleApplier) ErrorRender(text string) string   { return "[ERROR:" + text + "]" }
-func (m mockStyleApplier) MutedRender(text string) string   { return "[MUTED:" + text + "]" }
-func (m mockStyleApplier) SuccessRender(text string) string { return "[SUCCESS:" + text + "]" }
-func (m mockStyleApplier) WarningRender(text string) string { return "[WARNING:" + text + "]" }
-func (m mockStyleApplier) OutputPrefix() string             { return "  ⎿  " }
-func (m mockStyleApplier) OutputContinue() string           { return "     " }
-func (m mockStyleApplier) Bullet() string                   { return "● " }
+// Text styles (Ultraviolet-based)
+func (m mockStyleApplier) SuccessText(text string) string     { return "[SUCCESS:" + text + "]" }
+func (m mockStyleApplier) WarningText(text string) string     { return "[WARNING:" + text + "]" }
+func (m mockStyleApplier) MutedText(text string) string       { return "[MUTED:" + text + "]" }
+func (m mockStyleApplier) ErrorText(text string) string       { return "[ERROR:" + text + "]" }
+func (m mockStyleApplier) ErrorBoldText(text string) string   { return "[ERROR_BOLD:" + text + "]" }
+func (m mockStyleApplier) SuccessBoldText(text string) string { return "[SUCCESS_BOLD:" + text + "]" }
+
+// Output prefixes
+func (m mockStyleApplier) OutputPrefix() string   { return "  ⎿  " }
+func (m mockStyleApplier) OutputContinue() string { return "     " }
+func (m mockStyleApplier) Bullet() string         { return "● " }
+
+// Diff-related styles
 func (m mockStyleApplier) LineNumberRender(text string) string    { return "[LN:" + text + "]" }
 func (m mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
 func (m mockStyleApplier) DiffAddRender(text string) string       { return "[ADD:" + text + "]" }
 func (m mockStyleApplier) DiffRemoveRender(text string) string    { return "[REM:" + text + "]" }
 func (m mockStyleApplier) DiffAddBg() lipgloss.Color              { return lipgloss.Color("#00ff00") }
 func (m mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipgloss.Color("#ff0000") }
-func (m mockStyleApplier) SessionHeaderRender(text string) string { return "[HEADER:" + text + "]" }
+
+// Session/header styles
+func (m mockStyleApplier) SessionHeaderRender(text string) string    { return "[HEADER:" + text + "]" }
 func (m mockStyleApplier) ApplyThemeBoldGradient(text string) string { return "[GRADIENT:" + text + "]" }
 func (m mockStyleApplier) ApplySuccessGradient(text string) string   { return "[SUCCESS_GRAD:" + text + "]" }
 func (m mockStyleApplier) ApplyErrorGradient(text string) string     { return "[ERROR_GRAD:" + text + "]" }
-func (m mockStyleApplier) NoColor() bool                             { return true }
 
-// Ultraviolet-based style methods
-func (m mockStyleApplier) UVSuccessText(text string) string     { return "[UV_SUCCESS:" + text + "]" }
-func (m mockStyleApplier) UVWarningText(text string) string     { return "[UV_WARNING:" + text + "]" }
-func (m mockStyleApplier) UVMutedText(text string) string       { return "[UV_MUTED:" + text + "]" }
-func (m mockStyleApplier) UVErrorText(text string) string       { return "[UV_ERROR:" + text + "]" }
-func (m mockStyleApplier) UVErrorBoldText(text string) string   { return "[UV_ERROR_BOLD:" + text + "]" }
-func (m mockStyleApplier) UVSuccessBoldText(text string) string { return "[UV_SUCCESS_BOLD:" + text + "]" }
+// Color state
+func (m mockStyleApplier) NoColor() bool { return true }
 
 type mockCodeHighlighter struct{}
 
@@ -502,7 +505,7 @@ func TestRenderer_Render_NonVerbose(t *testing.T) {
 	if !strings.Contains(output, "Read 3 lines") {
 		t.Errorf("Expected 'Read 3 lines' in output, got: %q", output)
 	}
-	if !strings.Contains(output, "[UV_MUTED:") {
+	if !strings.Contains(output, "[MUTED:") {
 		t.Errorf("Expected UV muted style in output, got: %q", output)
 	}
 }
@@ -570,7 +573,7 @@ func TestRenderer_Render_Error(t *testing.T) {
 	output := buf.String()
 
 	// Should show error styled (using Ultraviolet for composition-safe styling)
-	if !strings.Contains(output, "[UV_ERROR:") {
+	if !strings.Contains(output, "[ERROR:") {
 		t.Errorf("Expected UV error style in output, got: %q", output)
 	}
 	if !strings.Contains(output, "Something went wrong") {
@@ -681,10 +684,10 @@ func TestRenderer_Render_EditResult_Verbose(t *testing.T) {
 	output := buf.String()
 
 	// Should show diff with UV-styled markers (Ultraviolet for composition-safe styling)
-	if !strings.Contains(output, "[UV_SUCCESS:+]") {
+	if !strings.Contains(output, "[SUCCESS:+]") {
 		t.Errorf("Expected UV success-styled + in output, got: %q", output)
 	}
-	if !strings.Contains(output, "[UV_ERROR:-]") {
+	if !strings.Contains(output, "[ERROR:-]") {
 		t.Errorf("Expected UV error-styled - in output, got: %q", output)
 	}
 	if !strings.Contains(output, "old line") {
@@ -1344,10 +1347,12 @@ func TestDefaultStyleApplier(t *testing.T) {
 	sa := render.DefaultStyleApplier{}
 
 	// Verify all methods exist and return strings
-	_ = sa.ErrorRender("test")
-	_ = sa.MutedRender("test")
-	_ = sa.SuccessRender("test")
-	_ = sa.WarningRender("test")
+	_ = sa.SuccessText("test")
+	_ = sa.WarningText("test")
+	_ = sa.MutedText("test")
+	_ = sa.ErrorText("test")
+	_ = sa.ErrorBoldText("test")
+	_ = sa.SuccessBoldText("test")
 	_ = sa.OutputPrefix()
 	_ = sa.OutputContinue()
 	_ = sa.Bullet()
@@ -1395,15 +1400,15 @@ func TestRenderer_Render_TodoResult(t *testing.T) {
 	output := buf.String()
 
 	// Check completed task shows checkmark and content is muted (using UV methods)
-	if !strings.Contains(output, "[UV_SUCCESS:✓]") {
+	if !strings.Contains(output, "[SUCCESS:✓]") {
 		t.Errorf("Expected UV success-styled checkmark for completed task, got: %q", output)
 	}
-	if !strings.Contains(output, "[UV_MUTED:Review code]") {
+	if !strings.Contains(output, "[MUTED:Review code]") {
 		t.Errorf("Expected UV muted content for completed task, got: %q", output)
 	}
 
 	// Check in_progress task shows arrow and uses activeForm (using UV methods)
-	if !strings.Contains(output, "[UV_WARNING:→]") {
+	if !strings.Contains(output, "[WARNING:→]") {
 		t.Errorf("Expected UV warning-styled arrow for in_progress task, got: %q", output)
 	}
 	if !strings.Contains(output, "Writing tests") {
@@ -1411,10 +1416,10 @@ func TestRenderer_Render_TodoResult(t *testing.T) {
 	}
 
 	// Check pending task shows circle and content is muted (using UV methods)
-	if !strings.Contains(output, "[UV_MUTED:○]") {
+	if !strings.Contains(output, "[MUTED:○]") {
 		t.Errorf("Expected UV muted circle for pending task, got: %q", output)
 	}
-	if !strings.Contains(output, "[UV_MUTED:Update docs]") {
+	if !strings.Contains(output, "[MUTED:Update docs]") {
 		t.Errorf("Expected UV muted content for pending task, got: %q", output)
 	}
 

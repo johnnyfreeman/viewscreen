@@ -107,11 +107,11 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 		if !sa.NoColor() {
 			header = sa.ApplyErrorGradient(header)
 		} else {
-			header = sa.UVErrorBoldText(header)
+			header = sa.ErrorBoldText(header)
 		}
 		fmt.Fprintln(out, header)
 		for _, err := range event.Errors {
-			fmt.Fprintf(out, "%s%s\n", sa.OutputPrefix(), sa.UVErrorText(err))
+			fmt.Fprintf(out, "%s%s\n", sa.OutputPrefix(), sa.ErrorText(err))
 		}
 	} else {
 		// Success header with gradient (or bold fallback for no-color mode)
@@ -119,22 +119,22 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 		if !sa.NoColor() {
 			header = sa.ApplySuccessGradient(header)
 		} else {
-			header = sa.UVSuccessBoldText(header)
+			header = sa.SuccessBoldText(header)
 		}
 		fmt.Fprintln(out, header)
 	}
 
 	fmt.Fprintf(out, "%s%s %.2fs (API: %.2fs)\n",
 		sa.OutputPrefix(),
-		sa.UVMutedText("Duration:"),
+		sa.MutedText("Duration:"),
 		float64(event.DurationMS)/1000, float64(event.DurationAPIMS)/1000)
-	fmt.Fprintf(out, "%s%s %d\n", sa.OutputContinue(), sa.UVMutedText("Turns:"), event.NumTurns)
-	fmt.Fprintf(out, "%s%s $%.4f\n", sa.OutputContinue(), sa.UVMutedText("Cost:"), event.TotalCostUSD)
+	fmt.Fprintf(out, "%s%s %d\n", sa.OutputContinue(), sa.MutedText("Turns:"), event.NumTurns)
+	fmt.Fprintf(out, "%s%s $%.4f\n", sa.OutputContinue(), sa.MutedText("Cost:"), event.TotalCostUSD)
 
 	if r.config.ShowUsage() {
 		fmt.Fprintf(out, "%s%s in=%d out=%d (cache: created=%d read=%d)\n",
 			sa.OutputContinue(),
-			sa.UVMutedText("Tokens:"),
+			sa.MutedText("Tokens:"),
 			event.Usage.InputTokens, event.Usage.OutputTokens,
 			event.Usage.CacheCreationInputTokens, event.Usage.CacheReadInputTokens)
 	}
@@ -142,7 +142,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 	if len(event.PermissionDenials) > 0 {
 		fmt.Fprintf(out, "%s%s %d\n",
 			sa.OutputContinue(),
-			sa.UVWarningText("Permission Denials:"),
+			sa.WarningText("Permission Denials:"),
 			len(event.PermissionDenials))
 		for _, denial := range event.PermissionDenials {
 			fmt.Fprintf(out, "%s  - %s (%s)\n", sa.OutputContinue(), denial.ToolName, denial.ToolUseID)

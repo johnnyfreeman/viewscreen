@@ -493,20 +493,26 @@ func TestStyleConstants(t *testing.T) {
 func TestInitStylesColorEnabled(t *testing.T) {
 	Init(false)
 
-	// Verify that semantic styles are initialized (not zero values)
+	// Verify that Ultraviolet text styles are initialized
 	// We can test this by rendering text and checking it's modified
 	testText := "test"
 
-	// Error style should produce colored output
-	errorResult := Error.Render(testText)
+	// ErrorText should produce colored output
+	errorResult := ErrorText(testText)
 	if errorResult == testText {
-		t.Error("Error style should apply formatting when color is enabled")
+		t.Error("ErrorText should apply formatting when color is enabled")
 	}
 
-	// Success style should produce colored output
-	successResult := Success.Render(testText)
+	// SuccessText should produce colored output
+	successResult := SuccessText(testText)
 	if successResult == testText {
-		t.Error("Success style should apply formatting when color is enabled")
+		t.Error("SuccessText should apply formatting when color is enabled")
+	}
+
+	// DiffAdd (Lipgloss background style) should produce colored output
+	diffResult := DiffAdd.Render(testText)
+	if diffResult == testText {
+		t.Error("DiffAdd style should apply formatting when color is enabled")
 	}
 }
 
@@ -516,21 +522,27 @@ func TestInitStylesColorDisabled(t *testing.T) {
 	// When color is disabled, styles should be no-ops
 	testText := "test"
 
-	// Error style should return plain text
-	errorResult := Error.Render(testText)
+	// ErrorText should return plain text
+	errorResult := ErrorText(testText)
 	if errorResult != testText {
-		t.Errorf("Error style should be a no-op when color is disabled, got %q", errorResult)
+		t.Errorf("ErrorText should be a no-op when color is disabled, got %q", errorResult)
 	}
 
-	// Success style should return plain text
-	successResult := Success.Render(testText)
+	// SuccessText should return plain text
+	successResult := SuccessText(testText)
 	if successResult != testText {
-		t.Errorf("Success style should be a no-op when color is disabled, got %q", successResult)
+		t.Errorf("SuccessText should be a no-op when color is disabled, got %q", successResult)
 	}
 
-	// Bold style should also be a no-op
-	boldResult := Bold.Render(testText)
+	// BoldText should also be a no-op
+	boldResult := BoldText(testText)
 	if boldResult != testText {
-		t.Errorf("Bold style should be a no-op when color is disabled, got %q", boldResult)
+		t.Errorf("BoldText should be a no-op when color is disabled, got %q", boldResult)
+	}
+
+	// DiffAdd (Lipgloss background style) should also be a no-op
+	diffResult := DiffAdd.Render(testText)
+	if diffResult != testText {
+		t.Errorf("DiffAdd style should be a no-op when color is disabled, got %q", diffResult)
 	}
 }

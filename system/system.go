@@ -83,12 +83,12 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 		header = r.styleApplier.SessionHeaderRender(header)
 	}
 	fmt.Fprintln(out, header)
-	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.UVMutedText("Model:"), event.Model)
-	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.UVMutedText("Version:"), event.ClaudeCodeVersion)
-	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.UVMutedText("CWD:"), event.CWD)
-	fmt.Fprintf(out, "%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.UVMutedText("Tools:"), len(event.Tools))
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedText("Model:"), event.Model)
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Version:"), event.ClaudeCodeVersion)
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("CWD:"), event.CWD)
+	fmt.Fprintf(out, "%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Tools:"), len(event.Tools))
 	if r.config.IsVerbose() && len(event.Agents) > 0 {
-		fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.UVMutedText("Agents:"), strings.Join(event.Agents, ", "))
+		fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Agents:"), strings.Join(event.Agents, ", "))
 	}
 	fmt.Fprintln(out)
 }
