@@ -385,7 +385,8 @@ func TestRenderSidebar(t *testing.T) {
 func TestNewSidebarStyles(t *testing.T) {
 	styles := NewSidebarStyles()
 
-	// Verify styles are initialized (non-zero)
+	// Verify Container style is initialized (the only lipgloss style remaining)
+	// All text styling is now handled by Ultraviolet functions in style/uvstyle.go
 	if styles.Container.GetWidth() != sidebarWidth {
 		t.Errorf("Container width = %d, want %d", styles.Container.GetWidth(), sidebarWidth)
 	}

@@ -77,6 +77,87 @@ func ErrorText(text string) string {
 	return style.Styled(text)
 }
 
+// Sidebar styling functions using Ultraviolet for proper style/content separation.
+// These use specific color codes matching the original lipgloss SidebarStyles.
+
+// SidebarHeaderText applies sidebar header/label color (gray-ish, #245).
+func SidebarHeaderText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: color.RGBA{R: 142, G: 142, B: 142, A: 255}, // ANSI 245 equivalent
+	}
+	return style.Styled(text)
+}
+
+// SidebarValueText applies sidebar value color (bright white-ish, #255).
+func SidebarValueText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: color.RGBA{R: 238, G: 238, B: 238, A: 255}, // ANSI 255 equivalent
+	}
+	return style.Styled(text)
+}
+
+// SidebarTodoPendingText applies pending todo color (dim gray, #241).
+func SidebarTodoPendingText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: color.RGBA{R: 102, G: 102, B: 102, A: 255}, // ANSI 241 equivalent
+	}
+	return style.Styled(text)
+}
+
+// SidebarTodoActiveText applies active/in-progress todo color (white, #255).
+func SidebarTodoActiveText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: color.RGBA{R: 238, G: 238, B: 238, A: 255}, // ANSI 255 equivalent
+	}
+	return style.Styled(text)
+}
+
+// SidebarTodoDoneText applies completed todo color (muted, #245).
+func SidebarTodoDoneText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: color.RGBA{R: 142, G: 142, B: 142, A: 255}, // ANSI 245 equivalent
+	}
+	return style.Styled(text)
+}
+
+// SidebarPromptText applies prompt text style (italic, gray #245).
+func SidebarPromptText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg:    color.RGBA{R: 142, G: 142, B: 142, A: 255}, // ANSI 245 equivalent
+		Attrs: uv.AttrItalic,
+	}
+	return style.Styled(text)
+}
+
+// SidebarDecoText applies decoration text color (dark gray, #242).
+func SidebarDecoText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: color.RGBA{R: 108, G: 108, B: 108, A: 255}, // ANSI 242 equivalent
+	}
+	return style.Styled(text)
+}
+
 // hexToRGBA converts a hex color string to color.RGBA.
 func hexToRGBA(hex string) color.RGBA {
 	c, err := colorful.Hex(hex)
