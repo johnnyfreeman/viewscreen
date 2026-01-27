@@ -9,9 +9,9 @@ import (
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/terminal"
 	"github.com/johnnyfreeman/viewscreen/tools"
 	"github.com/johnnyfreeman/viewscreen/types"
-	"golang.org/x/term"
 )
 
 // MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
@@ -78,14 +78,9 @@ func defaultToolUseRenderer(out *render.Output, block types.ContentBlock) {
 
 // NewRenderer creates a new assistant Renderer with default dependencies
 func NewRenderer() *Renderer {
-	width := 80
-	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
-		width = w
-	}
-
 	return &Renderer{
 		output:           os.Stdout,
-		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, width),
+		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, terminal.Width()),
 		toolUseRenderer:  defaultToolUseRenderer,
 	}
 }

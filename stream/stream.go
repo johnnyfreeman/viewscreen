@@ -10,9 +10,9 @@ import (
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/terminal"
 	"github.com/johnnyfreeman/viewscreen/tools"
 	"github.com/johnnyfreeman/viewscreen/types"
-	"golang.org/x/term"
 )
 
 // MarkdownRendererInterface is an alias for types.MarkdownRenderer for backward compatibility.
@@ -80,11 +80,7 @@ type Renderer struct {
 
 // NewRenderer creates a new stream Renderer
 func NewRenderer() *Renderer {
-	// Get terminal width for markdown wrapping
-	width := 80
-	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
-		width = w
-	}
+	width := terminal.Width()
 
 	return &Renderer{
 		CurrentBlockIndex: -1,

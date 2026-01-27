@@ -13,7 +13,6 @@ import (
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/terminal"
 	"github.com/johnnyfreeman/viewscreen/types"
-	"golang.org/x/term"
 )
 
 // ToolResultContent represents tool result content
@@ -228,10 +227,6 @@ func NewRenderer() *Renderer {
 	cc := DefaultConfigChecker{}
 	sa := render.DefaultStyleApplier{}
 	ch := NewDefaultCodeHighlighter(cc.NoColor())
-	width := 80
-	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 0 {
-		width = w
-	}
 
 	// Build the result registry with renderers in priority order
 	registry := NewResultRegistry()
@@ -244,7 +239,7 @@ func NewRenderer() *Renderer {
 		configChecker:    cc,
 		styleApplier:     sa,
 		highlighter:      ch,
-		markdownRenderer: render.NewMarkdownRenderer(cc.NoColor(), width),
+		markdownRenderer: render.NewMarkdownRenderer(cc.NoColor(), terminal.Width()),
 		toolContext:      &ToolContext{},
 		resultRegistry:   registry,
 	}
