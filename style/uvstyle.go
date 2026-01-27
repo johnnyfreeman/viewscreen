@@ -184,6 +184,30 @@ func SidebarDecoText(text string) string {
 	return style.Styled(text)
 }
 
+// LineNumberText applies line number styling (subtle foreground) using Ultraviolet.
+// Use this for diff/edit line numbers to avoid escape sequence conflicts.
+func LineNumberText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: hexToRGBA(string(CurrentTheme.FgSubtle)),
+	}
+	return style.Styled(text)
+}
+
+// LineNumberSepText applies line number separator styling (info/cyan foreground) using Ultraviolet.
+// Use this for the separator between line numbers and content.
+func LineNumberSepText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: hexToRGBA(string(CurrentTheme.Info)),
+	}
+	return style.Styled(text)
+}
+
 // hexToRGBA converts a hex color string to color.RGBA.
 func hexToRGBA(hex string) color.RGBA {
 	c, err := colorful.Hex(hex)

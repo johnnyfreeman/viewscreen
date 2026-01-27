@@ -74,8 +74,8 @@ func (d DefaultStyleApplier) OutputContinue() string { return style.OutputContin
 func (d DefaultStyleApplier) Bullet() string         { return style.Bullet }
 
 // Diff-related styles
-func (d DefaultStyleApplier) LineNumberRender(text string) string    { return style.LineNumber.Render(text) }
-func (d DefaultStyleApplier) LineNumberSepRender(text string) string { return style.LineNumberSep.Render("│") }
+func (d DefaultStyleApplier) LineNumberRender(text string) string    { return style.LineNumberText(text) }
+func (d DefaultStyleApplier) LineNumberSepRender(text string) string { return style.LineNumberSepText("│") }
 func (d DefaultStyleApplier) DiffAddRender(text string) string       { return style.DiffAdd.Render(text) }
 func (d DefaultStyleApplier) DiffRemoveRender(text string) string    { return style.DiffRemove.Render(text) }
 func (d DefaultStyleApplier) DiffAddBg() lipgloss.Color              { return style.DiffAddBg }
