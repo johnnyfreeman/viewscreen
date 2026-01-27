@@ -26,8 +26,9 @@ type IndicatorInterface interface {
 	Clear()
 }
 
-// ToolHeaderRenderer abstracts tool header rendering for testability
-type ToolHeaderRenderer func(toolName string, input map[string]interface{})
+// ToolHeaderRenderer abstracts tool header rendering for testability.
+// It returns the rendered string instead of printing directly.
+type ToolHeaderRenderer func(toolName string, input map[string]interface{}) string
 
 // EventData represents the nested event in stream_event
 type EventData struct {
@@ -91,7 +92,7 @@ func NewRenderer() *Renderer {
 		CurrentBlockIndex: -1,
 		markdownRenderer:  render.NewMarkdownRenderer(config.NoColor, width),
 		indicator:         render.NewStreamingIndicator(config.NoColor),
-		toolHeaderRender:  tools.RenderToolHeaderDefault,
+		toolHeaderRender:  tools.RenderToolHeaderToString,
 		output:            os.Stdout,
 		width:             width,
 	}
@@ -137,8 +138,9 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 	return r
 }
 
-// Render outputs the stream event to the terminal
-func (r *Renderer) Render(event Event) {
+// renderTo implements the core rendering logic, writing to the provided output.
+// This eliminates duplication between Render and RenderToString.
+func (r *Renderer) renderTo(out *render.Output, event Event, showIndicator bool) {
 	switch event.Event.Type {
 	case "message_start":
 		// Message starting, nothing to render
@@ -166,8 +168,9 @@ func (r *Renderer) Render(event Event) {
 			// Try text delta first
 			var textDelta TextDelta
 			if err := json.Unmarshal(event.Event.Delta, &textDelta); err == nil && textDelta.Type == "text_delta" {
-				// Show streaming indicator on first delta
-				r.indicator.Show()
+				if showIndicator {
+					r.indicator.Show()
+				}
 				// Buffer text for markdown rendering when block completes
 				r.textBuffer.WriteString(textDelta.Text)
 				return
@@ -179,25 +182,26 @@ func (r *Renderer) Render(event Event) {
 			}
 		}
 	case "content_block_stop":
-		// Clear streaming indicator before rendering final content
-		r.indicator.Clear()
+		if showIndicator {
+			r.indicator.Clear()
+		}
 
 		if r.InTextBlock && event.Event.Index == r.CurrentBlockIndex {
 			// Render buffered text with markdown
 			text := r.textBuffer.String()
 			if text != "" {
 				rendered := r.markdownRenderer.Render(text)
-				fmt.Fprint(r.output, rendered)
+				fmt.Fprint(out, rendered)
 			}
 		} else if r.InToolUseBlock && event.Event.Index == r.CurrentBlockIndex {
 			// Parse and display the accumulated tool input with full header
 			var input map[string]interface{}
 			toolInputStr := r.toolInput.String()
 			if err := json.Unmarshal([]byte(toolInputStr), &input); err == nil {
-				r.toolHeaderRender(r.toolName, input)
+				out.WriteString(r.toolHeaderRender(r.toolName, input))
 			} else {
 				// Fallback if JSON parse fails
-				fmt.Fprintln(r.output, style.ApplyThemeBoldGradient(style.Bullet+r.toolName))
+				fmt.Fprintln(out, style.ApplyThemeBoldGradient(style.Bullet+r.toolName))
 			}
 		}
 	case "message_delta":
@@ -208,6 +212,11 @@ func (r *Renderer) Render(event Event) {
 		// until after the assistant event is processed to prevent duplicate rendering
 		r.CurrentBlockIndex = -1
 	}
+}
+
+// Render outputs the stream event to the terminal
+func (r *Renderer) Render(event Event) {
+	r.renderTo(render.WriterOutput(r.output), event, true)
 }
 
 // GetBufferedText returns the accumulated text buffer content
@@ -223,70 +232,7 @@ func (r *Renderer) ResetBlockState() {
 
 // RenderToString renders the stream event to a string and returns it
 func (r *Renderer) RenderToString(event Event) string {
-	var sb strings.Builder
-
-	switch event.Event.Type {
-	case "message_start":
-		// Message starting, nothing to render
-	case "content_block_start":
-		r.CurrentBlockIndex = event.Event.Index
-		// Reset block state flags - only one block type active at a time
-		r.InTextBlock = false
-		r.InToolUseBlock = false
-		if len(event.Event.ContentBlock) > 0 {
-			var block types.ContentBlock
-			if err := json.Unmarshal(event.Event.ContentBlock, &block); err == nil {
-				r.CurrentBlockType = block.Type
-				if block.Type == "text" {
-					r.InTextBlock = true
-					r.textBuffer.Reset()
-				} else if block.Type == "tool_use" {
-					r.InToolUseBlock = true
-					r.toolName = block.Name
-					r.toolInput.Reset()
-				}
-			}
-		}
-	case "content_block_delta":
-		if len(event.Event.Delta) > 0 {
-			// Try text delta first
-			var textDelta TextDelta
-			if err := json.Unmarshal(event.Event.Delta, &textDelta); err == nil && textDelta.Type == "text_delta" {
-				// Buffer text for markdown rendering when block completes
-				r.textBuffer.WriteString(textDelta.Text)
-				return ""
-			}
-			// Try input JSON delta
-			var jsonDelta InputJSONDelta
-			if err := json.Unmarshal(event.Event.Delta, &jsonDelta); err == nil && jsonDelta.Type == "input_json_delta" {
-				r.toolInput.WriteString(jsonDelta.PartialJSON)
-			}
-		}
-	case "content_block_stop":
-		if r.InTextBlock && event.Event.Index == r.CurrentBlockIndex {
-			// Render buffered text with markdown
-			text := r.textBuffer.String()
-			if text != "" {
-				rendered := r.markdownRenderer.Render(text)
-				sb.WriteString(rendered)
-			}
-		} else if r.InToolUseBlock && event.Event.Index == r.CurrentBlockIndex {
-			// Parse and display the accumulated tool input with full header
-			var input map[string]interface{}
-			toolInputStr := r.toolInput.String()
-			if err := json.Unmarshal([]byte(toolInputStr), &input); err == nil {
-				sb.WriteString(tools.RenderToolHeaderToString(r.toolName, input))
-			} else {
-				// Fallback if JSON parse fails
-				sb.WriteString(style.ApplyThemeBoldGradient(style.Bullet+r.toolName) + "\n")
-			}
-		}
-	case "message_delta":
-		// Contains stop_reason, nothing to render
-	case "message_stop":
-		// Message complete
-		r.CurrentBlockIndex = -1
-	}
-
-	return sb.String()
+	out := render.StringOutput()
+	r.renderTo(out, event, false)
+	return out.String()
 }

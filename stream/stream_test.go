@@ -42,13 +42,15 @@ type mockToolHeaderRenderer struct {
 		toolName string
 		input    map[string]interface{}
 	}
+	returnValue string
 }
 
-func (m *mockToolHeaderRenderer) render(toolName string, input map[string]interface{}) {
+func (m *mockToolHeaderRenderer) render(toolName string, input map[string]interface{}) string {
 	m.calls = append(m.calls, struct {
 		toolName string
 		input    map[string]interface{}
 	}{toolName, input})
+	return m.returnValue
 }
 
 // Helper to create a content block JSON
@@ -139,8 +141,9 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with custom tool header renderer", func(t *testing.T) {
 		called := false
-		custom := func(toolName string, input map[string]interface{}) {
+		custom := func(toolName string, input map[string]interface{}) string {
 			called = true
+			return "rendered"
 		}
 		r := NewRendererWithOptions(WithToolHeaderRenderer(custom))
 
