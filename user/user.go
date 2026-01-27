@@ -12,6 +12,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/terminal"
+	"github.com/johnnyfreeman/viewscreen/textutil"
 	"github.com/johnnyfreeman/viewscreen/tools"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
@@ -296,13 +297,13 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 		contentStr := content.Content()
 		if content.IsError {
 			// Show error with output prefix
-			errMsg := terminal.StripSystemReminders(contentStr)
-			errMsg = terminal.Truncate(errMsg, 200)
+			errMsg := textutil.StripSystemReminders(contentStr)
+			errMsg = textutil.Truncate(errMsg, 200)
 			fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.ErrorRender(errMsg))
 		} else if contentStr != "" {
 			// Clean up the content
-			cleaned := terminal.StripSystemReminders(contentStr)
-			cleaned = terminal.StripLineNumbers(cleaned)
+			cleaned := textutil.StripSystemReminders(contentStr)
+			cleaned = textutil.StripLineNumbers(cleaned)
 
 			lines := strings.Split(cleaned, "\n")
 			lineCount := len(lines)
@@ -312,7 +313,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 				highlighted := r.highlightContent(cleaned)
 
 				// Truncate to max lines
-				truncated, remaining := terminal.TruncateLines(highlighted, terminal.DefaultMaxLines)
+				truncated, remaining := textutil.TruncateLines(highlighted, textutil.DefaultMaxLines)
 				resultLines := strings.Split(truncated, "\n")
 
 				for i, line := range resultLines {
@@ -342,7 +343,7 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 	for _, content := range event.Message.Content {
 		// Synthetic messages have type "text" with Text field populated
 		if content.Type == "text" && content.Text != "" {
-			cleaned := terminal.StripSystemReminders(content.Text)
+			cleaned := textutil.StripSystemReminders(content.Text)
 			lines := strings.Split(cleaned, "\n")
 
 			// Render as markdown if renderer is available
@@ -354,7 +355,7 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 				}
 			} else {
 				// Fallback to plain text with truncation
-				truncated, remaining := terminal.TruncateLines(cleaned, terminal.DefaultMaxLines)
+				truncated, remaining := textutil.TruncateLines(cleaned, textutil.DefaultMaxLines)
 				resultLines := strings.Split(truncated, "\n")
 
 				for i, line := range resultLines {

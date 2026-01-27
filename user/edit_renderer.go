@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/johnnyfreeman/viewscreen/render"
-	"github.com/johnnyfreeman/viewscreen/terminal"
+	"github.com/johnnyfreeman/viewscreen/textutil"
 )
 
 // EditRenderer handles rendering of edit results with syntax-highlighted diffs.
@@ -70,7 +70,7 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 			}
 
 			// Check truncation limit
-			if lineCount >= terminal.DefaultMaxLines {
+			if lineCount >= textutil.DefaultMaxLines {
 				// Count remaining lines
 				remaining := 0
 				for _, h := range editResult.StructuredPatch {
