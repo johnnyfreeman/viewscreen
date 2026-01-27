@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/content"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/terminal"
@@ -26,43 +27,13 @@ type ToolResultContent struct {
 	IsError    bool            `json:"is_error"`
 }
 
-// ContentBlock represents a single content block when content is an array
-type ContentBlock struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
-// Content returns the content as a string, handling both string and array formats
+// Content returns the content as a string, handling both string and array formats.
 func (t *ToolResultContent) Content() string {
 	// For synthetic text messages, return the Text field directly
 	if t.Text != "" {
 		return t.Text
 	}
-
-	if len(t.RawContent) == 0 {
-		return ""
-	}
-
-	// Try to unmarshal as string first
-	var str string
-	if err := json.Unmarshal(t.RawContent, &str); err == nil {
-		return str
-	}
-
-	// Try to unmarshal as array of content blocks
-	var blocks []ContentBlock
-	if err := json.Unmarshal(t.RawContent, &blocks); err == nil {
-		var parts []string
-		for _, block := range blocks {
-			if block.Type == "text" && block.Text != "" {
-				parts = append(parts, block.Text)
-			}
-		}
-		return strings.Join(parts, "\n")
-	}
-
-	// Fallback: return raw string representation
-	return string(t.RawContent)
+	return content.ExtractText(t.RawContent)
 }
 
 // Message represents the message object in user events

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/johnnyfreeman/viewscreen/content"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/tools"
 )
@@ -366,28 +367,28 @@ func TestContentBlock_Unmarshaling(t *testing.T) {
 	tests := []struct {
 		name     string
 		jsonData string
-		expected ContentBlock
+		expected content.Block
 	}{
 		{
 			name:     "text block",
 			jsonData: `{"type": "text", "text": "hello world"}`,
-			expected: ContentBlock{Type: "text", Text: "hello world"},
+			expected: content.Block{Type: "text", Text: "hello world"},
 		},
 		{
 			name:     "empty text",
 			jsonData: `{"type": "text", "text": ""}`,
-			expected: ContentBlock{Type: "text", Text: ""},
+			expected: content.Block{Type: "text", Text: ""},
 		},
 		{
 			name:     "image block without text",
 			jsonData: `{"type": "image"}`,
-			expected: ContentBlock{Type: "image", Text: ""},
+			expected: content.Block{Type: "image", Text: ""},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var block ContentBlock
+			var block content.Block
 			err := json.Unmarshal([]byte(tt.jsonData), &block)
 			if err != nil {
 				t.Fatalf("Failed to unmarshal: %v", err)
