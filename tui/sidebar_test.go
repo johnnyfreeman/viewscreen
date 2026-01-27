@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"charm.land/bubbles/v2/spinner"
+	"charm.land/lipgloss/v2"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
 )
@@ -389,5 +390,122 @@ func TestNewSidebarStyles(t *testing.T) {
 	// All text styling is now handled by Ultraviolet functions in style/uvstyle.go
 	if styles.Container.GetWidth() != sidebarWidth {
 		t.Errorf("Container width = %d, want %d", styles.Container.GetWidth(), sidebarWidth)
+	}
+}
+
+func TestNewHeaderStyles(t *testing.T) {
+	styles := NewHeaderStyles()
+
+	// Verify Modal style has border
+	if styles.Modal.GetBorderStyle() != lipgloss.RoundedBorder() {
+		t.Error("expected modal to have rounded border")
+	}
+}
+
+func TestRenderHeader(t *testing.T) {
+	t.Run("renders single line with all info", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "test-model"
+		s.TurnCount = 3
+		s.TotalCost = 0.05
+
+		output := RenderHeader(s, 100)
+
+		if output == "" {
+			t.Error("expected non-empty output from RenderHeader")
+		}
+		if !strings.Contains(output, "VIEWSCREEN") {
+			t.Error("expected VIEWSCREEN title in output")
+		}
+		if !strings.Contains(output, "test-model") {
+			t.Error("expected model name in output")
+		}
+		if !strings.Contains(output, "3") {
+			t.Error("expected turn count in output")
+		}
+		if !strings.Contains(output, "$0.05") {
+			t.Error("expected cost in output")
+		}
+		if !strings.Contains(output, "[d]") {
+			t.Error("expected key hint [d] in output")
+		}
+		if !strings.Contains(output, "─") {
+			t.Error("expected decoration in output")
+		}
+	})
+
+	t.Run("truncates long model names", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "very-long-model-name-that-exceeds-limit"
+		s.TurnCount = 1
+		s.TotalCost = 0
+
+		output := RenderHeader(s, 100)
+
+		// Should not contain the full model name
+		if strings.Contains(output, "very-long-model-name-that-exceeds-limit") {
+			t.Error("expected long model name to be truncated")
+		}
+		// Should contain truncation indicator
+		if !strings.Contains(output, "..") {
+			t.Error("expected truncation indicator for long model name")
+		}
+	})
+}
+
+func TestRenderDetailsModal(t *testing.T) {
+	s := state.NewState()
+	s.Model = "claude-opus"
+	s.TurnCount = 5
+	s.TotalCost = 0.1234
+	s.Prompt = "Hello world"
+	s.ToolInProgress = true
+	s.CurrentTool = "Read"
+	s.Todos = []state.Todo{
+		{Subject: "Task 1", Status: "completed"},
+	}
+
+	styles := NewHeaderStyles()
+	sp := newTestSpinner()
+
+	output := RenderDetailsModal(s, sp, 100, 40, styles)
+
+	// Check all sections are present
+	if !strings.Contains(output, "claude") {
+		t.Error("expected logo in output")
+	}
+	if !strings.Contains(output, "Hello world") {
+		t.Error("expected prompt in output")
+	}
+	if !strings.Contains(output, "claude-opus") {
+		t.Error("expected model in output")
+	}
+	if !strings.Contains(output, "Running") {
+		t.Error("expected Running header in output")
+	}
+	if !strings.Contains(output, "Task 1") {
+		t.Error("expected todo in output")
+	}
+	if !strings.Contains(output, "Press d or Esc to close") {
+		t.Error("expected close hint in output")
+	}
+}
+
+func TestLayoutModeConstants(t *testing.T) {
+	// Verify layout mode constants are defined correctly
+	if LayoutSidebar != 0 {
+		t.Error("expected LayoutSidebar to be 0")
+	}
+	if LayoutHeader != 1 {
+		t.Error("expected LayoutHeader to be 1")
+	}
+}
+
+func TestLayoutBreakpoint(t *testing.T) {
+	if breakpointWidth != 80 {
+		t.Errorf("breakpointWidth = %d, want 80", breakpointWidth)
+	}
+	if headerHeight != 1 {
+		t.Errorf("headerHeight = %d, want 1", headerHeight)
 	}
 }

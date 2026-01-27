@@ -25,7 +25,20 @@ var logoLines = []string{
 	"▄█ █▄▄ █▀▄ ██▄ ██▄ █ ▀█",
 }
 
-const sidebarWidth = 30
+const (
+	sidebarWidth    = 30
+	breakpointWidth = 80 // below this, use header mode
+	headerHeight    = 1  // single line header
+	modalWidth      = 40 // width of details modal
+)
+
+// LayoutMode determines how the UI is rendered based on terminal width
+type LayoutMode int
+
+const (
+	LayoutSidebar LayoutMode = iota // sidebar on right (>= 80 cols)
+	LayoutHeader                    // header on top (< 80 cols)
+)
 
 // SidebarStyles holds the lipgloss styles for layout-only concerns.
 // Text styling is handled by Ultraviolet functions in style/uvstyle.go
@@ -220,4 +233,122 @@ func (r *SidebarRenderer) Render(s *state.State, height int) string {
 func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles) string {
 	r := NewSidebarRenderer(styles, spinner)
 	return r.Render(s, height)
+}
+
+// HeaderStyles holds the lipgloss styles for header layout.
+type HeaderStyles struct {
+	Container lipgloss.Style
+	Modal     lipgloss.Style
+}
+
+// NewHeaderStyles creates header styles.
+func NewHeaderStyles() HeaderStyles {
+	return HeaderStyles{
+		Container: lipgloss.NewStyle(),
+		Modal: lipgloss.NewStyle().
+			Width(modalWidth).
+			Padding(1, 2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(string(style.CurrentTheme.FgMuted))),
+	}
+}
+
+// RenderHeader renders a single-line header for narrow terminals.
+// Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 ─── [d] ───
+func RenderHeader(s *state.State, width int) string {
+	// Build the info section: model │ turns │ cost
+	model := s.Model
+	maxModelLen := 15
+	if len(model) > maxModelLen {
+		model = model[:maxModelLen-2] + ".."
+	}
+
+	info := fmt.Sprintf("%s %s %d %s $%.2f",
+		model,
+		style.MutedText("│"),
+		s.TurnCount,
+		style.MutedText("│"),
+		s.TotalCost)
+
+	// Fixed parts
+	title := style.ApplyThemeBoldGradient("VIEWSCREEN")
+	keyHint := style.MutedText("[d]")
+
+	// Calculate decoration lengths
+	// Raw lengths (without ANSI): "─── " + "VIEWSCREEN" + " ─── " + info + " ─── " + "[d]" + " ───"
+	titleLen := 10 // "VIEWSCREEN"
+	infoLen := len(model) + 3 + len(fmt.Sprintf("%d", s.TurnCount)) + 3 + len(fmt.Sprintf("$%.2f", s.TotalCost))
+	keyHintLen := 3 // "[d]"
+	fixedLen := 4 + titleLen + 5 + infoLen + 5 + keyHintLen + 4 // decorations + spaces
+
+	// Remaining space for decorations
+	remaining := max(width-fixedLen, 4)
+
+	// Distribute decoration evenly
+	leftDeco := strings.Repeat("─", 3)
+	midDeco := strings.Repeat("─", 3)
+	rightDeco := strings.Repeat("─", max(remaining, 1))
+
+	return fmt.Sprintf("%s %s %s %s %s %s %s",
+		style.MutedText(leftDeco),
+		title,
+		style.MutedText(midDeco),
+		info,
+		style.MutedText(midDeco),
+		keyHint,
+		style.MutedText(rightDeco))
+}
+
+// RenderDetailsModal renders the details modal overlay.
+func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles) string {
+	r := NewSidebarRenderer(NewSidebarStyles(), sp)
+
+	var sb strings.Builder
+
+	// Logo
+	sb.WriteString(r.RenderLogo())
+	sb.WriteString("\n")
+
+	// Prompt if available
+	if s.Prompt != "" {
+		sb.WriteString(r.RenderPrompt(s.Prompt))
+	}
+
+	// Session info
+	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+
+	// Current tool
+	if s.ToolInProgress {
+		sb.WriteString(r.RenderCurrentTool(s.CurrentTool, s.CurrentToolInput))
+	}
+
+	// Todos
+	sb.WriteString(r.RenderTodos(s.Todos))
+
+	// Close hint
+	sb.WriteString("\n")
+	sb.WriteString(style.MutedText("Press d or Esc to close"))
+
+	modalContent := styles.Modal.Render(sb.String())
+
+	// Center the modal
+	modalHeight := strings.Count(modalContent, "\n") + 1
+	modalWidth := lipgloss.Width(modalContent)
+
+	topPadding := max((height-modalHeight)/2, 0)
+	leftPadding := max((width-modalWidth)/2, 0)
+
+	// Build centered modal
+	var result strings.Builder
+	for i := 0; i < topPadding; i++ {
+		result.WriteString("\n")
+	}
+
+	for _, line := range strings.Split(modalContent, "\n") {
+		result.WriteString(strings.Repeat(" ", leftPadding))
+		result.WriteString(line)
+		result.WriteString("\n")
+	}
+
+	return result.String()
 }

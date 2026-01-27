@@ -13,18 +13,40 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit // tea.Quit is a func() Msg, which is a Cmd
+	case "d":
+		// Toggle details modal (only in header mode)
+		if m.layoutMode == LayoutHeader {
+			m.showDetailsModal = !m.showDetailsModal
+		}
+	case "esc":
+		// Close details modal
+		if m.showDetailsModal {
+			m.showDetailsModal = false
+		}
 	case "up", "k":
-		m.viewport.ScrollUp(1)
+		if !m.showDetailsModal {
+			m.viewport.ScrollUp(1)
+		}
 	case "down", "j":
-		m.viewport.ScrollDown(1)
+		if !m.showDetailsModal {
+			m.viewport.ScrollDown(1)
+		}
 	case "pgup":
-		m.viewport.HalfPageUp()
+		if !m.showDetailsModal {
+			m.viewport.HalfPageUp()
+		}
 	case "pgdown":
-		m.viewport.HalfPageDown()
+		if !m.showDetailsModal {
+			m.viewport.HalfPageDown()
+		}
 	case "home", "g":
-		m.viewport.GotoTop()
+		if !m.showDetailsModal {
+			m.viewport.GotoTop()
+		}
 	case "end", "G":
-		m.viewport.GotoBottom()
+		if !m.showDetailsModal {
+			m.viewport.GotoBottom()
+		}
 	}
 	return m, nil
 }
@@ -34,20 +56,38 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 	m.width = msg.Width
 	m.height = msg.Height
 
-	// Calculate content width (total - sidebar - border)
-	contentWidth := max(m.width-sidebarWidth-3, 20)
+	// Determine layout mode based on terminal width
+	if m.width < breakpointWidth {
+		m.layoutMode = LayoutHeader
+	} else {
+		m.layoutMode = LayoutSidebar
+	}
+
+	// Calculate content dimensions based on layout mode
+	var contentWidth, contentHeight int
+	switch m.layoutMode {
+	case LayoutHeader:
+		// Full width minus padding
+		contentWidth = max(m.width-2, 20)
+		// Height minus header and margin
+		contentHeight = m.height - headerHeight - 1
+	default:
+		// Width minus sidebar and border
+		contentWidth = max(m.width-sidebarWidth-3, 20)
+		contentHeight = m.height - 2
+	}
 
 	if !m.ready {
 		// First time setup - use functional options for v2 API
 		m.viewport = viewport.New(
 			viewport.WithWidth(contentWidth),
-			viewport.WithHeight(m.height-2),
+			viewport.WithHeight(contentHeight),
 		)
 		m.viewport.YPosition = 0
 		m.ready = true
 	} else {
 		m.viewport.SetWidth(contentWidth)
-		m.viewport.SetHeight(m.height - 2)
+		m.viewport.SetHeight(contentHeight)
 	}
 
 	// Update viewport content

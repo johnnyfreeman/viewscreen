@@ -95,6 +95,57 @@ func TestHandleKeyMsg(t *testing.T) {
 			t.Error("expected no command on unknown key")
 		}
 	})
+
+	t.Run("d toggles details modal in header mode", func(t *testing.T) {
+		m := newTestModel()
+		m.layoutMode = LayoutHeader
+		m.showDetailsModal = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "d"})
+		if !m.showDetailsModal {
+			t.Error("expected showDetailsModal to be true after pressing d")
+		}
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "d"})
+		if m.showDetailsModal {
+			t.Error("expected showDetailsModal to be false after pressing d again")
+		}
+	})
+
+	t.Run("d does nothing in sidebar mode", func(t *testing.T) {
+		m := newTestModel()
+		m.layoutMode = LayoutSidebar
+		m.showDetailsModal = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "d"})
+		if m.showDetailsModal {
+			t.Error("expected showDetailsModal to remain false in sidebar mode")
+		}
+	})
+
+	t.Run("esc closes details modal", func(t *testing.T) {
+		m := newTestModel()
+		m.layoutMode = LayoutHeader
+		m.showDetailsModal = true
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEscape})
+		if m.showDetailsModal {
+			t.Error("expected showDetailsModal to be false after pressing Esc")
+		}
+	})
+
+	t.Run("scroll keys disabled when modal open", func(t *testing.T) {
+		m := newTestModel()
+		m.layoutMode = LayoutHeader
+		m.showDetailsModal = true
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		initialY := m.viewport.YOffset()
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
+		if m.viewport.YOffset() != initialY {
+			t.Error("expected scroll to be disabled when modal is open")
+		}
+	})
 }
 
 func TestHandleWindowSizeMsg(t *testing.T) {
@@ -138,6 +189,70 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 		expectedWidth := 120 - sidebarWidth - 3
 		if m.viewport.Width() != expectedWidth {
 			t.Errorf("viewport width = %d, want %d", m.viewport.Width(), expectedWidth)
+		}
+	})
+
+	t.Run("uses sidebar mode for wide terminals", func(t *testing.T) {
+		m := NewModel()
+		m.ready = false
+
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
+
+		if m.layoutMode != LayoutSidebar {
+			t.Errorf("layoutMode = %d, want LayoutSidebar (%d)", m.layoutMode, LayoutSidebar)
+		}
+	})
+
+	t.Run("uses header mode for narrow terminals", func(t *testing.T) {
+		m := NewModel()
+		m.ready = false
+
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 70, Height: 50})
+
+		if m.layoutMode != LayoutHeader {
+			t.Errorf("layoutMode = %d, want LayoutHeader (%d)", m.layoutMode, LayoutHeader)
+		}
+	})
+
+	t.Run("header mode uses full width", func(t *testing.T) {
+		m := NewModel()
+		m.ready = false
+
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 70, Height: 50})
+
+		// Content width should be total - 2 (padding)
+		expectedWidth := 70 - 2
+		if m.viewport.Width() != expectedWidth {
+			t.Errorf("viewport width = %d, want %d", m.viewport.Width(), expectedWidth)
+		}
+	})
+
+	t.Run("header mode adjusts height for header", func(t *testing.T) {
+		m := NewModel()
+		m.ready = false
+
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 70, Height: 50})
+
+		// Content height should be total - headerHeight - 1
+		expectedHeight := 50 - headerHeight - 1
+		if m.viewport.Height() != expectedHeight {
+			t.Errorf("viewport height = %d, want %d", m.viewport.Height(), expectedHeight)
+		}
+	})
+
+	t.Run("switches mode at breakpoint", func(t *testing.T) {
+		m := NewModel()
+
+		// At breakpoint - should be sidebar mode
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 80, Height: 50})
+		if m.layoutMode != LayoutSidebar {
+			t.Errorf("at breakpoint (80): layoutMode = %d, want LayoutSidebar", m.layoutMode)
+		}
+
+		// Just below breakpoint - should be header mode
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 79, Height: 50})
+		if m.layoutMode != LayoutHeader {
+			t.Errorf("below breakpoint (79): layoutMode = %d, want LayoutHeader", m.layoutMode)
 		}
 	})
 }

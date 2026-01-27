@@ -20,17 +20,20 @@ import (
 
 // Model is the main Bubbletea model for the TUI
 type Model struct {
-	width         int
-	height        int
-	viewport      viewport.Model
-	spinner       spinner.Model
-	state         *state.State
-	content       *strings.Builder // pointer to avoid copy issues
-	stdinDone     bool
-	scanner       *bufio.Scanner
-	sidebarStyles SidebarStyles
-	ready         bool
-	processor     *events.EventProcessor
+	width            int
+	height           int
+	viewport         viewport.Model
+	spinner          spinner.Model
+	state            *state.State
+	content          *strings.Builder // pointer to avoid copy issues
+	stdinDone        bool
+	scanner          *bufio.Scanner
+	sidebarStyles    SidebarStyles
+	headerStyles     HeaderStyles
+	layoutMode       LayoutMode
+	showDetailsModal bool
+	ready            bool
+	processor        *events.EventProcessor
 }
 
 // NewModel creates a new TUI model
@@ -56,6 +59,8 @@ func NewModel() Model {
 		content:       &strings.Builder{},
 		scanner:       scanner,
 		sidebarStyles: NewSidebarStyles(),
+		headerStyles:  NewHeaderStyles(),
+		layoutMode:    LayoutSidebar, // default to sidebar mode
 		processor:     events.NewEventProcessor(st),
 	}
 }
@@ -163,16 +168,26 @@ func (m *Model) updateViewportWithPendingTools() {
 	m.viewport.SetContent(content)
 }
 
-// renderLayout composes the main content area and sidebar
+// renderLayout composes the main content area and sidebar/header
 func (m Model) renderLayout() string {
-	// Render sidebar
-	sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles)
+	switch m.layoutMode {
+	case LayoutHeader:
+		// Header mode: single-line header on top, content below at full width
+		header := RenderHeader(m.state, m.width)
+		layout := lipgloss.JoinVertical(lipgloss.Left, header, m.viewport.View())
 
-	// Render main content with viewport
-	mainContent := m.viewport.View()
-
-	// Join horizontally
-	return lipgloss.JoinHorizontal(lipgloss.Top, mainContent, sidebar)
+		// Overlay modal if showing details
+		if m.showDetailsModal {
+			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles)
+			return modal
+		}
+		return layout
+	default:
+		// Sidebar mode: content left, sidebar right
+		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles)
+		mainContent := m.viewport.View()
+		return lipgloss.JoinHorizontal(lipgloss.Top, mainContent, sidebar)
+	}
 }
 
 // Run starts the TUI
