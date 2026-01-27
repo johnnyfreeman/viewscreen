@@ -36,6 +36,16 @@ func NewEventProcessor(s *state.State) *EventProcessor {
 	}
 }
 
+// NewEventProcessorWithRenderers creates a new EventProcessor with custom renderers.
+// This allows reusing an existing RendererSet, useful for testing or when
+// renderers need specific configuration.
+func NewEventProcessorWithRenderers(s *state.State, rs *RendererSet) *EventProcessor {
+	return &EventProcessor{
+		renderers: rs,
+		state:     s,
+	}
+}
+
 // Renderers returns the underlying RendererSet for direct access when needed.
 func (p *EventProcessor) Renderers() *RendererSet {
 	return p.renderers

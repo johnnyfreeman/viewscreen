@@ -26,11 +26,11 @@ func TestNewParser(t *testing.T) {
 		t.Fatal("NewParser returned nil")
 	}
 
-	if p.renderers == nil {
-		t.Error("expected renderers to be non-nil")
+	if p.Renderers() == nil {
+		t.Error("expected Renderers() to be non-nil")
 	}
-	if p.renderers.Stream == nil {
-		t.Error("expected renderers.Stream to be non-nil")
+	if p.Renderers().Stream == nil {
+		t.Error("expected Renderers().Stream to be non-nil")
 	}
 }
 
@@ -57,8 +57,14 @@ func TestNewParserWithOptions(t *testing.T) {
 		rs := events.NewRendererSet()
 		p := NewParserWithOptions(WithRendererSet(rs))
 
-		if p.renderers != rs {
-			t.Error("expected custom renderer set")
+		// The renderers should be accessible via Renderers()
+		// Note: WithRendererSet creates a new EventProcessor with these renderers
+		if p.Renderers() == nil {
+			t.Error("expected Renderers() to be non-nil")
+		}
+		// Verify the custom stream renderer is in place
+		if p.Renderers().Stream != rs.Stream {
+			t.Error("expected custom renderer set's Stream to be used")
 		}
 	})
 

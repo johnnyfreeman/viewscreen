@@ -7,19 +7,21 @@ import (
 	"os"
 
 	"github.com/johnnyfreeman/viewscreen/events"
-	"github.com/johnnyfreeman/viewscreen/style"
-	"github.com/johnnyfreeman/viewscreen/tools"
+	"github.com/johnnyfreeman/viewscreen/state"
 )
 
 // EventHandler is called for each parsed event
 type EventHandler func(eventType string, line []byte) error
 
-// Parser handles reading and dispatching events from an input source
+// Parser handles reading and dispatching events from an input source.
+// It uses EventProcessor internally for event processing, writing output
+// directly to stdout for streaming display.
 type Parser struct {
 	input        io.Reader
+	output       io.Writer
 	errOutput    io.Writer
 	eventHandler EventHandler
-	renderers    *events.RendererSet
+	processor    *events.EventProcessor
 }
 
 // Option configures a Parser
@@ -46,10 +48,18 @@ func WithEventHandler(h EventHandler) Option {
 	}
 }
 
-// WithRendererSet sets a custom renderer set
+// WithRendererSet sets a custom renderer set for the internal EventProcessor.
 func WithRendererSet(rs *events.RendererSet) Option {
 	return func(p *Parser) {
-		p.renderers = rs
+		// Create a new processor with the custom renderers
+		p.processor = events.NewEventProcessorWithRenderers(state.NewState(), rs)
+	}
+}
+
+// WithOutput sets a custom output writer (default: os.Stdout)
+func WithOutput(w io.Writer) Option {
+	return func(p *Parser) {
+		p.output = w
 	}
 }
 
@@ -62,13 +72,19 @@ func NewParser() *Parser {
 func NewParserWithOptions(opts ...Option) *Parser {
 	p := &Parser{
 		input:     os.Stdin,
+		output:    os.Stdout,
 		errOutput: os.Stderr,
-		renderers: events.NewRendererSet(),
+		processor: events.NewEventProcessor(state.NewState()),
 	}
 	for _, opt := range opts {
 		opt(p)
 	}
 	return p
+}
+
+// Renderers returns the underlying RendererSet for tests that need to inspect state.
+func (p *Parser) Renderers() *events.RendererSet {
+	return p.processor.Renderers()
 }
 
 // Run reads events from input and renders them
@@ -110,9 +126,10 @@ func (p *Parser) Run() error {
 			}
 		}
 
-		// Process the event
-		if err := p.processEvent(parsed); err != nil {
-			fmt.Fprintf(p.errOutput, "Error processing event: %v\n", err)
+		// Process the event through EventProcessor and write output
+		result := p.processor.Process(parsed)
+		if result.Rendered != "" {
+			fmt.Fprint(p.output, result.Rendered)
 		}
 	}
 
@@ -120,61 +137,6 @@ func (p *Parser) Run() error {
 		if err != io.EOF {
 			return fmt.Errorf("error reading input: %w", err)
 		}
-	}
-
-	return nil
-}
-
-// processEvent handles a parsed event
-func (p *Parser) processEvent(event events.Event) error {
-	r := p.renderers
-
-	switch e := event.(type) {
-	case events.SystemEvent:
-		r.System.Render(e.Data)
-
-	case events.AssistantEvent:
-		// Buffer tool_use blocks using the events package helper
-		events.BufferToolUse(e.Data, r.PendingTools, r.Stream)
-		// Render text blocks (tool_use rendering is always suppressed)
-		r.Assistant.Render(e.Data, r.Stream.InTextBlock(), true)
-		r.Stream.ResetBlockState()
-
-	case events.UserEvent:
-		// Match tool results with pending tool_use blocks
-		matched := events.MatchToolResults(e.Data, r.PendingTools)
-
-		// Render matched tool headers and set context
-		var isNested bool
-		for _, m := range matched {
-			isNested = m.IsNested
-			var ctx tools.ToolContext
-			if m.IsNested {
-				ctx = tools.RenderNestedToolUse(m.Block)
-			} else {
-				ctx = tools.RenderToolUse(m.Block)
-			}
-			r.User.SetToolContext(ctx)
-		}
-
-		// Render the tool result
-		if isNested {
-			r.User.RenderNested(e.Data)
-		} else {
-			r.User.Render(e.Data)
-		}
-
-	case events.StreamEvent:
-		r.Stream.Render(e.Data)
-
-	case events.ResultEvent:
-		// Flush any orphaned pending tools
-		orphaned := events.FlushOrphanedTools(r.PendingTools)
-		for _, o := range orphaned {
-			tools.RenderToolUse(o.Block)
-			fmt.Println(style.OutputPrefix + style.Muted.Render("(no result)"))
-		}
-		r.Result.Render(e.Data)
 	}
 
 	return nil
