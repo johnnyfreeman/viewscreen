@@ -34,12 +34,11 @@ type Model struct {
 
 // NewModel creates a new TUI model
 func NewModel() Model {
-	// Initialize spinner with Dot spinner using theme accent color.
-	// Note: bubbles spinner requires lipgloss.Style, so we convert our
-	// style.Color to lipgloss.Color for the spinner foreground.
+	// Initialize spinner with Dot spinner.
+	// No lipgloss style is applied here - styling is done via Ultraviolet
+	// when rendering (see style.SpinnerText) to avoid escape sequence conflicts.
 	s := spinner.New(
 		spinner.WithSpinner(spinner.Dot),
-		spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(string(style.CurrentTheme.Accent)))),
 	)
 
 	// Create scanner for stdin with large buffer
@@ -154,9 +153,10 @@ func (m Model) View() tea.View {
 // updateViewportWithPendingTools updates the viewport content, rendering pending tools with spinner
 func (m *Model) updateViewportWithPendingTools() {
 	content := m.content.String()
-	// Render pending tools with spinner instead of bullet
+	// Render pending tools with spinner instead of bullet.
+	// Apply Ultraviolet styling to the spinner for proper style/content separation.
 	m.processor.ForEachPendingTool(func(id string, pending tools.PendingTool) {
-		content += m.processor.RenderPendingTool(pending, m.spinner.View())
+		content += m.processor.RenderPendingTool(pending, style.SpinnerText(m.spinner.View()))
 	})
 	m.viewport.SetContent(content)
 }

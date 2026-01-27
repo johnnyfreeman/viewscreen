@@ -245,6 +245,19 @@ func AccentText(text string) string {
 	return style.Styled(text)
 }
 
+// SpinnerText applies spinner styling (accent color) using Ultraviolet.
+// Use this to style bubbles spinner output instead of lipgloss.Style,
+// ensuring proper style/content separation and avoiding escape sequence conflicts.
+func SpinnerText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: hexToRGBA(string(CurrentTheme.Accent)),
+	}
+	return style.Styled(text)
+}
+
 // hexToRGBA converts a hex color string to color.RGBA.
 func hexToRGBA(hex string) color.RGBA {
 	c, err := colorful.Hex(hex)
