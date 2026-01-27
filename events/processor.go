@@ -151,7 +151,7 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 	// Render matched tool headers and set context
 	for _, match := range matched {
 		isNested = match.IsNested
-		str, ctx := match.RenderToString()
+		str, ctx := tools.RenderResolved(match.ResolvedTool)
 		content.WriteString(str)
 		r.User.SetToolContext(ctx)
 	}
@@ -194,7 +194,7 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 	// Flush any orphaned pending tools using the tracker's method
 	orphaned := r.PendingTools.FlushAll()
 	for _, o := range orphaned {
-		str, _ := o.RenderToString()
+		str, _ := tools.RenderResolved(o.ResolvedTool)
 		content.WriteString(str)
 		content.WriteString(style.OutputPrefix + style.MutedText("(no result)") + "\n")
 	}

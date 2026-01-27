@@ -157,3 +157,13 @@ func (r *HeaderRenderer) RenderBlockToOutput(out *render.Output, block types.Con
 	input := ParseBlockInput(block)
 	r.renderTo(out, block.Name, input)
 }
+
+// RenderResolved renders a ResolvedTool (matched or orphaned) to a string.
+// This centralizes the rendering of resolved tools in one place.
+func RenderResolved(resolved ResolvedTool) (string, ToolContext) {
+	r := NewHeaderRenderer()
+	if resolved.IsNested {
+		r = NewHeaderRenderer(WithNested())
+	}
+	return r.RenderBlockToString(resolved.Block)
+}

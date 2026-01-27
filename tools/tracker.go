@@ -90,17 +90,11 @@ func (t *ToolUseTracker) Clear() {
 	t.pending = make(map[string]PendingTool)
 }
 
-// ResolvedTool contains the common fields and rendering logic for tools
-// that have been matched or orphaned. This consolidates the shared behavior
-// between MatchedTool and OrphanedTool.
+// ResolvedTool contains the data for a tool that has been matched or orphaned.
+// It is a pure data structure - rendering is handled by HeaderRenderer.
 type ResolvedTool struct {
 	Block    types.ContentBlock
 	IsNested bool
-}
-
-// RenderToString renders the tool header with appropriate nesting.
-func (r ResolvedTool) RenderToString() (string, ToolContext) {
-	return NewHeaderRenderer().RenderBlockToStringWithNesting(r.Block, r.IsNested)
 }
 
 // MatchedTool represents a tool_use block matched with its result.

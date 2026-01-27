@@ -675,97 +675,45 @@ func TestToolUseTracker_MatchFromUserMessage_MultipleResults(t *testing.T) {
 	}
 }
 
-// Tests for MatchedTool.RenderToString
+// Tests for RenderResolved
 
-func TestMatchedTool_RenderToString_NonNested(t *testing.T) {
-	matched := MatchedTool{
-		ResolvedTool: ResolvedTool{
-			Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
-			IsNested: false,
-		},
+func TestRenderResolved_NonNested(t *testing.T) {
+	resolved := ResolvedTool{
+		Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
+		IsNested: false,
 	}
 
-	str, ctx := matched.RenderToString()
+	str, ctx := RenderResolved(resolved)
 
 	// Should produce output (contains tool name)
 	if str == "" {
-		t.Error("RenderToString() should produce non-empty output")
+		t.Error("RenderResolved() should produce non-empty output")
 	}
 	if !containsSubstring(str, "Bash") {
-		t.Errorf("RenderToString() output should contain tool name, got: %q", str)
+		t.Errorf("RenderResolved() output should contain tool name, got: %q", str)
 	}
 	if ctx.ToolName != "Bash" {
-		t.Errorf("RenderToString() context should have ToolName 'Bash', got %q", ctx.ToolName)
+		t.Errorf("RenderResolved() context should have ToolName 'Bash', got %q", ctx.ToolName)
 	}
 }
 
-func TestMatchedTool_RenderToString_Nested(t *testing.T) {
-	matched := MatchedTool{
-		ResolvedTool: ResolvedTool{
-			Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
-			IsNested: true,
-		},
+func TestRenderResolved_Nested(t *testing.T) {
+	resolved := ResolvedTool{
+		Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
+		IsNested: true,
 	}
 
-	str, ctx := matched.RenderToString()
+	str, ctx := RenderResolved(resolved)
 
 	// Should produce output with nested prefix
 	if str == "" {
-		t.Error("RenderToString() should produce non-empty output")
+		t.Error("RenderResolved() should produce non-empty output")
 	}
 	if !containsSubstring(str, "Read") {
-		t.Errorf("RenderToString() output should contain tool name, got: %q", str)
+		t.Errorf("RenderResolved() output should contain tool name, got: %q", str)
 	}
 	if ctx.ToolName != "Read" {
-		t.Errorf("RenderToString() context should have ToolName 'Read', got %q", ctx.ToolName)
-	}
-}
-
-// Tests for OrphanedTool.RenderToString
-
-func TestOrphanedTool_RenderToString_NonNested(t *testing.T) {
-	orphaned := OrphanedTool{
-		ResolvedTool: ResolvedTool{
-			Block:    types.ContentBlock{ID: "tool-123", Name: "Bash"},
-			IsNested: false,
-		},
-		ID: "tool-123",
-	}
-
-	str, ctx := orphaned.RenderToString()
-
-	// Should produce output (contains tool name)
-	if str == "" {
-		t.Error("RenderToString() should produce non-empty output")
-	}
-	if !containsSubstring(str, "Bash") {
-		t.Errorf("RenderToString() output should contain tool name, got: %q", str)
-	}
-	if ctx.ToolName != "Bash" {
-		t.Errorf("RenderToString() context should have ToolName 'Bash', got %q", ctx.ToolName)
-	}
-}
-
-func TestOrphanedTool_RenderToString_Nested(t *testing.T) {
-	orphaned := OrphanedTool{
-		ResolvedTool: ResolvedTool{
-			Block:    types.ContentBlock{ID: "tool-123", Name: "Read"},
-			IsNested: true,
-		},
-		ID: "tool-123",
-	}
-
-	str, ctx := orphaned.RenderToString()
-
-	// Should produce output with nested prefix
-	if str == "" {
-		t.Error("RenderToString() should produce non-empty output")
-	}
-	if !containsSubstring(str, "Read") {
-		t.Errorf("RenderToString() output should contain tool name, got: %q", str)
-	}
-	if ctx.ToolName != "Read" {
-		t.Errorf("RenderToString() context should have ToolName 'Read', got %q", ctx.ToolName)
+		t.Errorf("RenderResolved() context should have ToolName 'Read', got %q", ctx.ToolName)
 	}
 }
 
