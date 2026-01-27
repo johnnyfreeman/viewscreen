@@ -8,6 +8,75 @@ import (
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
+// ToolDefinition describes a tool's metadata and rendering behavior.
+// This consolidates all tool-specific information in one place.
+type ToolDefinition struct {
+	// Name is the tool identifier (e.g., "Read", "Bash")
+	Name string
+
+	// HeaderField is the input field to display in the tool header.
+	// Empty for tools that don't show arguments.
+	HeaderField string
+
+	// FilePathField is the input field containing a file path (for syntax highlighting).
+	// Empty for tools that don't operate on files.
+	FilePathField string
+
+	// FilePathFallback is tried if FilePathField is not found in the input.
+	// Used by NotebookEdit which accepts both notebook_path and file_path.
+	FilePathFallback string
+
+	// CountField is the input field containing an array to count.
+	// Used with Singular/Plural for "N items" style headers.
+	CountField string
+	Singular   string
+	Plural     string
+}
+
+// RenderHeader returns the argument string to display in the tool header.
+func (d ToolDefinition) RenderHeader(input map[string]interface{}) string {
+	// Count-based rendering (e.g., "3 items")
+	if d.CountField != "" {
+		if arr, ok := input[d.CountField].([]interface{}); ok {
+			if len(arr) == 1 {
+				return fmt.Sprintf("1 %s", d.Singular)
+			}
+			return fmt.Sprintf("%d %s", len(arr), d.Plural)
+		}
+		return ""
+	}
+
+	// Field-based rendering
+	if d.HeaderField != "" {
+		if val, ok := input[d.HeaderField].(string); ok {
+			return val
+		}
+	}
+	return ""
+}
+
+// GetFilePath extracts the file path from the input if this tool operates on files.
+func (d ToolDefinition) GetFilePath(input map[string]interface{}) string {
+	if d.FilePathField == "" {
+		return ""
+	}
+	if path, ok := input[d.FilePathField].(string); ok {
+		return path
+	}
+	// Try fallback field if primary field not found
+	if d.FilePathFallback != "" {
+		if path, ok := input[d.FilePathFallback].(string); ok {
+			return path
+		}
+	}
+	return ""
+}
+
+// IsFilePathTool returns true if this tool operates on a file path.
+func (d ToolDefinition) IsFilePathTool() bool {
+	return d.FilePathField != ""
+}
+
 // ToolRenderer defines the interface for rendering tool headers
 type ToolRenderer interface {
 	// RenderHeader returns the argument string to display in the tool header.
@@ -22,8 +91,18 @@ func (f ToolRendererFunc) RenderHeader(input map[string]interface{}) string {
 	return f(input)
 }
 
-// registry holds tool-specific renderers
+// definitions holds all tool definitions, keyed by name
+var definitions = map[string]ToolDefinition{}
+
+// registry holds tool-specific renderers (for backwards compatibility and custom renderers)
 var registry = map[string]ToolRenderer{}
+
+// RegisterDefinition adds a tool definition to the registry.
+// This is the preferred way to register tools.
+func RegisterDefinition(def ToolDefinition) {
+	definitions[def.Name] = def
+	registry[def.Name] = def
+}
 
 // Register adds a tool renderer to the registry
 func Register(name string, r ToolRenderer) {
@@ -76,90 +155,53 @@ func GetToolArgFromBlock(block types.ContentBlock) string {
 // GetFilePath extracts the file path from tool input if present.
 // Used for syntax highlighting context.
 func GetFilePath(toolName string, input map[string]interface{}) string {
-	switch toolName {
-	case "Read", "Write", "Edit", "NotebookEdit":
-		if path, ok := input["file_path"].(string); ok {
-			return path
-		}
-		if path, ok := input["notebook_path"].(string); ok {
-			return path
-		}
+	if def, ok := definitions[toolName]; ok {
+		return def.GetFilePath(input)
 	}
 	return ""
-}
-
-// filePathTools lists tools whose primary argument is a file path
-var filePathTools = map[string]bool{
-	"Read":         true,
-	"Write":        true,
-	"Edit":         true,
-	"NotebookEdit": true,
 }
 
 // IsFilePathTool returns true if the tool's argument is a file path
 func IsFilePathTool(toolName string) bool {
-	return filePathTools[toolName]
-}
-
-// fieldExtractor returns a renderer that extracts a string field by name.
-func fieldExtractor(fieldName string) ToolRendererFunc {
-	return func(input map[string]interface{}) string {
-		if val, ok := input[fieldName].(string); ok {
-			return val
-		}
-		return ""
+	if def, ok := definitions[toolName]; ok {
+		return def.IsFilePathTool()
 	}
+	return false
 }
 
-// arrayCounter returns a renderer that counts items in an array field.
-// Uses singular form for count of 1, plural otherwise.
-func arrayCounter(fieldName, singular, plural string) ToolRendererFunc {
-	return func(input map[string]interface{}) string {
-		if arr, ok := input[fieldName].([]interface{}); ok {
-			if len(arr) == 1 {
-				return fmt.Sprintf("1 %s", singular)
-			}
-			return fmt.Sprintf("%d %s", len(arr), plural)
-		}
-		return ""
-	}
-}
+// builtinTools declares all built-in tool definitions.
+// Each definition consolidates the tool's header rendering, file path extraction,
+// and other metadata in one place.
+var builtinTools = []ToolDefinition{
+	// File operations - tools that operate on file paths
+	{Name: "Read", HeaderField: "file_path", FilePathField: "file_path"},
+	{Name: "Write", HeaderField: "file_path", FilePathField: "file_path"},
+	{Name: "Edit", HeaderField: "file_path", FilePathField: "file_path"},
+	{Name: "NotebookEdit", HeaderField: "notebook_path", FilePathField: "notebook_path", FilePathFallback: "file_path"},
 
-// noOpRenderer always returns empty string.
-var noOpRenderer = ToolRendererFunc(func(input map[string]interface{}) string {
-	return ""
-})
-
-// toolDefinitions declares all built-in tool renderers declaratively.
-// Each tool maps to either a field extractor, array counter, or no-op renderer.
-var toolDefinitions = map[string]ToolRendererFunc{
-	// Field extractors - extract a single string field
-	"Bash":         fieldExtractor("command"),
-	"Read":         fieldExtractor("file_path"),
-	"Write":        fieldExtractor("file_path"),
-	"Edit":         fieldExtractor("file_path"),
-	"Glob":         fieldExtractor("pattern"),
-	"Grep":         fieldExtractor("pattern"),
-	"Task":         fieldExtractor("description"),
-	"WebFetch":     fieldExtractor("url"),
-	"WebSearch":    fieldExtractor("query"),
-	"Skill":        fieldExtractor("skill"),
-	"NotebookEdit": fieldExtractor("notebook_path"),
-	"TaskOutput":   fieldExtractor("task_id"),
-	"TaskStop":     fieldExtractor("task_id"),
-	"ToolSearch":   fieldExtractor("query"),
+	// Simple field extractors - display a single string field
+	{Name: "Bash", HeaderField: "command"},
+	{Name: "Glob", HeaderField: "pattern"},
+	{Name: "Grep", HeaderField: "pattern"},
+	{Name: "Task", HeaderField: "description"},
+	{Name: "WebFetch", HeaderField: "url"},
+	{Name: "WebSearch", HeaderField: "query"},
+	{Name: "Skill", HeaderField: "skill"},
+	{Name: "TaskOutput", HeaderField: "task_id"},
+	{Name: "TaskStop", HeaderField: "task_id"},
+	{Name: "ToolSearch", HeaderField: "query"},
 
 	// Array counters - count items with singular/plural formatting
-	"TodoWrite":       arrayCounter("todos", "item", "items"),
-	"AskUserQuestion": arrayCounter("questions", "question", "questions"),
+	{Name: "TodoWrite", CountField: "todos", Singular: "item", Plural: "items"},
+	{Name: "AskUserQuestion", CountField: "questions", Singular: "question", Plural: "questions"},
 
 	// No-op renderers - tools with no meaningful arguments to display
-	"EnterPlanMode": noOpRenderer,
-	"ExitPlanMode":  noOpRenderer,
+	{Name: "EnterPlanMode"},
+	{Name: "ExitPlanMode"},
 }
 
 func init() {
-	for name, renderer := range toolDefinitions {
-		Register(name, renderer)
+	for _, def := range builtinTools {
+		RegisterDefinition(def)
 	}
 }

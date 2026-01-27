@@ -496,3 +496,169 @@ func TestToolRendererFuncInterface(t *testing.T) {
 		t.Errorf("Expected 'default', got %q", result)
 	}
 }
+
+func TestToolDefinition_RenderHeader(t *testing.T) {
+	tests := []struct {
+		name     string
+		def      ToolDefinition
+		input    map[string]interface{}
+		expected string
+	}{
+		{
+			name:     "field extractor with value",
+			def:      ToolDefinition{Name: "Test", HeaderField: "cmd"},
+			input:    map[string]interface{}{"cmd": "echo hello"},
+			expected: "echo hello",
+		},
+		{
+			name:     "field extractor without value",
+			def:      ToolDefinition{Name: "Test", HeaderField: "cmd"},
+			input:    map[string]interface{}{},
+			expected: "",
+		},
+		{
+			name:     "field extractor with non-string value",
+			def:      ToolDefinition{Name: "Test", HeaderField: "cmd"},
+			input:    map[string]interface{}{"cmd": 123},
+			expected: "",
+		},
+		{
+			name:     "count field with single item",
+			def:      ToolDefinition{Name: "Test", CountField: "items", Singular: "item", Plural: "items"},
+			input:    map[string]interface{}{"items": []interface{}{"a"}},
+			expected: "1 item",
+		},
+		{
+			name:     "count field with multiple items",
+			def:      ToolDefinition{Name: "Test", CountField: "items", Singular: "item", Plural: "items"},
+			input:    map[string]interface{}{"items": []interface{}{"a", "b", "c"}},
+			expected: "3 items",
+		},
+		{
+			name:     "count field with empty array",
+			def:      ToolDefinition{Name: "Test", CountField: "items", Singular: "item", Plural: "items"},
+			input:    map[string]interface{}{"items": []interface{}{}},
+			expected: "0 items",
+		},
+		{
+			name:     "count field missing",
+			def:      ToolDefinition{Name: "Test", CountField: "items", Singular: "item", Plural: "items"},
+			input:    map[string]interface{}{},
+			expected: "",
+		},
+		{
+			name:     "no-op definition",
+			def:      ToolDefinition{Name: "Test"},
+			input:    map[string]interface{}{"anything": "value"},
+			expected: "",
+		},
+		{
+			name:     "nil input",
+			def:      ToolDefinition{Name: "Test", HeaderField: "cmd"},
+			input:    nil,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.def.RenderHeader(tt.input)
+			if result != tt.expected {
+				t.Errorf("RenderHeader() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestToolDefinition_GetFilePath(t *testing.T) {
+	tests := []struct {
+		name     string
+		def      ToolDefinition
+		input    map[string]interface{}
+		expected string
+	}{
+		{
+			name:     "with file_path field",
+			def:      ToolDefinition{Name: "Test", FilePathField: "file_path"},
+			input:    map[string]interface{}{"file_path": "/path/to/file"},
+			expected: "/path/to/file",
+		},
+		{
+			name:     "with file_path missing",
+			def:      ToolDefinition{Name: "Test", FilePathField: "file_path"},
+			input:    map[string]interface{}{},
+			expected: "",
+		},
+		{
+			name:     "with fallback used",
+			def:      ToolDefinition{Name: "Test", FilePathField: "notebook_path", FilePathFallback: "file_path"},
+			input:    map[string]interface{}{"file_path": "/fallback/path"},
+			expected: "/fallback/path",
+		},
+		{
+			name:     "primary takes precedence over fallback",
+			def:      ToolDefinition{Name: "Test", FilePathField: "notebook_path", FilePathFallback: "file_path"},
+			input:    map[string]interface{}{"notebook_path": "/primary", "file_path": "/fallback"},
+			expected: "/primary",
+		},
+		{
+			name:     "no file path field defined",
+			def:      ToolDefinition{Name: "Test"},
+			input:    map[string]interface{}{"file_path": "/path"},
+			expected: "",
+		},
+		{
+			name:     "nil input",
+			def:      ToolDefinition{Name: "Test", FilePathField: "file_path"},
+			input:    nil,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.def.GetFilePath(tt.input)
+			if result != tt.expected {
+				t.Errorf("GetFilePath() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestToolDefinition_IsFilePathTool(t *testing.T) {
+	tests := []struct {
+		name     string
+		def      ToolDefinition
+		expected bool
+	}{
+		{
+			name:     "with file path field",
+			def:      ToolDefinition{Name: "Read", FilePathField: "file_path"},
+			expected: true,
+		},
+		{
+			name:     "without file path field",
+			def:      ToolDefinition{Name: "Bash", HeaderField: "command"},
+			expected: false,
+		},
+		{
+			name:     "empty definition",
+			def:      ToolDefinition{Name: "Test"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.def.IsFilePathTool()
+			if result != tt.expected {
+				t.Errorf("IsFilePathTool() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestToolDefinition_ImplementsToolRenderer(t *testing.T) {
+	// Verify ToolDefinition implements ToolRenderer interface
+	var _ ToolRenderer = ToolDefinition{}
+}
