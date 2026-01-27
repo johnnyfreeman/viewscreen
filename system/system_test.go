@@ -8,63 +8,8 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
-	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/testutil"
 )
-
-// mockStyleApplier is a test double for render.StyleApplier
-type mockStyleApplier struct {
-	noColor            bool
-	gradientCalls      []string
-	sessionHeaderCalls []string
-	mutedTextCalls     []string
-}
-
-func (m *mockStyleApplier) NoColor() bool { return m.noColor }
-
-// Text styles (Ultraviolet-based)
-func (m *mockStyleApplier) SuccessText(text string) string { return "[success]" + text + "[/success]" }
-func (m *mockStyleApplier) WarningText(text string) string { return "[warning]" + text + "[/warning]" }
-func (m *mockStyleApplier) MutedText(text string) string {
-	m.mutedTextCalls = append(m.mutedTextCalls, text)
-	return "[muted]" + text + "[/muted]"
-}
-func (m *mockStyleApplier) ErrorText(text string) string       { return "[error]" + text + "[/error]" }
-func (m *mockStyleApplier) ErrorBoldText(text string) string   { return "[error_bold]" + text + "[/error_bold]" }
-func (m *mockStyleApplier) SuccessBoldText(text string) string { return "[success_bold]" + text + "[/success_bold]" }
-
-// Output prefixes
-func (m *mockStyleApplier) Bullet() string         { return "● " }
-func (m *mockStyleApplier) OutputPrefix() string   { return "  ⎿  " }
-func (m *mockStyleApplier) OutputContinue() string { return "     " }
-
-// Diff-related styles
-func (m *mockStyleApplier) LineNumberRender(text string) string    { return "[ln]" + text + "[/ln]" }
-func (m *mockStyleApplier) LineNumberSepRender(text string) string { return "│" }
-func (m *mockStyleApplier) DiffAddBg() style.Color                 { return "#00ff00" }
-func (m *mockStyleApplier) DiffRemoveBg() style.Color              { return "#ff0000" }
-
-// Session/header styles
-func (m *mockStyleApplier) ApplyThemeBoldGradient(text string) string {
-	m.gradientCalls = append(m.gradientCalls, text)
-	return "[gradient]" + text + "[/gradient]"
-}
-func (m *mockStyleApplier) SessionHeaderRender(text string) string {
-	m.sessionHeaderCalls = append(m.sessionHeaderCalls, text)
-	return "[header]" + text + "[/header]"
-}
-func (m *mockStyleApplier) ApplySuccessGradient(text string) string { return "[success_grad]" + text + "[/success_grad]" }
-func (m *mockStyleApplier) ApplyErrorGradient(text string) string   { return "[error_grad]" + text + "[/error_grad]" }
-
-// mockConfigProvider is a test double for config.Provider
-type mockConfigProvider struct {
-	verbose   bool
-	noColor   bool
-	showUsage bool
-}
-
-func (m *mockConfigProvider) IsVerbose() bool { return m.verbose }
-func (m *mockConfigProvider) NoColor() bool   { return m.noColor }
-func (m *mockConfigProvider) ShowUsage() bool { return m.showUsage }
 
 func TestNewRenderer(t *testing.T) {
 	r := NewRenderer()
@@ -97,7 +42,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 	})
 
 	t.Run("with custom style applier", func(t *testing.T) {
-		mock := &mockStyleApplier{}
+		mock := &testutil.TrackingStyleApplier{}
 		r := NewRendererWithOptions(WithStyleApplier(mock))
 
 		if r.styleApplier != mock {
@@ -106,7 +51,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 	})
 
 	t.Run("with custom config provider", func(t *testing.T) {
-		mock := &mockConfigProvider{verbose: true}
+		mock := testutil.MockConfigProvider{VerboseVal: true}
 		r := NewRendererWithOptions(WithConfigProvider(mock))
 
 		if r.config != mock {
@@ -116,8 +61,8 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with multiple options", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		styleMock := &mockStyleApplier{}
-		configMock := &mockConfigProvider{}
+		styleMock := &testutil.TrackingStyleApplier{}
+		configMock := testutil.MockConfigProvider{}
 
 		r := NewRendererWithOptions(
 			WithOutput(buf),
@@ -139,8 +84,8 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 func TestRenderer_Render_BasicEvent(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: false}
-	configMock := &mockConfigProvider{verbose: false}
+	styleMock := &testutil.TrackingStyleApplier{MockStyleApplier: testutil.MockStyleApplier{NoColorVal: false}}
+	configMock := testutil.MockConfigProvider{VerboseVal: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
@@ -160,40 +105,40 @@ func TestRenderer_Render_BasicEvent(t *testing.T) {
 	result := output.String()
 
 	// Check header with gradient (since noColor is false)
-	if !strings.Contains(result, "[gradient]● Session Started[/gradient]") {
+	if !strings.Contains(result, "[GRADIENT:● Session Started]") {
 		t.Error("expected gradient header in output")
 	}
 
 	// Check model line
-	if !strings.Contains(result, "[muted]Model:[/muted] claude-3-opus") {
+	if !strings.Contains(result, "[MUTED:Model:] claude-3-opus") {
 		t.Errorf("expected model line in output, got: %s", result)
 	}
 
 	// Check version line
-	if !strings.Contains(result, "[muted]Version:[/muted] 1.0.0") {
+	if !strings.Contains(result, "[MUTED:Version:] 1.0.0") {
 		t.Error("expected version line in output")
 	}
 
 	// Check CWD line
-	if !strings.Contains(result, "[muted]CWD:[/muted] /home/user/project") {
+	if !strings.Contains(result, "[MUTED:CWD:] /home/user/project") {
 		t.Error("expected CWD line in output")
 	}
 
 	// Check tools count
-	if !strings.Contains(result, "[muted]Tools:[/muted] 3 available") {
+	if !strings.Contains(result, "[MUTED:Tools:] 3 available") {
 		t.Error("expected tools count in output")
 	}
 
 	// Check that gradient was applied to header
-	if len(styleMock.gradientCalls) != 1 {
-		t.Errorf("expected gradient to be called once, got %d", len(styleMock.gradientCalls))
+	if len(styleMock.GradientCalls) != 1 {
+		t.Errorf("expected gradient to be called once, got %d", len(styleMock.GradientCalls))
 	}
 }
 
 func TestRenderer_Render_NoColorMode(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: true}
-	configMock := &mockConfigProvider{verbose: false}
+	styleMock := &testutil.TrackingStyleApplier{MockStyleApplier: testutil.MockStyleApplier{NoColorVal: true}}
+	configMock := testutil.MockConfigProvider{VerboseVal: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
@@ -213,25 +158,25 @@ func TestRenderer_Render_NoColorMode(t *testing.T) {
 	result := output.String()
 
 	// Check header uses SessionHeaderRender instead of gradient
-	if !strings.Contains(result, "[header]● Session Started[/header]") {
+	if !strings.Contains(result, "[HEADER:● Session Started]") {
 		t.Errorf("expected session header style in no-color mode, got: %s", result)
 	}
 
 	// Gradient should not be called
-	if len(styleMock.gradientCalls) != 0 {
+	if len(styleMock.GradientCalls) != 0 {
 		t.Error("gradient should not be called in no-color mode")
 	}
 
 	// SessionHeader should be called
-	if len(styleMock.sessionHeaderCalls) != 1 {
-		t.Errorf("expected session header to be called once, got %d", len(styleMock.sessionHeaderCalls))
+	if len(styleMock.SessionHeaderCalls) != 1 {
+		t.Errorf("expected session header to be called once, got %d", len(styleMock.SessionHeaderCalls))
 	}
 }
 
 func TestRenderer_Render_VerboseWithAgents(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: true}
-	configMock := &mockConfigProvider{verbose: true}
+	styleMock := &testutil.TrackingStyleApplier{MockStyleApplier: testutil.MockStyleApplier{NoColorVal: true}}
+	configMock := testutil.MockConfigProvider{VerboseVal: true}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
@@ -252,15 +197,15 @@ func TestRenderer_Render_VerboseWithAgents(t *testing.T) {
 	result := output.String()
 
 	// Check agents line is present when verbose and agents exist
-	if !strings.Contains(result, "[muted]Agents:[/muted] coder, reviewer, tester") {
+	if !strings.Contains(result, "[MUTED:Agents:] coder, reviewer, tester") {
 		t.Errorf("expected agents line in verbose mode, got: %s", result)
 	}
 }
 
 func TestRenderer_Render_VerboseWithoutAgents(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: true}
-	configMock := &mockConfigProvider{verbose: true}
+	styleMock := testutil.MockStyleApplier{NoColorVal: true}
+	configMock := testutil.MockConfigProvider{VerboseVal: true}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
@@ -288,8 +233,8 @@ func TestRenderer_Render_VerboseWithoutAgents(t *testing.T) {
 
 func TestRenderer_Render_NonVerboseWithAgents(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: true}
-	configMock := &mockConfigProvider{verbose: false}
+	styleMock := testutil.MockStyleApplier{NoColorVal: true}
+	configMock := testutil.MockConfigProvider{VerboseVal: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
@@ -317,8 +262,8 @@ func TestRenderer_Render_NonVerboseWithAgents(t *testing.T) {
 
 func TestRenderer_Render_EmptyTools(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: true}
-	configMock := &mockConfigProvider{verbose: false}
+	styleMock := testutil.MockStyleApplier{NoColorVal: true}
+	configMock := testutil.MockConfigProvider{VerboseVal: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
@@ -338,15 +283,15 @@ func TestRenderer_Render_EmptyTools(t *testing.T) {
 	result := output.String()
 
 	// Should show 0 tools
-	if !strings.Contains(result, "[muted]Tools:[/muted] 0 available") {
+	if !strings.Contains(result, "[MUTED:Tools:] 0 available") {
 		t.Errorf("expected 0 tools in output, got: %s", result)
 	}
 }
 
 func TestRenderer_Render_OutputFormat(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: true}
-	configMock := &mockConfigProvider{verbose: false}
+	styleMock := testutil.MockStyleApplier{NoColorVal: true}
+	configMock := testutil.MockConfigProvider{VerboseVal: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
@@ -542,8 +487,8 @@ func TestDefaultConfigProvider(t *testing.T) {
 
 func TestRenderer_Render_MutedTextStyleCalls(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: true}
-	configMock := &mockConfigProvider{verbose: true}
+	styleMock := &testutil.TrackingStyleApplier{MockStyleApplier: testutil.MockStyleApplier{NoColorVal: true}}
+	configMock := testutil.MockConfigProvider{VerboseVal: true}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
@@ -563,21 +508,21 @@ func TestRenderer_Render_MutedTextStyleCalls(t *testing.T) {
 
 	// Should have called MutedText for: Model, Version, CWD, Tools, Agents
 	expectedMutedTextCalls := []string{"Model:", "Version:", "CWD:", "Tools:", "Agents:"}
-	if len(styleMock.mutedTextCalls) != len(expectedMutedTextCalls) {
-		t.Errorf("expected %d MutedText calls, got %d: %v", len(expectedMutedTextCalls), len(styleMock.mutedTextCalls), styleMock.mutedTextCalls)
+	if len(styleMock.MutedTextCalls) != len(expectedMutedTextCalls) {
+		t.Errorf("expected %d MutedText calls, got %d: %v", len(expectedMutedTextCalls), len(styleMock.MutedTextCalls), styleMock.MutedTextCalls)
 	}
 
 	for i, expected := range expectedMutedTextCalls {
-		if i < len(styleMock.mutedTextCalls) && styleMock.mutedTextCalls[i] != expected {
-			t.Errorf("MutedText call %d: expected %q, got %q", i, expected, styleMock.mutedTextCalls[i])
+		if i < len(styleMock.MutedTextCalls) && styleMock.MutedTextCalls[i] != expected {
+			t.Errorf("MutedText call %d: expected %q, got %q", i, expected, styleMock.MutedTextCalls[i])
 		}
 	}
 }
 
 func TestRenderer_Render_SpecialCharacters(t *testing.T) {
 	output := &bytes.Buffer{}
-	styleMock := &mockStyleApplier{noColor: true}
-	configMock := &mockConfigProvider{verbose: false}
+	styleMock := testutil.MockStyleApplier{NoColorVal: true}
+	configMock := testutil.MockConfigProvider{VerboseVal: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),

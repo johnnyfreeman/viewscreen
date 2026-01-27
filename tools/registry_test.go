@@ -2,18 +2,9 @@ package tools
 
 import (
 	"testing"
+
+	"github.com/johnnyfreeman/viewscreen/testutil"
 )
-
-// mockConfigProvider implements config.Provider for testing
-type mockConfigProvider struct {
-	verbose   bool
-	noColor   bool
-	showUsage bool
-}
-
-func (m mockConfigProvider) IsVerbose() bool { return m.verbose }
-func (m mockConfigProvider) NoColor() bool   { return m.noColor }
-func (m mockConfigProvider) ShowUsage() bool { return m.showUsage }
 
 func TestGetDefinition(t *testing.T) {
 	tests := []struct {
@@ -321,7 +312,7 @@ func TestGetToolArg(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := mockConfigProvider{verbose: tt.verbose}
+			cfg := testutil.MockConfigProvider{VerboseVal: tt.verbose}
 			result := GetToolArgWithConfig(tt.toolName, tt.input, cfg)
 			if result != tt.expected {
 				t.Errorf("GetToolArgWithConfig(%q, %v) = %q, expected %q", tt.toolName, tt.input, result, tt.expected)
