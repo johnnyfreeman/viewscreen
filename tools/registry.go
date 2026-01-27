@@ -101,135 +101,65 @@ func IsFilePathTool(toolName string) bool {
 	return filePathTools[toolName]
 }
 
-func init() {
-	// Register built-in tool renderers
-	RegisterFunc("Bash", func(input map[string]interface{}) string {
-		if cmd, ok := input["command"].(string); ok {
-			return cmd
+// fieldExtractor returns a renderer that extracts a string field by name.
+func fieldExtractor(fieldName string) ToolRendererFunc {
+	return func(input map[string]interface{}) string {
+		if val, ok := input[fieldName].(string); ok {
+			return val
 		}
 		return ""
-	})
+	}
+}
 
-	RegisterFunc("Read", func(input map[string]interface{}) string {
-		if path, ok := input["file_path"].(string); ok {
-			return path
-		}
-		return ""
-	})
-
-	RegisterFunc("Write", func(input map[string]interface{}) string {
-		if path, ok := input["file_path"].(string); ok {
-			return path
-		}
-		return ""
-	})
-
-	RegisterFunc("Edit", func(input map[string]interface{}) string {
-		if path, ok := input["file_path"].(string); ok {
-			return path
-		}
-		return ""
-	})
-
-	RegisterFunc("Glob", func(input map[string]interface{}) string {
-		if pattern, ok := input["pattern"].(string); ok {
-			return pattern
-		}
-		return ""
-	})
-
-	RegisterFunc("Grep", func(input map[string]interface{}) string {
-		if pattern, ok := input["pattern"].(string); ok {
-			return pattern
-		}
-		return ""
-	})
-
-	RegisterFunc("Task", func(input map[string]interface{}) string {
-		if desc, ok := input["description"].(string); ok {
-			return desc
-		}
-		return ""
-	})
-
-	RegisterFunc("WebFetch", func(input map[string]interface{}) string {
-		if url, ok := input["url"].(string); ok {
-			return url
-		}
-		return ""
-	})
-
-	RegisterFunc("WebSearch", func(input map[string]interface{}) string {
-		if query, ok := input["query"].(string); ok {
-			return query
-		}
-		return ""
-	})
-
-	RegisterFunc("TodoWrite", func(input map[string]interface{}) string {
-		if todos, ok := input["todos"].([]interface{}); ok {
-			return fmt.Sprintf("%d items", len(todos))
-		}
-		return ""
-	})
-
-	// AskUserQuestion displays the number of questions being asked
-	RegisterFunc("AskUserQuestion", func(input map[string]interface{}) string {
-		if questions, ok := input["questions"].([]interface{}); ok {
-			if len(questions) == 1 {
-				return "1 question"
+// arrayCounter returns a renderer that counts items in an array field.
+// Uses singular form for count of 1, plural otherwise.
+func arrayCounter(fieldName, singular, plural string) ToolRendererFunc {
+	return func(input map[string]interface{}) string {
+		if arr, ok := input[fieldName].([]interface{}); ok {
+			if len(arr) == 1 {
+				return fmt.Sprintf("1 %s", singular)
 			}
-			return fmt.Sprintf("%d questions", len(questions))
+			return fmt.Sprintf("%d %s", len(arr), plural)
 		}
 		return ""
-	})
+	}
+}
 
-	RegisterFunc("Skill", func(input map[string]interface{}) string {
-		if skill, ok := input["skill"].(string); ok {
-			return skill
-		}
-		return ""
-	})
+// noOpRenderer always returns empty string.
+var noOpRenderer = ToolRendererFunc(func(input map[string]interface{}) string {
+	return ""
+})
 
-	// NotebookEdit displays the notebook path
-	RegisterFunc("NotebookEdit", func(input map[string]interface{}) string {
-		if path, ok := input["notebook_path"].(string); ok {
-			return path
-		}
-		return ""
-	})
+// toolDefinitions declares all built-in tool renderers declaratively.
+// Each tool maps to either a field extractor, array counter, or no-op renderer.
+var toolDefinitions = map[string]ToolRendererFunc{
+	// Field extractors - extract a single string field
+	"Bash":         fieldExtractor("command"),
+	"Read":         fieldExtractor("file_path"),
+	"Write":        fieldExtractor("file_path"),
+	"Edit":         fieldExtractor("file_path"),
+	"Glob":         fieldExtractor("pattern"),
+	"Grep":         fieldExtractor("pattern"),
+	"Task":         fieldExtractor("description"),
+	"WebFetch":     fieldExtractor("url"),
+	"WebSearch":    fieldExtractor("query"),
+	"Skill":        fieldExtractor("skill"),
+	"NotebookEdit": fieldExtractor("notebook_path"),
+	"TaskOutput":   fieldExtractor("task_id"),
+	"TaskStop":     fieldExtractor("task_id"),
+	"ToolSearch":   fieldExtractor("query"),
 
-	// TaskOutput displays the task ID being checked
-	RegisterFunc("TaskOutput", func(input map[string]interface{}) string {
-		if taskID, ok := input["task_id"].(string); ok {
-			return taskID
-		}
-		return ""
-	})
+	// Array counters - count items with singular/plural formatting
+	"TodoWrite":       arrayCounter("todos", "item", "items"),
+	"AskUserQuestion": arrayCounter("questions", "question", "questions"),
 
-	// TaskStop displays the task ID being stopped
-	RegisterFunc("TaskStop", func(input map[string]interface{}) string {
-		if taskID, ok := input["task_id"].(string); ok {
-			return taskID
-		}
-		return ""
-	})
+	// No-op renderers - tools with no meaningful arguments to display
+	"EnterPlanMode": noOpRenderer,
+	"ExitPlanMode":  noOpRenderer,
+}
 
-	// EnterPlanMode has no meaningful arguments to display
-	RegisterFunc("EnterPlanMode", func(input map[string]interface{}) string {
-		return ""
-	})
-
-	// ExitPlanMode has no meaningful arguments to display
-	RegisterFunc("ExitPlanMode", func(input map[string]interface{}) string {
-		return ""
-	})
-
-	// ToolSearch displays the search query
-	RegisterFunc("ToolSearch", func(input map[string]interface{}) string {
-		if query, ok := input["query"].(string); ok {
-			return query
-		}
-		return ""
-	})
+func init() {
+	for name, renderer := range toolDefinitions {
+		Register(name, renderer)
+	}
 }
