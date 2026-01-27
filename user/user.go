@@ -103,6 +103,7 @@ type Renderer struct {
 	highlighter      CodeHighlighter
 	markdownRenderer MarkdownRenderer
 	toolContext      *tools.ToolContext
+	contentCleaner   *textutil.ContentCleaner
 	// Registry for result-specific renderers
 	resultRegistry *ResultRegistry
 }
@@ -152,6 +153,13 @@ func WithMarkdownRenderer(mr MarkdownRenderer) RendererOption {
 	}
 }
 
+// WithContentCleaner sets a custom content cleaner
+func WithContentCleaner(cc *textutil.ContentCleaner) RendererOption {
+	return func(r *Renderer) {
+		r.contentCleaner = cc
+	}
+}
+
 // NewRenderer creates a new user Renderer with default dependencies
 func NewRenderer() *Renderer {
 	cc := DefaultConfigChecker{}
@@ -171,6 +179,7 @@ func NewRenderer() *Renderer {
 		highlighter:      ch,
 		markdownRenderer: render.NewMarkdownRenderer(cc.NoColor(), terminal.Width()),
 		toolContext:      &tools.ToolContext{},
+		contentCleaner:   textutil.DefaultContentCleaner(),
 		resultRegistry:   registry,
 	}
 }
@@ -231,13 +240,12 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 		contentStr := content.Content()
 		if content.IsError {
 			// Show error with output prefix
-			errMsg := textutil.StripSystemReminders(contentStr)
+			errMsg := r.contentCleaner.Clean(contentStr)
 			errMsg = textutil.Truncate(errMsg, 200)
 			fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.ErrorRender(errMsg))
 		} else if contentStr != "" {
-			// Clean up the content
-			cleaned := textutil.StripSystemReminders(contentStr)
-			cleaned = textutil.StripLineNumbers(cleaned)
+			// Clean up the content using the content cleaner pipeline
+			cleaned := r.contentCleaner.Clean(contentStr)
 
 			lines := strings.Split(cleaned, "\n")
 			lineCount := len(lines)
@@ -274,7 +282,7 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 	for _, content := range event.Message.Content {
 		// Synthetic messages have type "text" with Text field populated
 		if content.Type == "text" && content.Text != "" {
-			cleaned := textutil.StripSystemReminders(content.Text)
+			cleaned := r.contentCleaner.Clean(content.Text)
 			lines := strings.Split(cleaned, "\n")
 
 			// Render as markdown if renderer is available

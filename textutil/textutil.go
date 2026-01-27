@@ -157,3 +157,50 @@ func (p *PrefixedWriter) Reset() {
 func (p *PrefixedWriter) IsFirst() bool {
 	return p.first
 }
+
+// ContentCleaner applies a configurable sequence of cleaning operations to text.
+// This consolidates scattered cleaning logic (like stripping system reminders
+// and line numbers) into a single, composable pipeline.
+type ContentCleaner struct {
+	cleaners []func(string) string
+}
+
+// NewContentCleaner creates an empty content cleaner.
+// Use the With* methods to add cleaning operations.
+func NewContentCleaner() *ContentCleaner {
+	return &ContentCleaner{}
+}
+
+// WithSystemReminderStrip adds system reminder stripping to the pipeline.
+func (c *ContentCleaner) WithSystemReminderStrip() *ContentCleaner {
+	c.cleaners = append(c.cleaners, StripSystemReminders)
+	return c
+}
+
+// WithLineNumberStrip adds line number stripping to the pipeline.
+func (c *ContentCleaner) WithLineNumberStrip() *ContentCleaner {
+	c.cleaners = append(c.cleaners, StripLineNumbers)
+	return c
+}
+
+// WithCustom adds a custom cleaning function to the pipeline.
+func (c *ContentCleaner) WithCustom(fn func(string) string) *ContentCleaner {
+	c.cleaners = append(c.cleaners, fn)
+	return c
+}
+
+// Clean applies all configured cleaning operations in order.
+func (c *ContentCleaner) Clean(content string) string {
+	for _, cleaner := range c.cleaners {
+		content = cleaner(content)
+	}
+	return content
+}
+
+// DefaultContentCleaner returns a cleaner with the standard cleaning operations:
+// strip system reminders, then strip line numbers.
+func DefaultContentCleaner() *ContentCleaner {
+	return NewContentCleaner().
+		WithSystemReminderStrip().
+		WithLineNumberStrip()
+}

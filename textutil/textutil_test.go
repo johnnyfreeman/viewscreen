@@ -514,3 +514,85 @@ func TestPrefixedWriter(t *testing.T) {
 		}
 	})
 }
+
+func TestContentCleaner(t *testing.T) {
+	t.Run("empty cleaner does nothing", func(t *testing.T) {
+		c := NewContentCleaner()
+		input := "hello <system-reminder>test</system-reminder> world"
+		result := c.Clean(input)
+		if result != input {
+			t.Errorf("Clean() = %q, want %q", result, input)
+		}
+	})
+
+	t.Run("with system reminder strip", func(t *testing.T) {
+		c := NewContentCleaner().WithSystemReminderStrip()
+		input := "before <system-reminder>reminder</system-reminder> after"
+		result := c.Clean(input)
+		expected := "before after"
+		if result != expected {
+			t.Errorf("Clean() = %q, want %q", result, expected)
+		}
+	})
+
+	t.Run("with line number strip", func(t *testing.T) {
+		c := NewContentCleaner().WithLineNumberStrip()
+		input := "     1→line one\n     2→line two"
+		result := c.Clean(input)
+		expected := "line one\nline two"
+		if result != expected {
+			t.Errorf("Clean() = %q, want %q", result, expected)
+		}
+	})
+
+	t.Run("with both strips in order", func(t *testing.T) {
+		c := NewContentCleaner().
+			WithSystemReminderStrip().
+			WithLineNumberStrip()
+		input := "     1→code\n<system-reminder>test</system-reminder>\n     2→more"
+		result := c.Clean(input)
+		expected := "code\nmore"
+		if result != expected {
+			t.Errorf("Clean() = %q, want %q", result, expected)
+		}
+	})
+
+	t.Run("with custom cleaner", func(t *testing.T) {
+		c := NewContentCleaner().WithCustom(strings.ToUpper)
+		result := c.Clean("hello world")
+		expected := "HELLO WORLD"
+		if result != expected {
+			t.Errorf("Clean() = %q, want %q", result, expected)
+		}
+	})
+
+	t.Run("cleaners compose in order", func(t *testing.T) {
+		// Add prefix, then uppercase: "hello" -> ">>hello" -> ">>HELLO"
+		c := NewContentCleaner().
+			WithCustom(func(s string) string { return ">>" + s }).
+			WithCustom(strings.ToUpper)
+		result := c.Clean("hello")
+		expected := ">>HELLO"
+		if result != expected {
+			t.Errorf("Clean() = %q, want %q", result, expected)
+		}
+	})
+
+	t.Run("default content cleaner", func(t *testing.T) {
+		c := DefaultContentCleaner()
+		input := "     1→package main\n<system-reminder>test</system-reminder>\n     2→func main()"
+		result := c.Clean(input)
+		expected := "package main\nfunc main()"
+		if result != expected {
+			t.Errorf("Clean() = %q, want %q", result, expected)
+		}
+	})
+
+	t.Run("empty input returns empty", func(t *testing.T) {
+		c := DefaultContentCleaner()
+		result := c.Clean("")
+		if result != "" {
+			t.Errorf("Clean(\"\") = %q, want empty string", result)
+		}
+	})
+}
