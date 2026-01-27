@@ -75,8 +75,9 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 	// Separator character for line numbers
 	sep := er.styleApplier.LineNumberSepRender("│")
 
-	first := true
+	pw := textutil.NewPrefixedWriter(ctx.Output, ctx.OutputPrefix, ctx.OutputContinue)
 	lineCount := 0
+
 	for _, hunk := range editResult.StructuredPatch {
 		oldLine := hunk.OldStart
 		newLine := hunk.NewStart
@@ -96,7 +97,7 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 				remaining -= lineCount
 				if remaining > 0 {
 					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Fprintf(ctx.Output, "%s%s\n", ctx.OutputContinue, er.styleApplier.MutedRender(indicator))
+					pw.WriteLinef("%s", er.styleApplier.MutedRender(indicator))
 				}
 				return true
 			}
@@ -151,12 +152,7 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 			}
 
 			// Output with separators: ⎿ 123 │ + code
-			if first {
-				fmt.Fprintf(ctx.Output, "%s%s %s %s %s\n", ctx.OutputPrefix, lineNums, sep, op, styled)
-				first = false
-			} else {
-				fmt.Fprintf(ctx.Output, "%s%s %s %s %s\n", ctx.OutputContinue, lineNums, sep, op, styled)
-			}
+			pw.WriteLinef("%s %s %s %s", lineNums, sep, op, styled)
 			lineCount++
 		}
 	}

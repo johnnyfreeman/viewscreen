@@ -279,18 +279,15 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 				truncated, remaining := textutil.TruncateLines(highlighted, textutil.DefaultMaxLines)
 				resultLines := strings.Split(truncated, "\n")
 
-				for i, line := range resultLines {
-					if i == 0 {
-						fmt.Fprintf(out, "%s%s\n", outputPrefix, line)
-					} else {
-						fmt.Fprintf(out, "%s%s\n", outputContinue, line)
-					}
+				pw := textutil.NewPrefixedWriter(out, outputPrefix, outputContinue)
+				for _, line := range resultLines {
+					pw.WriteLine(line)
 				}
 
 				// Show truncation indicator if content was truncated
 				if remaining > 0 {
 					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Fprintf(out, "%s%s\n", outputContinue, r.styleApplier.MutedRender(indicator))
+					pw.WriteLinef("%s", r.styleApplier.MutedRender(indicator))
 				}
 			} else {
 				// Show summary in non-verbose mode
@@ -321,17 +318,14 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 				truncated, remaining := textutil.TruncateLines(cleaned, textutil.DefaultMaxLines)
 				resultLines := strings.Split(truncated, "\n")
 
-				for i, line := range resultLines {
-					if i == 0 {
-						fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputPrefix(), line)
-					} else {
-						fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputContinue(), line)
-					}
+				pw := textutil.NewPrefixedWriter(out, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
+				for _, line := range resultLines {
+					pw.WriteLine(line)
 				}
 
 				if remaining > 0 {
 					indicator := fmt.Sprintf("… (%d more lines)", remaining)
-					fmt.Fprintf(out, "%s%s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender(indicator))
+					pw.WriteLinef("%s", r.styleApplier.MutedRender(indicator))
 					return
 				}
 			}

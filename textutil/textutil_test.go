@@ -1,6 +1,7 @@
 package textutil
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -410,4 +411,106 @@ func TestWrapText(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrefixedWriter(t *testing.T) {
+	t.Run("first line uses first prefix", func(t *testing.T) {
+		var buf bytes.Buffer
+		pw := NewPrefixedWriter(&buf, "FIRST: ", "CONT: ")
+
+		pw.WriteLine("line one")
+
+		expected := "FIRST: line one\n"
+		if buf.String() != expected {
+			t.Errorf("got %q, want %q", buf.String(), expected)
+		}
+	})
+
+	t.Run("subsequent lines use continue prefix", func(t *testing.T) {
+		var buf bytes.Buffer
+		pw := NewPrefixedWriter(&buf, "⎿  ", "   ")
+
+		pw.WriteLine("first")
+		pw.WriteLine("second")
+		pw.WriteLine("third")
+
+		expected := "⎿  first\n   second\n   third\n"
+		if buf.String() != expected {
+			t.Errorf("got %q, want %q", buf.String(), expected)
+		}
+	})
+
+	t.Run("WriteLinef with formatting", func(t *testing.T) {
+		var buf bytes.Buffer
+		pw := NewPrefixedWriter(&buf, "> ", "  ")
+
+		pw.WriteLinef("count: %d", 42)
+		pw.WriteLinef("name: %s", "test")
+
+		expected := "> count: 42\n  name: test\n"
+		if buf.String() != expected {
+			t.Errorf("got %q, want %q", buf.String(), expected)
+		}
+	})
+
+	t.Run("Prefix method returns correct prefix", func(t *testing.T) {
+		var buf bytes.Buffer
+		pw := NewPrefixedWriter(&buf, "A", "B")
+
+		if p := pw.Prefix(); p != "A" {
+			t.Errorf("first Prefix() = %q, want %q", p, "A")
+		}
+		if p := pw.Prefix(); p != "B" {
+			t.Errorf("second Prefix() = %q, want %q", p, "B")
+		}
+		if p := pw.Prefix(); p != "B" {
+			t.Errorf("third Prefix() = %q, want %q", p, "B")
+		}
+	})
+
+	t.Run("Reset resets state", func(t *testing.T) {
+		var buf bytes.Buffer
+		pw := NewPrefixedWriter(&buf, "FIRST", "CONT")
+
+		pw.Prefix() // consume first
+		pw.Reset()
+
+		if p := pw.Prefix(); p != "FIRST" {
+			t.Errorf("after Reset, Prefix() = %q, want %q", p, "FIRST")
+		}
+	})
+
+	t.Run("IsFirst returns correct state", func(t *testing.T) {
+		var buf bytes.Buffer
+		pw := NewPrefixedWriter(&buf, "A", "B")
+
+		if !pw.IsFirst() {
+			t.Error("IsFirst() should be true initially")
+		}
+
+		pw.Prefix()
+
+		if pw.IsFirst() {
+			t.Error("IsFirst() should be false after Prefix()")
+		}
+
+		pw.Reset()
+
+		if !pw.IsFirst() {
+			t.Error("IsFirst() should be true after Reset()")
+		}
+	})
+
+	t.Run("empty prefixes work correctly", func(t *testing.T) {
+		var buf bytes.Buffer
+		pw := NewPrefixedWriter(&buf, "", "")
+
+		pw.WriteLine("line1")
+		pw.WriteLine("line2")
+
+		expected := "line1\nline2\n"
+		if buf.String() != expected {
+			t.Errorf("got %q, want %q", buf.String(), expected)
+		}
+	})
 }

@@ -2,9 +2,9 @@ package user
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/textutil"
 )
 
 // Todo represents a single todo item
@@ -51,7 +51,9 @@ func (tr *TodoRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 	}
 
 	// Render each todo with status indicator
-	for i, todo := range todoResult.NewTodos {
+	pw := textutil.NewPrefixedWriter(ctx.Output, ctx.OutputPrefix, ctx.OutputContinue)
+
+	for _, todo := range todoResult.NewTodos {
 		var statusIndicator string
 		var contentRenderer func(string) string
 
@@ -67,18 +69,12 @@ func (tr *TodoRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 			contentRenderer = tr.styleApplier.MutedRender
 		}
 
-		// Use OutputPrefix for first line, OutputContinue for rest
-		prefix := ctx.OutputContinue
-		if i == 0 {
-			prefix = ctx.OutputPrefix
-		}
-
 		content := todo.Content
 		if todo.Status == "in_progress" && todo.ActiveForm != "" {
 			content = todo.ActiveForm
 		}
 
-		fmt.Fprintf(ctx.Output, "%s%s %s\n", prefix, statusIndicator, contentRenderer(content))
+		pw.WriteLinef("%s %s", statusIndicator, contentRenderer(content))
 	}
 
 	return true
