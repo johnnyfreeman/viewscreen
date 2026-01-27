@@ -1,8 +1,6 @@
 package tools
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/johnnyfreeman/viewscreen/render"
@@ -35,118 +33,54 @@ func DefaultHeaderOptions() HeaderOptions {
 // RenderHeaderTo is the core rendering logic for tool headers.
 // It writes to the provided output using the specified options.
 // Returns tool context for use by the caller.
+//
+// Deprecated: Use HeaderRenderer for new code. This function is maintained
+// for backward compatibility.
 func RenderHeaderTo(out *render.Output, toolName string, input map[string]any, opts HeaderOptions) ToolContext {
-	args := GetToolArg(toolName, input)
-
-	// Truncate long args
-	if len(args) > 80 {
-		args = args[:77] + "..."
-	}
-
-	// Dotted underline for file paths for emphasis
-	styledArgs := args
-	if IsFilePathTool(toolName) && args != "" {
-		styledArgs = style.DottedUnderline(args)
-	}
-
-	// Build header: [prefix][icon]ToolName args
-	icon := opts.Icon
-	if icon == "" {
-		icon = style.Bullet
-	}
-	fmt.Fprint(out, opts.Prefix+style.ApplyThemeBoldGradient(icon+toolName))
-	if styledArgs != "" {
-		fmt.Fprint(out, " "+style.Muted.Render(styledArgs))
-	}
-	fmt.Fprintln(out)
-
-	return ToolContext{
-		ToolName: toolName,
-		FilePath: GetFilePath(toolName, input),
-	}
-}
-
-// renderToolHeaderTo is an internal helper using default options.
-func renderToolHeaderTo(out *render.Output, prefix, toolName string, input map[string]any) ToolContext {
-	return RenderHeaderTo(out, toolName, input, HeaderOptions{
-		Icon:   style.Bullet,
-		Prefix: prefix,
-	})
-}
-
-// renderToolUseTo renders a tool use block, delegating to renderToolHeaderTo.
-// Returns tool context for use by the caller.
-func renderToolUseTo(out *render.Output, prefix string, block types.ContentBlock) ToolContext {
-	if len(block.Input) > 0 {
-		var input map[string]any
-		if err := json.Unmarshal(block.Input, &input); err == nil {
-			return renderToolHeaderTo(out, prefix, block.Name, input)
-		}
-	}
-	// Fallback if no input or parse error
-	fmt.Fprintln(out, prefix+style.ApplyThemeBoldGradient(style.Bullet+block.Name))
-	return ToolContext{ToolName: block.Name, FilePath: ""}
+	r := NewHeaderRenderer(WithIcon(opts.Icon), WithPrefix(opts.Prefix))
+	return r.renderTo(out, toolName, input)
 }
 
 // RenderToolUse renders a tool use block header and input to stdout.
 // Returns tool context for syntax highlighting of tool results.
 func RenderToolUse(block types.ContentBlock) ToolContext {
-	return renderToolUseTo(render.WriterOutput(os.Stdout), "", block)
+	return NewHeaderRenderer().RenderBlock(block)
 }
 
 // RenderToolUseToString renders a tool use block to a string.
 // Returns the rendered string and tool context.
 func RenderToolUseToString(block types.ContentBlock) (string, ToolContext) {
-	out := render.StringOutput()
-	ctx := renderToolUseTo(out, "", block)
-	return out.String(), ctx
+	return NewHeaderRenderer().RenderBlockToString(block)
 }
 
 // RenderToolHeader renders the tool header in format: ● ToolName args
 // Returns tool context for syntax highlighting of tool results.
 func RenderToolHeader(toolName string, input map[string]any) ToolContext {
-	return renderToolHeaderTo(render.WriterOutput(os.Stdout), "", toolName, input)
+	return NewHeaderRenderer().Render(toolName, input)
 }
 
 // RenderToolHeaderToString renders the tool header to a string.
 // Returns the rendered string and tool context.
 func RenderToolHeaderToString(toolName string, input map[string]any) (string, ToolContext) {
-	out := render.StringOutput()
-	ctx := renderToolHeaderTo(out, "", toolName, input)
-	return out.String(), ctx
+	return NewHeaderRenderer().RenderToString(toolName, input)
 }
 
 // RenderNestedToolUse renders a tool use block with nested indentation for sub-agent tools.
 // Returns tool context for syntax highlighting of tool results.
 func RenderNestedToolUse(block types.ContentBlock) ToolContext {
-	return renderToolUseTo(render.WriterOutput(os.Stdout), style.NestedPrefix, block)
+	return NewHeaderRenderer(WithOutput(os.Stdout), WithNested()).RenderBlock(block)
 }
 
 // RenderNestedToolUseToString renders a nested tool use block to a string.
 // Returns the rendered string and tool context.
 func RenderNestedToolUseToString(block types.ContentBlock) (string, ToolContext) {
-	out := render.StringOutput()
-	ctx := renderToolUseTo(out, style.NestedPrefix, block)
-	return out.String(), ctx
+	return NewHeaderRenderer(WithNested()).RenderBlockToString(block)
 }
 
 // RenderHeaderToString renders a tool header to string with the given options.
 // Returns the rendered string.
 func RenderHeaderToString(toolName string, input map[string]any, opts HeaderOptions) string {
-	out := render.StringOutput()
-	RenderHeaderTo(out, toolName, input, opts)
-	return out.String()
-}
-
-// ParseBlockInput parses the JSON input from a ContentBlock into a map.
-// Returns nil if input is empty or parsing fails.
-func ParseBlockInput(block types.ContentBlock) map[string]any {
-	if len(block.Input) == 0 {
-		return nil
-	}
-	var input map[string]any
-	if err := json.Unmarshal(block.Input, &input); err != nil {
-		return nil
-	}
-	return input
+	r := NewHeaderRenderer(WithIcon(opts.Icon), WithPrefix(opts.Prefix))
+	str, _ := r.RenderToString(toolName, input)
+	return str
 }

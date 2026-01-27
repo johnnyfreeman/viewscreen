@@ -10,7 +10,6 @@ import (
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/system"
 	"github.com/johnnyfreeman/viewscreen/tools"
-	"github.com/johnnyfreeman/viewscreen/types"
 	"github.com/johnnyfreeman/viewscreen/user"
 )
 
@@ -67,8 +66,13 @@ func (p *EventProcessor) HasPendingTools() bool {
 
 // RenderPendingTool renders a pending tool with the given icon (for spinner animation).
 func (p *EventProcessor) RenderPendingTool(pending tools.PendingTool, icon string) string {
-	isNested := p.renderers.PendingTools.IsNested(pending)
-	return renderToolWithIcon(pending.Block, icon, isNested)
+	opts := []tools.HeaderRendererOption{tools.WithIcon(icon)}
+	if p.renderers.PendingTools.IsNested(pending) {
+		opts = append(opts, tools.WithNested())
+	}
+	r := tools.NewHeaderRenderer(opts...)
+	str, _ := r.RenderBlockToString(pending.Block)
+	return str
 }
 
 // ForEachPendingTool iterates over all pending tools.
@@ -185,12 +189,3 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 	return ProcessResult{Rendered: content.String()}
 }
 
-// renderToolWithIcon renders a tool header with a custom icon.
-func renderToolWithIcon(block types.ContentBlock, icon string, isNested bool) string {
-	input := tools.ParseBlockInput(block)
-	opts := tools.HeaderOptions{Icon: icon}
-	if isNested {
-		opts.Prefix = style.NestedPrefix
-	}
-	return tools.RenderHeaderToString(block.Name, input, opts)
-}
