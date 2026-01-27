@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"encoding/json"
 	"os"
 	"strings"
 
@@ -298,31 +299,21 @@ func (m *Model) updateViewportWithPendingTools() {
 
 // renderToolHeaderWithSpinner renders a tool header with spinner instead of bullet
 func (m *Model) renderToolHeaderWithSpinner(block types.ContentBlock, isNested bool) string {
-	args := tools.GetToolArgFromBlock(block)
-
-	// Truncate long args
-	if len(args) > 80 {
-		args = args[:77] + "..."
+	var input map[string]any
+	if len(block.Input) > 0 {
+		_ = json.Unmarshal(block.Input, &input)
 	}
 
-	// Build header with spinner: ◐ToolName args
-	// For nested tools, add the nested prefix: │ ◐ToolName args
-	var result string
+	opts := tools.HeaderOptions{
+		Icon: m.spinner.View(),
+	}
 	if isNested {
-		result = style.NestedPrefix + m.spinner.View() + style.ApplyThemeBoldGradient(block.Name)
-	} else {
-		result = m.spinner.View() + style.ApplyThemeBoldGradient(block.Name)
+		opts.Prefix = style.NestedPrefix
 	}
-	if args != "" {
-		// Apply dotted underline for file path tools
-		if tools.IsFilePathTool(block.Name) {
-			result += " " + style.Muted.Render(style.DottedUnderline(args))
-		} else {
-			result += " " + style.Muted.Render(args)
-		}
-	}
-	result += "\n"
-	return result
+
+	out := render.StringOutput()
+	tools.RenderHeaderTo(out, block.Name, input, opts)
+	return out.String()
 }
 
 // renderLayout composes the main content area and sidebar

@@ -16,10 +16,26 @@ type ToolContext struct {
 	FilePath string
 }
 
-// renderToolHeaderTo is the core rendering logic for tool headers.
-// It writes to the provided output and uses the optional prefix for nested tools.
+// HeaderOptions configures how a tool header is rendered.
+type HeaderOptions struct {
+	// Icon is the prefix icon (default: style.Bullet "● ")
+	Icon string
+	// Prefix is prepended to the header (e.g., style.NestedPrefix for sub-agents)
+	Prefix string
+}
+
+// DefaultHeaderOptions returns the default options for tool header rendering.
+func DefaultHeaderOptions() HeaderOptions {
+	return HeaderOptions{
+		Icon:   style.Bullet,
+		Prefix: "",
+	}
+}
+
+// RenderHeaderTo is the core rendering logic for tool headers.
+// It writes to the provided output using the specified options.
 // Returns tool context for use by the caller.
-func renderToolHeaderTo(out *render.Output, prefix, toolName string, input map[string]any) ToolContext {
+func RenderHeaderTo(out *render.Output, toolName string, input map[string]any, opts HeaderOptions) ToolContext {
 	args := GetToolArg(toolName, input)
 
 	// Truncate long args
@@ -33,8 +49,12 @@ func renderToolHeaderTo(out *render.Output, prefix, toolName string, input map[s
 		styledArgs = style.DottedUnderline(args)
 	}
 
-	// Build header: [prefix]● ToolName args
-	fmt.Fprint(out, prefix+style.ApplyThemeBoldGradient(style.Bullet+toolName))
+	// Build header: [prefix][icon]ToolName args
+	icon := opts.Icon
+	if icon == "" {
+		icon = style.Bullet
+	}
+	fmt.Fprint(out, opts.Prefix+style.ApplyThemeBoldGradient(icon+toolName))
 	if styledArgs != "" {
 		fmt.Fprint(out, " "+style.Muted.Render(styledArgs))
 	}
@@ -44,6 +64,14 @@ func renderToolHeaderTo(out *render.Output, prefix, toolName string, input map[s
 		ToolName: toolName,
 		FilePath: GetFilePath(toolName, input),
 	}
+}
+
+// renderToolHeaderTo is an internal helper using default options.
+func renderToolHeaderTo(out *render.Output, prefix, toolName string, input map[string]any) ToolContext {
+	return RenderHeaderTo(out, toolName, input, HeaderOptions{
+		Icon:   style.Bullet,
+		Prefix: prefix,
+	})
 }
 
 // renderToolUseTo renders a tool use block, delegating to renderToolHeaderTo.

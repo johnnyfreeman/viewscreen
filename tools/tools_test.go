@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
@@ -431,23 +432,121 @@ func TestRenderNestedToolUseToString(t *testing.T) {
 func TestFunctionSignatures(t *testing.T) {
 	// Verify that the function signatures match what callers expect
 	t.Run("RenderToolUse signature", func(t *testing.T) {
-		var fn func(types.ContentBlock) ToolContext = RenderToolUse
-		if fn == nil {
-			t.Error("RenderToolUse should not be nil")
-		}
+		_ = RenderToolUse // Compile-time check
 	})
 
 	t.Run("RenderToolHeader signature", func(t *testing.T) {
-		var fn func(string, map[string]any) ToolContext = RenderToolHeader
-		if fn == nil {
-			t.Error("RenderToolHeader should not be nil")
-		}
+		_ = RenderToolHeader // Compile-time check
 	})
 
 	t.Run("RenderNestedToolUse signature", func(t *testing.T) {
-		var fn func(types.ContentBlock) ToolContext = RenderNestedToolUse
-		if fn == nil {
-			t.Error("RenderNestedToolUse should not be nil")
-		}
+		_ = RenderNestedToolUse // Compile-time check
 	})
+}
+
+func TestRenderHeaderTo(t *testing.T) {
+	tests := []struct {
+		name         string
+		toolName     string
+		input        map[string]any
+		opts         HeaderOptions
+		wantContains []string
+	}{
+		{
+			name:     "default options uses bullet",
+			toolName: "Bash",
+			input:    map[string]any{"command": "echo hi"},
+			opts:     DefaultHeaderOptions(),
+			wantContains: []string{
+				style.Bullet,
+				"Bash",
+				"echo hi",
+			},
+		},
+		{
+			name:     "custom icon replaces bullet",
+			toolName: "Read",
+			input:    map[string]any{"file_path": "/path/to/file"},
+			opts: HeaderOptions{
+				Icon: "◐ ",
+			},
+			wantContains: []string{
+				"◐ ",
+				"Read",
+				"/path/to/file",
+			},
+		},
+		{
+			name:     "prefix is prepended",
+			toolName: "Grep",
+			input:    map[string]any{"pattern": "TODO"},
+			opts: HeaderOptions{
+				Prefix: style.NestedPrefix,
+			},
+			wantContains: []string{
+				style.NestedPrefix,
+				style.Bullet,
+				"Grep",
+				"TODO",
+			},
+		},
+		{
+			name:     "custom icon with prefix",
+			toolName: "Glob",
+			input:    map[string]any{"pattern": "**/*.go"},
+			opts: HeaderOptions{
+				Icon:   "⏳ ",
+				Prefix: ">> ",
+			},
+			wantContains: []string{
+				">> ",
+				"⏳ ",
+				"Glob",
+				"**/*.go",
+			},
+		},
+		{
+			name:     "empty icon defaults to bullet",
+			toolName: "Task",
+			input:    map[string]any{"description": "test"},
+			opts: HeaderOptions{
+				Icon: "",
+			},
+			wantContains: []string{
+				style.Bullet,
+				"Task",
+				"test",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := render.StringOutput()
+			RenderHeaderTo(out, tt.toolName, tt.input, tt.opts)
+			result := out.String()
+
+			for _, want := range tt.wantContains {
+				if !strings.Contains(result, want) {
+					t.Errorf("RenderHeaderTo() output missing %q\nGot: %q", want, result)
+				}
+			}
+
+			if !strings.HasSuffix(result, "\n") {
+				t.Errorf("RenderHeaderTo() output should end with newline, got: %q", result)
+			}
+		})
+	}
+}
+
+func TestDefaultHeaderOptions(t *testing.T) {
+	opts := DefaultHeaderOptions()
+
+	if opts.Icon != style.Bullet {
+		t.Errorf("DefaultHeaderOptions().Icon = %q, want %q", opts.Icon, style.Bullet)
+	}
+
+	if opts.Prefix != "" {
+		t.Errorf("DefaultHeaderOptions().Prefix = %q, want empty string", opts.Prefix)
+	}
 }
