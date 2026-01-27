@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/style"
@@ -155,4 +156,63 @@ var defaultRenderer = NewRenderer()
 // Render outputs the result event to the terminal using the default renderer
 func Render(event Event) {
 	defaultRenderer.Render(event)
+}
+
+// RenderToString renders the result event to a string
+func (r *Renderer) RenderToString(event Event) string {
+	var sb strings.Builder
+	sb.WriteString("\n")
+	if event.IsError {
+		// Error header with gradient
+		header := fmt.Sprintf("%sSession Error", style.Bullet)
+		if !r.noColor() {
+			header = style.ApplyErrorGradient(header)
+		} else {
+			header = style.Error.Bold(true).Render(header)
+		}
+		sb.WriteString(header + "\n")
+		for _, err := range event.Errors {
+			sb.WriteString(fmt.Sprintf("%s%s\n", style.OutputPrefix, style.Error.Render(err)))
+		}
+	} else {
+		// Success header with gradient
+		header := fmt.Sprintf("%sSession Complete", style.Bullet)
+		if !r.noColor() {
+			header = style.ApplySuccessGradient(header)
+		} else {
+			header = style.Success.Bold(true).Render(header)
+		}
+		sb.WriteString(header + "\n")
+	}
+
+	sb.WriteString(fmt.Sprintf("%s%s %.2fs (API: %.2fs)\n",
+		style.OutputPrefix,
+		style.Muted.Render("Duration:"),
+		float64(event.DurationMS)/1000, float64(event.DurationAPIMS)/1000))
+	sb.WriteString(fmt.Sprintf("%s%s %d\n", style.OutputContinue, style.Muted.Render("Turns:"), event.NumTurns))
+	sb.WriteString(fmt.Sprintf("%s%s $%.4f\n", style.OutputContinue, style.Muted.Render("Cost:"), event.TotalCostUSD))
+
+	if r.showUsage() {
+		sb.WriteString(fmt.Sprintf("%s%s in=%d out=%d (cache: created=%d read=%d)\n",
+			style.OutputContinue,
+			style.Muted.Render("Tokens:"),
+			event.Usage.InputTokens, event.Usage.OutputTokens,
+			event.Usage.CacheCreationInputTokens, event.Usage.CacheReadInputTokens))
+	}
+
+	if len(event.PermissionDenials) > 0 {
+		sb.WriteString(fmt.Sprintf("%s%s %d\n",
+			style.OutputContinue,
+			style.Warning.Render("Permission Denials:"),
+			len(event.PermissionDenials)))
+		for _, denial := range event.PermissionDenials {
+			sb.WriteString(fmt.Sprintf("%s  - %s (%s)\n", style.OutputContinue, denial.ToolName, denial.ToolUseID))
+		}
+	}
+	return sb.String()
+}
+
+// RenderToString renders the result event to a string using the default renderer
+func RenderToString(event Event) string {
+	return defaultRenderer.RenderToString(event)
 }

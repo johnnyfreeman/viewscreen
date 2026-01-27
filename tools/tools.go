@@ -103,3 +103,156 @@ func RenderToolUseDefault(block types.ContentBlock) {
 func RenderToolHeaderDefault(toolName string, input map[string]interface{}) {
 	RenderToolHeader(toolName, input)
 }
+
+// RenderToolUseToString renders a tool use block to a string
+func RenderToolUseToString(block types.ContentBlock) string {
+	if len(block.Input) > 0 {
+		var input map[string]interface{}
+		if err := json.Unmarshal(block.Input, &input); err == nil {
+			return RenderToolHeaderToString(block.Name, input)
+		}
+	}
+	// Fallback if no input or parse error
+	return style.ApplyThemeBoldGradient(style.Bullet+block.Name) + "\n"
+}
+
+// RenderToolHeaderToString renders the tool header to a string in format: ● ToolName args
+func RenderToolHeaderToString(toolName string, input map[string]interface{}) string {
+	// Use registry to get the argument string
+	args := GetToolArg(toolName, input)
+
+	// Truncate long args
+	truncated := false
+	if len(args) > 80 {
+		args = args[:77]
+		truncated = true
+	}
+
+	// Dotted underline for file paths for emphasis
+	var styledArgs string
+	if IsFilePathTool(toolName) && args != "" {
+		if truncated {
+			args += "..."
+		}
+		styledArgs = style.DottedUnderline(args)
+	} else {
+		if truncated {
+			args += "..."
+		}
+		styledArgs = args
+	}
+
+	// Build header: ● ToolName args
+	var result string
+	result = style.ApplyThemeBoldGradient(style.Bullet + toolName)
+	if styledArgs != "" {
+		result += " " + style.Muted.Render(styledArgs)
+	}
+	result += "\n"
+
+	// Set context for syntax highlighting of tool results
+	filePath := GetFilePath(toolName, input)
+	user.SetToolContext(toolName, filePath)
+
+	return result
+}
+
+// RenderNestedToolUse renders a tool use block with nested indentation for sub-agent tools
+func RenderNestedToolUse(block types.ContentBlock, opts ...ToolRenderOption) {
+	cfg := newRenderConfig(opts...)
+	if len(block.Input) > 0 {
+		var input map[string]interface{}
+		if err := json.Unmarshal(block.Input, &input); err == nil {
+			RenderNestedToolHeader(block.Name, input, opts...)
+			return
+		}
+	}
+	// Fallback if no input or parse error
+	fmt.Fprintln(cfg.output, style.NestedPrefix+style.ApplyThemeBoldGradient(style.Bullet+block.Name))
+	user.SetToolContext(block.Name, "")
+}
+
+// RenderNestedToolHeader renders a nested tool header with indentation
+func RenderNestedToolHeader(toolName string, input map[string]interface{}, opts ...ToolRenderOption) {
+	cfg := newRenderConfig(opts...)
+
+	args := GetToolArg(toolName, input)
+
+	truncated := false
+	if len(args) > 80 {
+		args = args[:77]
+		truncated = true
+	}
+
+	var styledArgs string
+	if IsFilePathTool(toolName) && args != "" {
+		if truncated {
+			args += "..."
+		}
+		styledArgs = style.DottedUnderline(args)
+	} else {
+		if truncated {
+			args += "..."
+		}
+		styledArgs = args
+	}
+
+	// Build nested header: │ ● ToolName args
+	fmt.Fprint(cfg.output, style.NestedPrefix+style.ApplyThemeBoldGradient(style.Bullet+toolName))
+	if styledArgs != "" {
+		fmt.Fprint(cfg.output, " "+style.Muted.Render(styledArgs))
+	}
+	fmt.Fprintln(cfg.output)
+
+	filePath := GetFilePath(toolName, input)
+	user.SetToolContext(toolName, filePath)
+}
+
+// RenderNestedToolUseToString renders a nested tool use block to a string
+func RenderNestedToolUseToString(block types.ContentBlock) string {
+	if len(block.Input) > 0 {
+		var input map[string]interface{}
+		if err := json.Unmarshal(block.Input, &input); err == nil {
+			return RenderNestedToolHeaderToString(block.Name, input)
+		}
+	}
+	// Fallback if no input or parse error
+	return style.NestedPrefix + style.ApplyThemeBoldGradient(style.Bullet+block.Name) + "\n"
+}
+
+// RenderNestedToolHeaderToString renders a nested tool header to a string
+func RenderNestedToolHeaderToString(toolName string, input map[string]interface{}) string {
+	args := GetToolArg(toolName, input)
+
+	truncated := false
+	if len(args) > 80 {
+		args = args[:77]
+		truncated = true
+	}
+
+	var styledArgs string
+	if IsFilePathTool(toolName) && args != "" {
+		if truncated {
+			args += "..."
+		}
+		styledArgs = style.DottedUnderline(args)
+	} else {
+		if truncated {
+			args += "..."
+		}
+		styledArgs = args
+	}
+
+	// Build nested header: │ ● ToolName args
+	var result string
+	result = style.NestedPrefix + style.ApplyThemeBoldGradient(style.Bullet+toolName)
+	if styledArgs != "" {
+		result += " " + style.Muted.Render(styledArgs)
+	}
+	result += "\n"
+
+	filePath := GetFilePath(toolName, input)
+	user.SetToolContext(toolName, filePath)
+
+	return result
+}

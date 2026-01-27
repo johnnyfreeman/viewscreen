@@ -7,6 +7,8 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/parser"
+	"github.com/johnnyfreeman/viewscreen/tui"
+	"golang.org/x/term"
 )
 
 // Runner encapsulates application dependencies for testability
@@ -66,6 +68,21 @@ func NewRunner(opts ...RunnerOption) *Runner {
 func (r *Runner) Run() {
 	r.parseFlags()
 
+	// Determine if we should use TUI mode
+	// TUI mode is used when:
+	// 1. --no-tui flag is NOT set, AND
+	// 2. stdout is a TTY (interactive terminal)
+	useTUI := !config.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
+
+	if useTUI {
+		if err := tui.Run(); err != nil {
+			fmt.Fprintf(r.errOutput, "TUI error: %v\n", err)
+			r.exitFunc(1)
+		}
+		return
+	}
+
+	// Legacy mode: stream directly to stdout
 	p := r.parserFactory()
 	if err := p.Run(); err != nil {
 		fmt.Fprintf(r.errOutput, "%v\n", err)

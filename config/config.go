@@ -11,6 +11,7 @@ var (
 	Verbose   bool
 	NoColor   bool
 	ShowUsage bool
+	NoTUI     bool
 )
 
 // StyleInitializer is an interface for initializing styles
@@ -31,6 +32,7 @@ type Config struct {
 	Verbose   bool
 	NoColor   bool
 	ShowUsage bool
+	NoTUI     bool
 }
 
 // Option is a functional option for configuring the parser
@@ -97,6 +99,7 @@ func Parse(opts ...Option) (*Config, error) {
 	p.flagSet.BoolVar(&cfg.Verbose, "v", false, "Verbose output (show more details)")
 	p.flagSet.BoolVar(&cfg.NoColor, "no-color", false, "Disable colored output")
 	p.flagSet.BoolVar(&cfg.ShowUsage, "usage", true, "Show token usage in result")
+	p.flagSet.BoolVar(&cfg.NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
 
 	if err := p.flagSet.Parse(p.args); err != nil {
 		return nil, err
@@ -113,6 +116,7 @@ func ParseFlags() {
 	flag.BoolVar(&Verbose, "v", false, "Verbose output (show more details)")
 	flag.BoolVar(&NoColor, "no-color", false, "Disable colored output")
 	flag.BoolVar(&ShowUsage, "usage", true, "Show token usage in result")
+	flag.BoolVar(&NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
 	flag.Parse()
 
 	style.Init(NoColor)

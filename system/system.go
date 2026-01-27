@@ -138,3 +138,30 @@ func getDefaultRenderer() *Renderer {
 func Render(event Event) {
 	getDefaultRenderer().Render(event)
 }
+
+// RenderToString renders the system event to a string
+func (r *Renderer) RenderToString(event Event) string {
+	var sb strings.Builder
+	// Use gradient for session header when color is enabled
+	header := fmt.Sprintf("%sSession Started", r.styleApplier.Bullet())
+	if !r.styleApplier.NoColor() {
+		header = r.styleApplier.ApplyThemeBoldGradient(header)
+	} else {
+		header = r.styleApplier.SessionHeaderRender(header)
+	}
+	sb.WriteString(header + "\n")
+	sb.WriteString(fmt.Sprintf("%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedRender("Model:"), event.Model))
+	sb.WriteString(fmt.Sprintf("%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Version:"), event.ClaudeCodeVersion))
+	sb.WriteString(fmt.Sprintf("%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("CWD:"), event.CWD))
+	sb.WriteString(fmt.Sprintf("%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Tools:"), len(event.Tools)))
+	if r.verboseChecker.IsVerbose() && len(event.Agents) > 0 {
+		sb.WriteString(fmt.Sprintf("%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Agents:"), strings.Join(event.Agents, ", ")))
+	}
+	sb.WriteString("\n")
+	return sb.String()
+}
+
+// RenderToString is a package-level convenience function for backward compatibility
+func RenderToString(event Event) string {
+	return getDefaultRenderer().RenderToString(event)
+}

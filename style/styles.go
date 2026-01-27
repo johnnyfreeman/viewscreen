@@ -14,6 +14,11 @@ const (
 	OutputPrefix = "  ⎿  "
 	// OutputContinue is the prefix for continued output lines
 	OutputContinue = "     "
+
+	// Nested prefixes for sub-agent tool calls
+	NestedPrefix         = "  │ "     // Prefix for nested tool headers (before bullet)
+	NestedOutputPrefix   = "  │   ⎿  " // Prefix for nested tool results
+	NestedOutputContinue = "  │      " // Continued nested output
 )
 
 // ANSI escape codes for extended underline styles

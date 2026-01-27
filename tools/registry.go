@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/johnnyfreeman/viewscreen/config"
+	"github.com/johnnyfreeman/viewscreen/types"
 )
 
 // ToolRenderer defines the interface for rendering tool headers
@@ -57,6 +58,19 @@ func GetToolArg(toolName string, input map[string]interface{}) string {
 		}
 	}
 	return ""
+}
+
+// GetToolArgFromBlock extracts the tool argument from a ContentBlock.
+// Convenience wrapper for use with types.ContentBlock.
+func GetToolArgFromBlock(block types.ContentBlock) string {
+	if len(block.Input) == 0 {
+		return ""
+	}
+	var input map[string]interface{}
+	if err := json.Unmarshal(block.Input, &input); err != nil {
+		return ""
+	}
+	return GetToolArg(block.Name, input)
 }
 
 // GetFilePath extracts the file path from tool input if present.

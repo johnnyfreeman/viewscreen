@@ -65,9 +65,7 @@ func (m *MarkdownRenderer) Render(content string) string {
 	if err != nil {
 		return content
 	}
-
-	// Glamour adds trailing newlines, trim to single newline
-	return strings.TrimRight(rendered, "\n") + "\n"
+	return strings.TrimSpace(rendered) + "\n"
 }
 
 // RenderMuted renders markdown content with muted styling
@@ -81,8 +79,7 @@ func (m *MarkdownRenderer) RenderMuted(content string) string {
 	if err != nil {
 		return content
 	}
-
-	return strings.TrimRight(rendered, "\n") + "\n"
+	return strings.TrimSpace(rendered) + "\n"
 }
 
 // getMutedStyle returns a glamour style config with muted colors

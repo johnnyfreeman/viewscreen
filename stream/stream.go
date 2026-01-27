@@ -144,6 +144,9 @@ func (r *Renderer) Render(event Event) {
 		// Message starting, nothing to render
 	case "content_block_start":
 		r.CurrentBlockIndex = event.Event.Index
+		// Reset block state flags - only one block type active at a time
+		r.InTextBlock = false
+		r.InToolUseBlock = false
 		if len(event.Event.ContentBlock) > 0 {
 			var block types.ContentBlock
 			if err := json.Unmarshal(event.Event.ContentBlock, &block); err == nil {
@@ -216,4 +219,74 @@ func (r *Renderer) GetBufferedText() string {
 func (r *Renderer) ResetBlockState() {
 	r.InTextBlock = false
 	r.InToolUseBlock = false
+}
+
+// RenderToString renders the stream event to a string and returns it
+func (r *Renderer) RenderToString(event Event) string {
+	var sb strings.Builder
+
+	switch event.Event.Type {
+	case "message_start":
+		// Message starting, nothing to render
+	case "content_block_start":
+		r.CurrentBlockIndex = event.Event.Index
+		// Reset block state flags - only one block type active at a time
+		r.InTextBlock = false
+		r.InToolUseBlock = false
+		if len(event.Event.ContentBlock) > 0 {
+			var block types.ContentBlock
+			if err := json.Unmarshal(event.Event.ContentBlock, &block); err == nil {
+				r.CurrentBlockType = block.Type
+				if block.Type == "text" {
+					r.InTextBlock = true
+					r.textBuffer.Reset()
+				} else if block.Type == "tool_use" {
+					r.InToolUseBlock = true
+					r.toolName = block.Name
+					r.toolInput.Reset()
+				}
+			}
+		}
+	case "content_block_delta":
+		if len(event.Event.Delta) > 0 {
+			// Try text delta first
+			var textDelta TextDelta
+			if err := json.Unmarshal(event.Event.Delta, &textDelta); err == nil && textDelta.Type == "text_delta" {
+				// Buffer text for markdown rendering when block completes
+				r.textBuffer.WriteString(textDelta.Text)
+				return ""
+			}
+			// Try input JSON delta
+			var jsonDelta InputJSONDelta
+			if err := json.Unmarshal(event.Event.Delta, &jsonDelta); err == nil && jsonDelta.Type == "input_json_delta" {
+				r.toolInput.WriteString(jsonDelta.PartialJSON)
+			}
+		}
+	case "content_block_stop":
+		if r.InTextBlock && event.Event.Index == r.CurrentBlockIndex {
+			// Render buffered text with markdown
+			text := r.textBuffer.String()
+			if text != "" {
+				rendered := r.markdownRenderer.Render(text)
+				sb.WriteString(rendered)
+			}
+		} else if r.InToolUseBlock && event.Event.Index == r.CurrentBlockIndex {
+			// Parse and display the accumulated tool input with full header
+			var input map[string]interface{}
+			toolInputStr := r.toolInput.String()
+			if err := json.Unmarshal([]byte(toolInputStr), &input); err == nil {
+				sb.WriteString(tools.RenderToolHeaderToString(r.toolName, input))
+			} else {
+				// Fallback if JSON parse fails
+				sb.WriteString(style.ApplyThemeBoldGradient(style.Bullet+r.toolName) + "\n")
+			}
+		}
+	case "message_delta":
+		// Contains stop_reason, nothing to render
+	case "message_stop":
+		// Message complete
+		r.CurrentBlockIndex = -1
+	}
+
+	return sb.String()
 }
