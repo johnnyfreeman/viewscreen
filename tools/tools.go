@@ -129,3 +129,24 @@ func RenderNestedToolUseToString(block types.ContentBlock) (string, ToolContext)
 	ctx := renderToolUseTo(out, style.NestedPrefix, block)
 	return out.String(), ctx
 }
+
+// RenderHeaderToString renders a tool header to string with the given options.
+// Returns the rendered string.
+func RenderHeaderToString(toolName string, input map[string]any, opts HeaderOptions) string {
+	out := render.StringOutput()
+	RenderHeaderTo(out, toolName, input, opts)
+	return out.String()
+}
+
+// ParseBlockInput parses the JSON input from a ContentBlock into a map.
+// Returns nil if input is empty or parsing fails.
+func ParseBlockInput(block types.ContentBlock) map[string]any {
+	if len(block.Input) == 0 {
+		return nil
+	}
+	var input map[string]any
+	if err := json.Unmarshal(block.Input, &input); err != nil {
+		return nil
+	}
+	return input
+}

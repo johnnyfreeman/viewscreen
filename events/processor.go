@@ -1,0 +1,196 @@
+package events
+
+import (
+	"strings"
+
+	"github.com/johnnyfreeman/viewscreen/assistant"
+	"github.com/johnnyfreeman/viewscreen/result"
+	"github.com/johnnyfreeman/viewscreen/state"
+	"github.com/johnnyfreeman/viewscreen/stream"
+	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/system"
+	"github.com/johnnyfreeman/viewscreen/tools"
+	"github.com/johnnyfreeman/viewscreen/types"
+	"github.com/johnnyfreeman/viewscreen/user"
+)
+
+// ProcessResult contains the output from processing an event.
+type ProcessResult struct {
+	// Rendered is the rendered content to append to output
+	Rendered string
+	// HasPendingTools indicates whether there are pending tools waiting for results
+	HasPendingTools bool
+}
+
+// EventProcessor processes parsed events, updates state, and produces rendered output.
+// It separates the event processing logic from the TUI concerns.
+type EventProcessor struct {
+	renderers *RendererSet
+	state     *state.State
+}
+
+// NewEventProcessor creates a new EventProcessor with the given state.
+func NewEventProcessor(s *state.State) *EventProcessor {
+	return &EventProcessor{
+		renderers: NewRendererSet(),
+		state:     s,
+	}
+}
+
+// Renderers returns the underlying RendererSet for direct access when needed.
+func (p *EventProcessor) Renderers() *RendererSet {
+	return p.renderers
+}
+
+// Process handles a parsed event and returns the rendered result.
+func (p *EventProcessor) Process(event Event) ProcessResult {
+	switch e := event.(type) {
+	case SystemEvent:
+		return p.processSystem(e.Data)
+	case AssistantEvent:
+		return p.processAssistant(e.Data)
+	case UserEvent:
+		return p.processUser(e.Data)
+	case StreamEvent:
+		return p.processStream(e.Data)
+	case ResultEvent:
+		return p.processResult(e.Data)
+	default:
+		return ProcessResult{}
+	}
+}
+
+// HasPendingTools returns whether there are pending tools awaiting results.
+func (p *EventProcessor) HasPendingTools() bool {
+	return p.renderers.PendingTools.Len() > 0
+}
+
+// RenderPendingTool renders a pending tool with the given icon (for spinner animation).
+func (p *EventProcessor) RenderPendingTool(pending tools.PendingTool, icon string) string {
+	isNested := p.renderers.PendingTools.IsNested(pending)
+	return renderToolWithIcon(pending.Block, icon, isNested)
+}
+
+// ForEachPendingTool iterates over all pending tools.
+func (p *EventProcessor) ForEachPendingTool(fn func(id string, pending tools.PendingTool)) {
+	p.renderers.PendingTools.ForEach(fn)
+}
+
+func (p *EventProcessor) processSystem(event system.Event) ProcessResult {
+	p.state.UpdateFromSystemEvent(event)
+	rendered := p.renderers.System.RenderToString(event)
+	return ProcessResult{Rendered: rendered}
+}
+
+func (p *EventProcessor) processAssistant(event assistant.Event) ProcessResult {
+	p.state.IncrementTurnCount()
+	r := p.renderers
+
+	// Buffer tool_use blocks
+	if BufferToolUse(event, r.PendingTools, r.Stream) {
+		// Update state to show the first pending tool
+		for _, block := range event.Message.Content {
+			if block.Type == "tool_use" && block.ID != "" {
+				p.state.SetCurrentTool(block.Name, tools.GetToolArgFromBlock(block))
+				break
+			}
+		}
+	}
+
+	// Render text blocks only (tools are buffered)
+	rendered := r.Assistant.RenderToString(
+		event,
+		r.Stream.InTextBlock(),
+		true, // Suppress tool rendering - we handle it separately
+	)
+	r.Stream.ResetBlockState()
+
+	return ProcessResult{
+		Rendered:        rendered,
+		HasPendingTools: r.PendingTools.Len() > 0,
+	}
+}
+
+func (p *EventProcessor) processUser(event user.Event) ProcessResult {
+	p.state.UpdateFromToolUseResult(event.ToolUseResult)
+	r := p.renderers
+
+	// Match tool results with pending tools
+	matched := MatchToolResults(event, r.PendingTools)
+
+	var content strings.Builder
+	var isNested bool
+
+	// Render matched tool headers and set context
+	for _, match := range matched {
+		isNested = match.IsNested
+		var str string
+		var ctx tools.ToolContext
+		if match.IsNested {
+			str, ctx = tools.RenderNestedToolUseToString(match.Block)
+		} else {
+			str, ctx = tools.RenderToolUseToString(match.Block)
+		}
+		content.WriteString(str)
+		r.User.SetToolContext(ctx)
+	}
+
+	// Clear tool state if no more pending tools
+	if r.PendingTools.Len() == 0 {
+		p.state.ClearCurrentTool()
+	}
+
+	// Render the tool result (with nested prefix if applicable)
+	if isNested {
+		content.WriteString(r.User.RenderNestedToString(event))
+	} else {
+		content.WriteString(r.User.RenderToString(event))
+	}
+
+	return ProcessResult{
+		Rendered:        content.String(),
+		HasPendingTools: r.PendingTools.Len() > 0,
+	}
+}
+
+func (p *EventProcessor) processStream(event stream.Event) ProcessResult {
+	r := p.renderers
+	rendered := r.Stream.RenderToString(event)
+
+	// Update state for tool progress tracking
+	if event.Event.Type == "content_block_start" && r.Stream.InToolUseBlock() {
+		p.state.SetCurrentTool(r.Stream.CurrentBlockType(), "")
+	}
+
+	return ProcessResult{Rendered: rendered}
+}
+
+func (p *EventProcessor) processResult(event result.Event) ProcessResult {
+	r := p.renderers
+
+	var content strings.Builder
+
+	// Flush any orphaned pending tools
+	orphaned := FlushOrphanedTools(r.PendingTools)
+	for _, o := range orphaned {
+		str, _ := tools.RenderToolUseToString(o.Block)
+		content.WriteString(str)
+		content.WriteString(style.OutputPrefix + style.Muted.Render("(no result)") + "\n")
+	}
+
+	p.state.ClearCurrentTool()
+	p.state.UpdateFromResultEvent(event)
+	content.WriteString(r.Result.RenderToString(event))
+
+	return ProcessResult{Rendered: content.String()}
+}
+
+// renderToolWithIcon renders a tool header with a custom icon.
+func renderToolWithIcon(block types.ContentBlock, icon string, isNested bool) string {
+	input := tools.ParseBlockInput(block)
+	opts := tools.HeaderOptions{Icon: icon}
+	if isNested {
+		opts.Prefix = style.NestedPrefix
+	}
+	return tools.RenderHeaderToString(block.Name, input, opts)
+}
