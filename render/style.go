@@ -82,7 +82,7 @@ func (d DefaultStyleApplier) DiffAddBg() lipgloss.Color              { return st
 func (d DefaultStyleApplier) DiffRemoveBg() lipgloss.Color           { return style.DiffRemoveBg }
 
 // Session/header styles
-func (d DefaultStyleApplier) SessionHeaderRender(text string) string { return style.SessionHeader.Render(text) }
+func (d DefaultStyleApplier) SessionHeaderRender(text string) string { return style.InfoBoldText(text) }
 func (d DefaultStyleApplier) ApplyThemeBoldGradient(text string) string {
 	return style.ApplyThemeBoldGradient(text)
 }

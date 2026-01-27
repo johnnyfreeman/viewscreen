@@ -208,6 +208,19 @@ func LineNumberSepText(text string) string {
 	return style.Styled(text)
 }
 
+// InfoBoldText applies info (cyan) foreground color with bold using Ultraviolet.
+// Use this for info headers when styling needs to be composition-safe.
+func InfoBoldText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg:    hexToRGBA(string(CurrentTheme.Info)),
+		Attrs: uv.AttrBold,
+	}
+	return style.Styled(text)
+}
+
 // hexToRGBA converts a hex color string to color.RGBA.
 func hexToRGBA(hex string) color.RGBA {
 	c, err := colorful.Hex(hex)
