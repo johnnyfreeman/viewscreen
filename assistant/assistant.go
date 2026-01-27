@@ -37,8 +37,8 @@ type MarkdownRendererInterface interface {
 	Render(content string) string
 }
 
-// ToolUseRenderer is a function type for rendering tool use blocks
-type ToolUseRenderer func(block types.ContentBlock)
+// ToolUseRenderer is a function type for rendering tool use blocks to a writer
+type ToolUseRenderer func(out *render.Output, block types.ContentBlock)
 
 // Renderer handles rendering assistant events
 type Renderer struct {
@@ -71,6 +71,11 @@ func WithToolUseRenderer(tr ToolUseRenderer) RendererOption {
 	}
 }
 
+// defaultToolUseRenderer wraps tools.RenderToolUse to write to an Output
+func defaultToolUseRenderer(out *render.Output, block types.ContentBlock) {
+	out.WriteString(tools.RenderToolUseToString(block))
+}
+
 // NewRenderer creates a new assistant Renderer with default dependencies
 func NewRenderer() *Renderer {
 	width := 80
@@ -81,7 +86,7 @@ func NewRenderer() *Renderer {
 	return &Renderer{
 		output:           os.Stdout,
 		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, width),
-		toolUseRenderer:  tools.RenderToolUse,
+		toolUseRenderer:  defaultToolUseRenderer,
 	}
 }
 
@@ -94,12 +99,12 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 	return r
 }
 
-// Render outputs the assistant event to the terminal
-// inTextBlock and inToolUseBlock indicate whether we were streaming these block types
-func (r *Renderer) Render(event Event, inTextBlock, inToolUseBlock bool) {
+// renderTo is the unified rendering method that writes to any output.
+// This eliminates duplication between Render and RenderToString.
+func (r *Renderer) renderTo(out *render.Output, event Event, inTextBlock, inToolUseBlock bool) {
 	if event.Error != "" {
-		fmt.Fprintln(r.output, style.ApplyErrorGradient(style.Bullet+"Error"))
-		fmt.Fprintf(r.output, "%s%s\n", style.OutputPrefix, style.Error.Render(event.Error))
+		fmt.Fprintln(out, style.ApplyErrorGradient(style.Bullet+"Error"))
+		fmt.Fprintf(out, "%s%s\n", style.OutputPrefix, style.Error.Render(event.Error))
 	}
 
 	for _, block := range event.Message.Content {
@@ -108,18 +113,24 @@ func (r *Renderer) Render(event Event, inTextBlock, inToolUseBlock bool) {
 			// Only render if we weren't streaming (text would already be shown)
 			if !inTextBlock {
 				rendered := r.markdownRenderer.Render(block.Text)
-				fmt.Fprint(r.output, rendered)
+				fmt.Fprint(out, rendered)
 				if !strings.HasSuffix(rendered, "\n") {
-					fmt.Fprintln(r.output)
+					fmt.Fprintln(out)
 				}
 			}
 		case "tool_use":
 			// Only render if we weren't streaming
 			if !inToolUseBlock {
-				r.toolUseRenderer(block)
+				r.toolUseRenderer(out, block)
 			}
 		}
 	}
+}
+
+// Render outputs the assistant event to the terminal
+// inTextBlock and inToolUseBlock indicate whether we were streaming these block types
+func (r *Renderer) Render(event Event, inTextBlock, inToolUseBlock bool) {
+	r.renderTo(render.WriterOutput(r.output), event, inTextBlock, inToolUseBlock)
 }
 
 // Package-level renderer for backward compatibility
@@ -138,45 +149,15 @@ func Render(event Event, inTextBlock, inToolUseBlock bool) {
 	getDefaultRenderer().Render(event, inTextBlock, inToolUseBlock)
 }
 
-// ToolUseStringRenderer is a function type for rendering tool use blocks to string
-type ToolUseStringRenderer func(block types.ContentBlock) string
-
 // RenderToString renders the assistant event to a string
 // inTextBlock and inToolUseBlock indicate whether we were streaming these block types
-func (r *Renderer) RenderToString(event Event, inTextBlock, inToolUseBlock bool, toolStringRenderer ToolUseStringRenderer) string {
-	var sb strings.Builder
-
-	if event.Error != "" {
-		sb.WriteString(style.ApplyErrorGradient(style.Bullet+"Error") + "\n")
-		sb.WriteString(fmt.Sprintf("%s%s\n", style.OutputPrefix, style.Error.Render(event.Error)))
-	}
-
-	for _, block := range event.Message.Content {
-		switch block.Type {
-		case "text":
-			// Only render if we weren't streaming (text would already be shown)
-			if !inTextBlock {
-				rendered := r.markdownRenderer.Render(block.Text)
-				sb.WriteString(rendered)
-				if !strings.HasSuffix(rendered, "\n") {
-					sb.WriteString("\n")
-				}
-			}
-		case "tool_use":
-			// Only render if we weren't streaming
-			if !inToolUseBlock && toolStringRenderer != nil {
-				sb.WriteString(toolStringRenderer(block))
-			}
-		}
-	}
-	return sb.String()
+func (r *Renderer) RenderToString(event Event, inTextBlock, inToolUseBlock bool) string {
+	out := render.StringOutput()
+	r.renderTo(out, event, inTextBlock, inToolUseBlock)
+	return out.String()
 }
 
 // RenderToString is a package-level convenience function
 func RenderToString(event Event, inTextBlock, inToolUseBlock bool) string {
-	// Use a simple tool renderer that returns the tool header
-	toolStringRenderer := func(block types.ContentBlock) string {
-		return tools.RenderToolUseToString(block)
-	}
-	return getDefaultRenderer().RenderToString(event, inTextBlock, inToolUseBlock, toolStringRenderer)
+	return getDefaultRenderer().RenderToString(event, inTextBlock, inToolUseBlock)
 }

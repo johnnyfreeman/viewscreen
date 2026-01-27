@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
@@ -27,7 +28,7 @@ type mockToolUseRenderer struct {
 	calls []types.ContentBlock
 }
 
-func (m *mockToolUseRenderer) render(block types.ContentBlock) {
+func (m *mockToolUseRenderer) render(out *render.Output, block types.ContentBlock) {
 	m.calls = append(m.calls, block)
 }
 
@@ -72,12 +73,12 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with custom tool use renderer", func(t *testing.T) {
 		called := false
-		custom := func(block types.ContentBlock) {
+		custom := func(out *render.Output, block types.ContentBlock) {
 			called = true
 		}
 		r := NewRendererWithOptions(WithToolUseRenderer(custom))
 
-		r.toolUseRenderer(types.ContentBlock{})
+		r.toolUseRenderer(render.StringOutput(), types.ContentBlock{})
 		if !called {
 			t.Error("expected custom tool use renderer to be called")
 		}

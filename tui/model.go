@@ -201,7 +201,6 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 			msg.Event,
 			m.streamRenderer.InTextBlock,
 			true, // Suppress tool rendering - we handle it separately
-			nil,
 		)
 		m.content.WriteString(rendered)
 		m.streamRenderer.ResetBlockState()
