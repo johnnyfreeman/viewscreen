@@ -7,10 +7,13 @@ import (
 	"github.com/lucasb-eyer/go-colorful"
 )
 
-// ApplyGradient applies a horizontal color gradient to text.
+// applyGradientCore applies a horizontal color gradient to text with optional bold.
 // Uses HCL color space for perceptually uniform blending.
-func ApplyGradient(text string, from, to lipgloss.Color) string {
+func applyGradientCore(text string, from, to lipgloss.Color, bold bool) string {
 	if noColor {
+		if bold {
+			return Bold.Render(text)
+		}
 		return text
 	}
 
@@ -19,13 +22,18 @@ func ApplyGradient(text string, from, to lipgloss.Color) string {
 		return text
 	}
 
-	// Parse colors
 	fromColor, err := colorful.Hex(string(from))
 	if err != nil {
+		if bold {
+			return Bold.Render(text)
+		}
 		return text
 	}
 	toColor, err := colorful.Hex(string(to))
 	if err != nil {
+		if bold {
+			return Bold.Render(text)
+		}
 		return text
 	}
 
@@ -43,12 +51,16 @@ func ApplyGradient(text string, from, to lipgloss.Color) string {
 		blended := fromColor.BlendHcl(toColor, t).Clamped()
 		hex := blended.Hex()
 
-		// Apply color to this character
-		style := lipgloss.NewStyle().Foreground(lipgloss.Color(hex))
+		style := lipgloss.NewStyle().Bold(bold).Foreground(lipgloss.Color(hex))
 		b.WriteString(style.Render(string(r)))
 	}
 
 	return b.String()
+}
+
+// ApplyGradient applies a horizontal color gradient to text.
+func ApplyGradient(text string, from, to lipgloss.Color) string {
+	return applyGradientCore(text, from, to, false)
 }
 
 // ApplyThemeGradient applies the current theme's gradient colors to text.
@@ -58,41 +70,7 @@ func ApplyThemeGradient(text string) string {
 
 // ApplyBoldGradient applies a bold gradient to text.
 func ApplyBoldGradient(text string, from, to lipgloss.Color) string {
-	if noColor {
-		return Bold.Render(text)
-	}
-
-	runes := []rune(text)
-	if len(runes) == 0 {
-		return text
-	}
-
-	fromColor, err := colorful.Hex(string(from))
-	if err != nil {
-		return Bold.Render(text)
-	}
-	toColor, err := colorful.Hex(string(to))
-	if err != nil {
-		return Bold.Render(text)
-	}
-
-	var b strings.Builder
-	b.Grow(len(text) * 20)
-
-	for i, r := range runes {
-		var t float64
-		if len(runes) > 1 {
-			t = float64(i) / float64(len(runes)-1)
-		}
-
-		blended := fromColor.BlendHcl(toColor, t).Clamped()
-		hex := blended.Hex()
-
-		style := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(hex))
-		b.WriteString(style.Render(string(r)))
-	}
-
-	return b.String()
+	return applyGradientCore(text, from, to, true)
 }
 
 // ApplyThemeBoldGradient applies a bold gradient using theme colors.
