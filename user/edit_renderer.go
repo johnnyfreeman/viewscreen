@@ -93,7 +93,7 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 				}
 				remaining -= lineCount
 				if remaining > 0 {
-					pw.WriteLinef("%s", er.styleApplier.MutedRender(textutil.TruncationIndicator(remaining)))
+					pw.WriteLinef("%s", er.styleApplier.UVMutedText(textutil.TruncationIndicator(remaining)))
 				}
 				return true
 			}
@@ -108,12 +108,12 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 			case '+':
 				// Added line: show new line number with + indicator
 				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
-				op = er.styleApplier.SuccessRender("+")
+				op = er.styleApplier.UVSuccessText("+")
 				newLine++
 			case '-':
 				// Removed line: show old line number with - indicator
 				lineNum = fmt.Sprintf("%*d", numWidth, oldLine)
-				op = er.styleApplier.ErrorRender("-")
+				op = er.styleApplier.UVErrorText("-")
 				oldLine++
 			default:
 				// Context line: show new line number with space

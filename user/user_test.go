@@ -680,12 +680,12 @@ func TestRenderer_Render_EditResult_Verbose(t *testing.T) {
 	r.Render(event)
 	output := buf.String()
 
-	// Should show diff with styled markers
-	if !strings.Contains(output, "[SUCCESS:+]") {
-		t.Errorf("Expected success-styled + in output, got: %q", output)
+	// Should show diff with UV-styled markers (Ultraviolet for composition-safe styling)
+	if !strings.Contains(output, "[UV_SUCCESS:+]") {
+		t.Errorf("Expected UV success-styled + in output, got: %q", output)
 	}
-	if !strings.Contains(output, "[ERROR:-]") {
-		t.Errorf("Expected error-styled - in output, got: %q", output)
+	if !strings.Contains(output, "[UV_ERROR:-]") {
+		t.Errorf("Expected UV error-styled - in output, got: %q", output)
 	}
 	if !strings.Contains(output, "old line") {
 		t.Errorf("Expected 'old line' in output, got: %q", output)
