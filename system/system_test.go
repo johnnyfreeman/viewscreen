@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
 )
 
@@ -52,12 +53,16 @@ func (m *mockStyleApplier) DiffRemoveBg() lipgloss.Color           { return lipg
 func (m *mockStyleApplier) ApplySuccessGradient(text string) string { return "[success_grad]" + text + "[/success_grad]" }
 func (m *mockStyleApplier) ApplyErrorGradient(text string) string   { return "[error_grad]" + text + "[/error_grad]" }
 
-// mockVerboseChecker is a test double for VerboseChecker
-type mockVerboseChecker struct {
-	verbose bool
+// mockConfigProvider is a test double for config.Provider
+type mockConfigProvider struct {
+	verbose   bool
+	noColor   bool
+	showUsage bool
 }
 
-func (m *mockVerboseChecker) IsVerbose() bool { return m.verbose }
+func (m *mockConfigProvider) IsVerbose() bool { return m.verbose }
+func (m *mockConfigProvider) NoColor() bool   { return m.noColor }
+func (m *mockConfigProvider) ShowUsage() bool { return m.showUsage }
 
 func TestNewRenderer(t *testing.T) {
 	r := NewRenderer()
@@ -74,8 +79,8 @@ func TestNewRenderer(t *testing.T) {
 		t.Error("expected styleApplier to be non-nil")
 	}
 
-	if r.verboseChecker == nil {
-		t.Error("expected verboseChecker to be non-nil")
+	if r.config == nil {
+		t.Error("expected config to be non-nil")
 	}
 }
 
@@ -98,24 +103,24 @@ func TestNewRendererWithOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("with custom verbose checker", func(t *testing.T) {
-		mock := &mockVerboseChecker{verbose: true}
-		r := NewRendererWithOptions(WithVerboseChecker(mock))
+	t.Run("with custom config provider", func(t *testing.T) {
+		mock := &mockConfigProvider{verbose: true}
+		r := NewRendererWithOptions(WithConfigProvider(mock))
 
-		if r.verboseChecker != mock {
-			t.Error("expected custom verbose checker")
+		if r.config != mock {
+			t.Error("expected custom config provider")
 		}
 	})
 
 	t.Run("with multiple options", func(t *testing.T) {
 		buf := &bytes.Buffer{}
 		styleMock := &mockStyleApplier{}
-		verboseMock := &mockVerboseChecker{}
+		configMock := &mockConfigProvider{}
 
 		r := NewRendererWithOptions(
 			WithOutput(buf),
 			WithStyleApplier(styleMock),
-			WithVerboseChecker(verboseMock),
+			WithConfigProvider(configMock),
 		)
 
 		if r.output != buf {
@@ -124,8 +129,8 @@ func TestNewRendererWithOptions(t *testing.T) {
 		if r.styleApplier != styleMock {
 			t.Error("expected custom style applier")
 		}
-		if r.verboseChecker != verboseMock {
-			t.Error("expected custom verbose checker")
+		if r.config != configMock {
+			t.Error("expected custom config provider")
 		}
 	})
 }
@@ -133,12 +138,12 @@ func TestNewRendererWithOptions(t *testing.T) {
 func TestRenderer_Render_BasicEvent(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: false}
-	verboseMock := &mockVerboseChecker{verbose: false}
+	configMock := &mockConfigProvider{verbose: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{
@@ -186,12 +191,12 @@ func TestRenderer_Render_BasicEvent(t *testing.T) {
 func TestRenderer_Render_NoColorMode(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
-	verboseMock := &mockVerboseChecker{verbose: false}
+	configMock := &mockConfigProvider{verbose: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{
@@ -224,12 +229,12 @@ func TestRenderer_Render_NoColorMode(t *testing.T) {
 func TestRenderer_Render_VerboseWithAgents(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
-	verboseMock := &mockVerboseChecker{verbose: true}
+	configMock := &mockConfigProvider{verbose: true}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{
@@ -253,12 +258,12 @@ func TestRenderer_Render_VerboseWithAgents(t *testing.T) {
 func TestRenderer_Render_VerboseWithoutAgents(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
-	verboseMock := &mockVerboseChecker{verbose: true}
+	configMock := &mockConfigProvider{verbose: true}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{
@@ -282,12 +287,12 @@ func TestRenderer_Render_VerboseWithoutAgents(t *testing.T) {
 func TestRenderer_Render_NonVerboseWithAgents(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
-	verboseMock := &mockVerboseChecker{verbose: false}
+	configMock := &mockConfigProvider{verbose: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{
@@ -311,12 +316,12 @@ func TestRenderer_Render_NonVerboseWithAgents(t *testing.T) {
 func TestRenderer_Render_EmptyTools(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
-	verboseMock := &mockVerboseChecker{verbose: false}
+	configMock := &mockConfigProvider{verbose: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{
@@ -339,12 +344,12 @@ func TestRenderer_Render_EmptyTools(t *testing.T) {
 func TestRenderer_Render_OutputFormat(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
-	verboseMock := &mockVerboseChecker{verbose: false}
+	configMock := &mockConfigProvider{verbose: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{
@@ -523,23 +528,25 @@ func TestDefaultStyleApplier(t *testing.T) {
 	}
 }
 
-func TestDefaultVerboseChecker(t *testing.T) {
-	dvc := DefaultVerboseChecker{}
+func TestDefaultConfigProvider(t *testing.T) {
+	dp := config.DefaultProvider{}
 
-	// Test that the method doesn't panic
-	// The actual value depends on config.Verbose which we can't easily control here
-	_ = dvc.IsVerbose()
+	// Test that the methods don't panic
+	// The actual values depend on config globals which we can't easily control here
+	_ = dp.IsVerbose()
+	_ = dp.NoColor()
+	_ = dp.ShowUsage()
 }
 
 func TestRenderer_Render_MutedStyleCalls(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
-	verboseMock := &mockVerboseChecker{verbose: true}
+	configMock := &mockConfigProvider{verbose: true}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{
@@ -568,12 +575,12 @@ func TestRenderer_Render_MutedStyleCalls(t *testing.T) {
 func TestRenderer_Render_SpecialCharacters(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &mockStyleApplier{noColor: true}
-	verboseMock := &mockVerboseChecker{verbose: false}
+	configMock := &mockConfigProvider{verbose: false}
 
 	r := NewRendererWithOptions(
 		WithOutput(output),
 		WithStyleApplier(styleMock),
-		WithVerboseChecker(verboseMock),
+		WithConfigProvider(configMock),
 	)
 
 	event := Event{

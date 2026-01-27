@@ -122,12 +122,18 @@ func GetRenderer(name string) ToolRenderer {
 // GetToolArg returns the display argument for a tool using the registry.
 // Falls back to JSON preview for unknown tools in verbose mode.
 func GetToolArg(toolName string, input map[string]interface{}) string {
+	return GetToolArgWithConfig(toolName, input, config.DefaultProvider{})
+}
+
+// GetToolArgWithConfig returns the display argument for a tool using the provided config.
+// Falls back to JSON preview for unknown tools in verbose mode.
+func GetToolArgWithConfig(toolName string, input map[string]interface{}, cfg config.Provider) string {
 	if r := GetRenderer(toolName); r != nil {
 		return r.RenderHeader(input)
 	}
 
 	// Fallback: show compact JSON for unknown tools in verbose mode
-	if config.Verbose {
+	if cfg.IsVerbose() {
 		if data, err := json.Marshal(input); err == nil {
 			s := string(data)
 			if len(s) > 100 {

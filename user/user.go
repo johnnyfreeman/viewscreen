@@ -50,17 +50,6 @@ type Event struct {
 	IsSynthetic   bool            `json:"isSynthetic"`
 }
 
-// ConfigChecker abstracts config flag checking for testability
-type ConfigChecker interface {
-	IsVerbose() bool
-	NoColor() bool
-}
-
-// DefaultConfigChecker uses the actual config package
-type DefaultConfigChecker struct{}
-
-func (d DefaultConfigChecker) IsVerbose() bool { return config.Verbose }
-func (d DefaultConfigChecker) NoColor() bool   { return config.NoColor }
 
 // CodeHighlighter abstracts code highlighting for testability
 type CodeHighlighter interface {
@@ -103,7 +92,7 @@ type MarkdownRenderer = types.MarkdownRenderer
 // Renderer handles rendering user events
 type Renderer struct {
 	output           io.Writer
-	configChecker    ConfigChecker
+	config           config.Provider
 	styleApplier     render.StyleApplier
 	highlighter      CodeHighlighter
 	markdownRenderer MarkdownRenderer
@@ -123,10 +112,10 @@ func WithOutput(w io.Writer) RendererOption {
 	}
 }
 
-// WithConfigChecker sets a custom config checker
-func WithConfigChecker(cc ConfigChecker) RendererOption {
+// WithConfigProvider sets a custom config provider
+func WithConfigProvider(cp config.Provider) RendererOption {
 	return func(r *Renderer) {
-		r.configChecker = cc
+		r.config = cp
 	}
 }
 
@@ -167,9 +156,9 @@ func WithContentCleaner(cc *textutil.ContentCleaner) RendererOption {
 
 // NewRenderer creates a new user Renderer with default dependencies
 func NewRenderer() *Renderer {
-	cc := DefaultConfigChecker{}
+	cfg := config.DefaultProvider{}
 	sa := render.DefaultStyleApplier{}
-	ch := NewDefaultCodeHighlighter(cc.NoColor())
+	ch := NewDefaultCodeHighlighter(cfg.NoColor())
 
 	// Build the result registry with renderers in priority order
 	registry := NewResultRegistry()
@@ -179,10 +168,10 @@ func NewRenderer() *Renderer {
 
 	return &Renderer{
 		output:           os.Stdout,
-		configChecker:    cc,
+		config:           cfg,
 		styleApplier:     sa,
 		highlighter:      ch,
-		markdownRenderer: render.NewMarkdownRenderer(cc.NoColor(), terminal.Width()),
+		markdownRenderer: render.NewMarkdownRenderer(cfg.NoColor(), terminal.Width()),
 		toolContext:      &tools.ToolContext{},
 		contentCleaner:   textutil.DefaultContentCleaner(),
 		resultRegistry:   registry,
@@ -225,7 +214,7 @@ func (r *Renderer) RenderNested(event Event) {
 func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outputContinue string) {
 	// Handle synthetic messages (e.g., skill content) in verbose mode
 	if event.IsSynthetic {
-		if r.configChecker.IsVerbose() {
+		if r.config.IsVerbose() {
 			r.renderSyntheticMessageTo(out, event)
 		}
 		return
@@ -255,7 +244,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 			lines := strings.Split(cleaned, "\n")
 			lineCount := len(lines)
 
-			if r.configChecker.IsVerbose() {
+			if r.config.IsVerbose() {
 				// Apply syntax highlighting first
 				highlighted := r.highlightContent(cleaned)
 

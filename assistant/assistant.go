@@ -44,6 +44,7 @@ type Renderer struct {
 	output           io.Writer
 	markdownRenderer types.MarkdownRenderer
 	toolUseRenderer  ToolUseRenderer
+	config           config.Provider
 }
 
 // RendererOption is a functional option for configuring a Renderer
@@ -70,6 +71,13 @@ func WithToolUseRenderer(tr ToolUseRenderer) RendererOption {
 	}
 }
 
+// WithConfigProvider sets a custom config provider
+func WithConfigProvider(cp config.Provider) RendererOption {
+	return func(r *Renderer) {
+		r.config = cp
+	}
+}
+
 // defaultToolUseRenderer renders a tool_use block to an Output using HeaderRenderer.
 // It uses HeaderRenderer.RenderBlockToOutput which writes directly to the output,
 // avoiding string allocation.
@@ -79,10 +87,12 @@ func defaultToolUseRenderer(out *render.Output, block types.ContentBlock) {
 
 // NewRenderer creates a new assistant Renderer with default dependencies
 func NewRenderer() *Renderer {
+	cfg := config.DefaultProvider{}
 	return &Renderer{
 		output:           os.Stdout,
-		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, terminal.Width()),
+		markdownRenderer: render.NewMarkdownRenderer(cfg.NoColor(), terminal.Width()),
 		toolUseRenderer:  defaultToolUseRenderer,
+		config:           cfg,
 	}
 }
 

@@ -8,6 +8,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// mockConfigProvider implements config.Provider for testing
+type mockConfigProvider struct {
+	verbose   bool
+	noColor   bool
+	showUsage bool
+}
+
+func (m mockConfigProvider) IsVerbose() bool { return m.verbose }
+func (m mockConfigProvider) NoColor() bool   { return m.noColor }
+func (m mockConfigProvider) ShowUsage() bool { return m.showUsage }
+
 // mockStyleApplier implements render.StyleApplier for testing
 type mockStyleApplier struct {
 	noColor bool
@@ -43,8 +54,8 @@ func TestNewRenderer(t *testing.T) {
 		t.Error("expected output to be non-nil")
 	}
 
-	if r.showUsage == nil {
-		t.Error("expected showUsage to be non-nil")
+	if r.config == nil {
+		t.Error("expected config to be non-nil")
 	}
 
 	if r.styleApplier == nil {
@@ -62,17 +73,12 @@ func TestNewRendererWithOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("with custom showUsage", func(t *testing.T) {
-		called := false
-		fn := func() bool {
-			called = true
-			return true
-		}
-		r := NewRenderer(WithShowUsage(fn))
+	t.Run("with custom config provider", func(t *testing.T) {
+		cp := mockConfigProvider{showUsage: true}
+		r := NewRenderer(WithConfigProvider(cp))
 
-		r.showUsage()
-		if !called {
-			t.Error("expected custom showUsage to be called")
+		if !r.config.ShowUsage() {
+			t.Error("expected showUsage to return true")
 		}
 	})
 
@@ -87,14 +93,11 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with multiple options", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		showUsageCalled := false
+		cp := mockConfigProvider{showUsage: true}
 
 		r := NewRenderer(
 			WithOutput(buf),
-			WithShowUsage(func() bool {
-				showUsageCalled = true
-				return true
-			}),
+			WithConfigProvider(cp),
 			WithStyleApplier(mockStyleApplier{noColor: true}),
 		)
 
@@ -102,9 +105,8 @@ func TestNewRendererWithOptions(t *testing.T) {
 			t.Error("expected custom output")
 		}
 
-		r.showUsage()
-		if !showUsageCalled {
-			t.Error("expected showUsage to be called")
+		if !r.config.ShowUsage() {
+			t.Error("expected showUsage to return true")
 		}
 
 		if r.styleApplier == nil {
@@ -117,7 +119,7 @@ func TestRenderer_Render_Success(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return false }),
+		WithConfigProvider(mockConfigProvider{showUsage: false}),
 		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
@@ -161,7 +163,7 @@ func TestRenderer_Render_Error(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return false }),
+		WithConfigProvider(mockConfigProvider{showUsage: false}),
 		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
@@ -196,7 +198,7 @@ func TestRenderer_Render_WithUsage(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return true }),
+		WithConfigProvider(mockConfigProvider{showUsage: true}),
 		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
@@ -237,7 +239,7 @@ func TestRenderer_Render_WithoutUsage(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return false }),
+		WithConfigProvider(mockConfigProvider{showUsage: false}),
 		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
@@ -267,7 +269,7 @@ func TestRenderer_Render_WithPermissionDenials(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return false }),
+		WithConfigProvider(mockConfigProvider{showUsage: false}),
 		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
@@ -320,7 +322,7 @@ func TestRenderer_Render_NoPermissionDenials(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return false }),
+		WithConfigProvider(mockConfigProvider{showUsage: false}),
 		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
@@ -347,7 +349,7 @@ func TestRenderer_Render_ZeroValues(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return true }),
+		WithConfigProvider(mockConfigProvider{showUsage: true}),
 		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
@@ -385,7 +387,7 @@ func TestRenderer_Render_LargeCost(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return false }),
+		WithConfigProvider(mockConfigProvider{showUsage: false}),
 		WithStyleApplier(mockStyleApplier{noColor: true}),
 	)
 
@@ -525,7 +527,7 @@ func TestRenderer_Render_WithColor(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return false }),
+		WithConfigProvider(mockConfigProvider{showUsage: false}),
 		WithStyleApplier(mockStyleApplier{noColor: false}), // Color enabled
 	)
 
@@ -551,7 +553,7 @@ func TestRenderer_Render_ErrorWithColor(t *testing.T) {
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
-		WithShowUsage(func() bool { return false }),
+		WithConfigProvider(mockConfigProvider{showUsage: false}),
 		WithStyleApplier(mockStyleApplier{noColor: false}), // Color enabled
 	)
 

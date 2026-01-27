@@ -166,7 +166,8 @@ func (m Model) renderLayout() string {
 // Run starts the TUI
 func Run() error {
 	// Initialize styles (needed for renderers)
-	render.NewMarkdownRenderer(config.NoColor, 80)
+	cfg := config.DefaultProvider{}
+	render.NewMarkdownRenderer(cfg.NoColor(), 80)
 
 	p := tea.NewProgram(
 		NewModel(),

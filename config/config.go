@@ -14,6 +14,22 @@ var (
 	NoTUI     bool
 )
 
+// Provider abstracts config access for testability.
+// This interface unifies the scattered config access patterns across packages.
+type Provider interface {
+	IsVerbose() bool
+	NoColor() bool
+	ShowUsage() bool
+}
+
+// DefaultProvider reads from the global config variables.
+// Use this in production code.
+type DefaultProvider struct{}
+
+func (DefaultProvider) IsVerbose() bool { return Verbose }
+func (DefaultProvider) NoColor() bool   { return NoColor }
+func (DefaultProvider) ShowUsage() bool { return ShowUsage }
+
 // StyleInitializer is an interface for initializing styles
 type StyleInitializer interface {
 	Init(disableColor bool)

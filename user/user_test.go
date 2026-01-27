@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/content"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/tools"
@@ -405,13 +406,15 @@ func TestContentBlock_Unmarshaling(t *testing.T) {
 
 // Mock implementations for testing
 
-type mockConfigChecker struct {
-	verbose bool
-	noColor bool
+type mockConfigProvider struct {
+	verbose   bool
+	noColor   bool
+	showUsage bool
 }
 
-func (m mockConfigChecker) IsVerbose() bool { return m.verbose }
-func (m mockConfigChecker) NoColor() bool   { return m.noColor }
+func (m mockConfigProvider) IsVerbose() bool { return m.verbose }
+func (m mockConfigProvider) NoColor() bool   { return m.noColor }
+func (m mockConfigProvider) ShowUsage() bool { return m.showUsage }
 
 type mockStyleApplier struct{}
 
@@ -449,7 +452,7 @@ func (m mockCodeHighlighter) HighlightFileWithBg(code, filename string, bgColor 
 
 func TestRenderer_SetToolContext(t *testing.T) {
 	r := NewRendererWithOptions(
-		WithConfigChecker(mockConfigChecker{noColor: true}),
+		WithConfigProvider(mockConfigProvider{noColor: true}),
 	)
 
 	r.SetToolContext(tools.ToolContext{ToolName: "Read", FilePath: "/path/to/file.go"})
@@ -466,7 +469,7 @@ func TestRenderer_Render_NonVerbose(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: false, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -500,7 +503,7 @@ func TestRenderer_Render_Verbose(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -537,7 +540,7 @@ func TestRenderer_Render_Error(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: false, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -571,7 +574,7 @@ func TestRenderer_Render_EmptyContent(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -602,7 +605,7 @@ func TestRenderer_Render_MultipleContent(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: false, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -639,7 +642,7 @@ func TestRenderer_Render_EditResult_Verbose(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -688,7 +691,7 @@ func TestRenderer_Render_EditResult_ContextLines(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -731,7 +734,7 @@ func TestRenderer_Render_EditResult_NonVerbose(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: false, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -775,7 +778,7 @@ func TestRenderer_Render_EditResult_EmptyPatch(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -813,7 +816,7 @@ func TestRenderer_Render_StripsSystemReminders(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -856,7 +859,7 @@ func TestRenderer_highlightContent_WithToolContext(t *testing.T) {
 	}
 
 	r := NewRendererWithOptions(
-		WithConfigChecker(mockConfigChecker{noColor: true}),
+		WithConfigProvider(mockConfigProvider{noColor: true}),
 		WithCodeHighlighter(mockHighlighter),
 		WithToolContext(&tools.ToolContext{FilePath: "/path/to/file.go"}),
 	)
@@ -909,7 +912,7 @@ func TestRenderer_highlightContent_WithUnknownExtension(t *testing.T) {
 	}
 
 	r := NewRendererWithOptions(
-		WithConfigChecker(mockConfigChecker{noColor: true}),
+		WithConfigProvider(mockConfigProvider{noColor: true}),
 		WithCodeHighlighter(mockHighlighter),
 		WithToolContext(&tools.ToolContext{FilePath: "/path/to/file.unknown"}), // Unknown extension
 	)
@@ -927,8 +930,8 @@ func TestNewRenderer_Defaults(t *testing.T) {
 	if r.output == nil {
 		t.Error("Expected output to be set")
 	}
-	if r.configChecker == nil {
-		t.Error("Expected configChecker to be set")
+	if r.config == nil {
+		t.Error("Expected config to be set")
 	}
 	if r.styleApplier == nil {
 		t.Error("Expected styleApplier to be set")
@@ -943,14 +946,14 @@ func TestNewRenderer_Defaults(t *testing.T) {
 
 func TestNewRendererWithOptions_AllOptions(t *testing.T) {
 	var buf bytes.Buffer
-	cc := mockConfigChecker{verbose: true}
+	cc := mockConfigProvider{verbose: true}
 	sa := mockStyleApplier{}
 	ch := mockCodeHighlighter{}
 	tc := &tools.ToolContext{ToolName: "Test", FilePath: "/test"}
 
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(cc),
+		WithConfigProvider(cc),
 		WithStyleApplier(sa),
 		WithCodeHighlighter(ch),
 		WithToolContext(tc),
@@ -959,8 +962,8 @@ func TestNewRendererWithOptions_AllOptions(t *testing.T) {
 	if r.output != &buf {
 		t.Error("Expected output to be set via option")
 	}
-	if r.configChecker != cc {
-		t.Error("Expected configChecker to be set via option")
+	if r.config != cc {
+		t.Error("Expected config to be set via option")
 	}
 	if r.toolContext != tc {
 		t.Error("Expected toolContext to be set via option")
@@ -971,7 +974,7 @@ func TestRenderer_Render_EditResult_MultipleHunks(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -1020,7 +1023,7 @@ func TestRenderer_Render_EditResult_SkipsEmptyLines(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -1063,7 +1066,7 @@ func TestRenderer_Render_EditResult_InvalidJSON(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -1095,7 +1098,7 @@ func TestRenderer_Render_LineNumbers(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -1135,7 +1138,7 @@ func TestRenderer_Render_WriteResult_Create(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: false, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -1172,7 +1175,7 @@ func TestRenderer_Render_WriteResult_SingleLine(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: false, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -1205,7 +1208,7 @@ func TestRenderer_Render_WriteResult_NotCreate(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: true, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: true, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -1320,12 +1323,13 @@ func TestRendererSetToolContextMultiple(t *testing.T) {
 	}
 }
 
-func TestDefaultConfigChecker(t *testing.T) {
-	cc := DefaultConfigChecker{}
+func TestDefaultConfigProvider(t *testing.T) {
+	cp := config.DefaultProvider{}
 
 	// These just verify the methods exist and return bools
-	_ = cc.IsVerbose()
-	_ = cc.NoColor()
+	_ = cp.IsVerbose()
+	_ = cp.NoColor()
+	_ = cp.ShowUsage()
 }
 
 func TestDefaultStyleApplier(t *testing.T) {
@@ -1356,7 +1360,7 @@ func TestRenderer_Render_TodoResult(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: false, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
@@ -1416,7 +1420,7 @@ func TestRenderer_Render_TodoResult_EmptyTodos(t *testing.T) {
 	var buf bytes.Buffer
 	r := NewRendererWithOptions(
 		WithOutput(&buf),
-		WithConfigChecker(mockConfigChecker{verbose: false, noColor: true}),
+		WithConfigProvider(mockConfigProvider{verbose: false, noColor: true}),
 		WithStyleApplier(mockStyleApplier{}),
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)

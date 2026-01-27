@@ -24,21 +24,11 @@ type Event struct {
 }
 
 
-// VerboseChecker abstracts verbose flag checking for testability
-type VerboseChecker interface {
-	IsVerbose() bool
-}
-
-// DefaultVerboseChecker uses the actual config package
-type DefaultVerboseChecker struct{}
-
-func (d DefaultVerboseChecker) IsVerbose() bool { return config.Verbose }
-
 // Renderer handles rendering system events
 type Renderer struct {
-	output         io.Writer
-	styleApplier   render.StyleApplier
-	verboseChecker VerboseChecker
+	output       io.Writer
+	styleApplier render.StyleApplier
+	config       config.Provider
 }
 
 // RendererOption is a functional option for configuring a Renderer
@@ -58,19 +48,19 @@ func WithStyleApplier(sa render.StyleApplier) RendererOption {
 	}
 }
 
-// WithVerboseChecker sets a custom verbose checker
-func WithVerboseChecker(vc VerboseChecker) RendererOption {
+// WithConfigProvider sets a custom config provider
+func WithConfigProvider(cp config.Provider) RendererOption {
 	return func(r *Renderer) {
-		r.verboseChecker = vc
+		r.config = cp
 	}
 }
 
 // NewRenderer creates a new system Renderer with default dependencies
 func NewRenderer() *Renderer {
 	return &Renderer{
-		output:         os.Stdout,
-		styleApplier:   render.DefaultStyleApplier{},
-		verboseChecker: DefaultVerboseChecker{},
+		output:       os.Stdout,
+		styleApplier: render.DefaultStyleApplier{},
+		config:       config.DefaultProvider{},
 	}
 }
 
@@ -97,7 +87,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Version:"), event.ClaudeCodeVersion)
 	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("CWD:"), event.CWD)
 	fmt.Fprintf(out, "%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Tools:"), len(event.Tools))
-	if r.verboseChecker.IsVerbose() && len(event.Agents) > 0 {
+	if r.config.IsVerbose() && len(event.Agents) > 0 {
 		fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedRender("Agents:"), strings.Join(event.Agents, ", "))
 	}
 	fmt.Fprintln(out)

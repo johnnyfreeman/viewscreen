@@ -97,7 +97,8 @@ func (m Model) handleStdinClosed() Model {
 
 // handleParseError processes event parsing errors.
 func (m Model) handleParseError(msg events.ParseError) Model {
-	if config.Verbose {
+	cfg := config.DefaultProvider{}
+	if cfg.IsVerbose() {
 		m.content.WriteString("Parse error: " + msg.Line + "\n")
 		m.viewport.SetContent(m.content.String())
 		m.viewport.GotoBottom()

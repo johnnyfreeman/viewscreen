@@ -70,6 +70,7 @@ type Renderer struct {
 	toolHeaderRender ToolHeaderRenderer
 	output           io.Writer
 	width            int
+	config           config.Provider
 }
 
 // defaultToolHeaderRenderer adapts HeaderRenderer to the ToolHeaderRenderer interface
@@ -80,14 +81,16 @@ func defaultToolHeaderRenderer(toolName string, input map[string]any) (string, t
 // NewRenderer creates a new stream Renderer
 func NewRenderer() *Renderer {
 	width := terminal.Width()
+	cfg := config.DefaultProvider{}
 
 	return &Renderer{
 		block:            NewBlockState(),
-		markdownRenderer: render.NewMarkdownRenderer(config.NoColor, width),
-		indicator:        indicator.NewStreamingIndicator(config.NoColor),
+		markdownRenderer: render.NewMarkdownRenderer(cfg.NoColor(), width),
+		indicator:        indicator.NewStreamingIndicator(cfg.NoColor()),
 		toolHeaderRender: defaultToolHeaderRenderer,
 		output:           os.Stdout,
 		width:            width,
+		config:           cfg,
 	}
 }
 
@@ -119,6 +122,13 @@ func WithIndicator(i IndicatorInterface) RendererOption {
 func WithToolHeaderRenderer(f ToolHeaderRenderer) RendererOption {
 	return func(r *Renderer) {
 		r.toolHeaderRender = f
+	}
+}
+
+// WithConfigProvider sets a custom config provider
+func WithConfigProvider(cp config.Provider) RendererOption {
+	return func(r *Renderer) {
+		r.config = cp
 	}
 }
 

@@ -57,7 +57,7 @@ type Event struct {
 // Renderer handles rendering of result events with configurable output and options
 type Renderer struct {
 	output       io.Writer
-	showUsage    func() bool
+	config       config.Provider
 	styleApplier render.StyleApplier
 }
 
@@ -71,10 +71,10 @@ func WithOutput(w io.Writer) RendererOption {
 	}
 }
 
-// WithShowUsage sets the function to check if usage should be shown
-func WithShowUsage(fn func() bool) RendererOption {
+// WithConfigProvider sets a custom config provider
+func WithConfigProvider(cp config.Provider) RendererOption {
 	return func(r *Renderer) {
-		r.showUsage = fn
+		r.config = cp
 	}
 }
 
@@ -89,7 +89,7 @@ func WithStyleApplier(sa render.StyleApplier) RendererOption {
 func NewRenderer(opts ...RendererOption) *Renderer {
 	r := &Renderer{
 		output:       os.Stdout,
-		showUsage:    func() bool { return config.ShowUsage },
+		config:       config.DefaultProvider{},
 		styleApplier: render.DefaultStyleApplier{},
 	}
 	for _, opt := range opts {
@@ -132,7 +132,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 	fmt.Fprintf(out, "%s%s %d\n", sa.OutputContinue(), sa.MutedRender("Turns:"), event.NumTurns)
 	fmt.Fprintf(out, "%s%s $%.4f\n", sa.OutputContinue(), sa.MutedRender("Cost:"), event.TotalCostUSD)
 
-	if r.showUsage() {
+	if r.config.ShowUsage() {
 		fmt.Fprintf(out, "%s%s in=%d out=%d (cache: created=%d read=%d)\n",
 			sa.OutputContinue(),
 			sa.MutedRender("Tokens:"),
