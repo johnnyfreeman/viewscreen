@@ -63,83 +63,38 @@ func (m Model) Init() tea.Cmd {
 	)
 }
 
-// Update handles messages
+// Update handles messages by dispatching to focused handlers.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m, tea.Quit
-		case "up", "k":
-			m.viewport.ScrollUp(1)
-		case "down", "j":
-			m.viewport.ScrollDown(1)
-		case "pgup":
-			m.viewport.HalfPageUp()
-		case "pgdown":
-			m.viewport.HalfPageDown()
-		case "home", "g":
-			m.viewport.GotoTop()
-		case "end", "G":
-			m.viewport.GotoBottom()
+		m, cmd = m.handleKeyMsg(msg)
+		if cmd != nil {
+			return m, cmd // KeyMsg may return tea.Quit
 		}
 
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-
-		// Calculate content width (total - sidebar - border)
-		contentWidth := max(m.width-sidebarWidth-3, 20)
-
-		if !m.ready {
-			// First time setup
-			m.viewport = viewport.New(contentWidth, m.height-2)
-			m.viewport.YPosition = 0
-			m.ready = true
-		} else {
-			m.viewport.Width = contentWidth
-			m.viewport.Height = m.height - 2
-		}
-
-		// Update viewport content
-		m.viewport.SetContent(m.content.String())
+		m = m.handleWindowSizeMsg(msg)
 
 	case spinner.TickMsg:
-		m.spinner, cmd = m.spinner.Update(msg)
-		cmds = append(cmds, cmd)
-		// Refresh viewport to animate spinner for pending tools
-		if m.processor.HasPendingTools() {
-			m.updateViewportWithPendingTools()
+		m, cmd = m.handleSpinnerTick(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 
 	case RawLineMsg:
-		// Parse the line and dispatch appropriate message
-		parsedMsg := ParseEvent(msg.Line)
-		if parsedMsg != nil {
-			// Process the parsed event immediately
-			m, cmd = m.processEvent(parsedMsg)
-			if cmd != nil {
-				cmds = append(cmds, cmd)
-			}
+		m, cmd = m.handleRawLine(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
-		// Continue reading stdin
-		cmds = append(cmds, ReadStdinLine(m.scanner))
 
 	case StdinClosedMsg:
-		m.stdinDone = true
-		// Don't quit immediately - let user view the content
-		// They can press 'q' to quit
+		m = m.handleStdinClosed()
 
 	case events.ParseError:
-		// Optionally show parse errors in verbose mode
-		if config.Verbose {
-			m.content.WriteString("Parse error: " + msg.Line + "\n")
-			m.viewport.SetContent(m.content.String())
-			m.viewport.GotoBottom()
-		}
+		m = m.handleParseError(msg)
 	}
 
 	// Update viewport
