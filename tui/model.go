@@ -13,6 +13,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/state"
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/tools"
 )
 
@@ -33,10 +34,12 @@ type Model struct {
 
 // NewModel creates a new TUI model
 func NewModel() Model {
-	// Initialize spinner with Dot spinner and orange color
+	// Initialize spinner with Dot spinner using theme accent color.
+	// Note: bubbles spinner requires lipgloss.Style, but we use the theme
+	// color to stay consistent with the rest of the application styling.
 	s := spinner.New(
 		spinner.WithSpinner(spinner.Dot),
-		spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("214"))),
+		spinner.WithStyle(lipgloss.NewStyle().Foreground(style.CurrentTheme.Accent)),
 	)
 
 	// Create scanner for stdin with large buffer

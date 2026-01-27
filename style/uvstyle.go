@@ -233,6 +233,18 @@ func BoldText(text string) string {
 	return style.Styled(text)
 }
 
+// AccentText applies accent (purple) foreground color using Ultraviolet.
+// Use this for branded/accent elements when styling needs to be composition-safe.
+func AccentText(text string) string {
+	if noColor {
+		return text
+	}
+	style := &uv.Style{
+		Fg: hexToRGBA(string(CurrentTheme.Accent)),
+	}
+	return style.Styled(text)
+}
+
 // hexToRGBA converts a hex color string to color.RGBA.
 func hexToRGBA(hex string) color.RGBA {
 	c, err := colorful.Hex(hex)
