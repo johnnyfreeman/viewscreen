@@ -69,9 +69,6 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 	}
 	numWidth := len(fmt.Sprintf("%d", maxLine))
 
-	// Get language for syntax highlighting
-	lang := render.DetectLanguageFromPath(editResult.FilePath)
-
 	// Separator character for line numbers
 	sep := er.styleApplier.LineNumberSepRender("│")
 
@@ -129,26 +126,15 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 			lineNums := er.styleApplier.LineNumberRender(lineNum)
 
 			// Syntax highlight with appropriate background for diff lines
+			// HighlightFileWithBg uses the filename for language detection (via chroma)
 			var styled string
 			switch prefix {
 			case '+':
-				if lang != "" {
-					styled = er.highlighter.HighlightWithBg(content, lang, er.styleApplier.DiffAddBg())
-				} else {
-					styled = er.styleApplier.DiffAddRender(content)
-				}
+				styled = er.highlighter.HighlightFileWithBg(content, editResult.FilePath, er.styleApplier.DiffAddBg())
 			case '-':
-				if lang != "" {
-					styled = er.highlighter.HighlightWithBg(content, lang, er.styleApplier.DiffRemoveBg())
-				} else {
-					styled = er.styleApplier.DiffRemoveRender(content)
-				}
+				styled = er.highlighter.HighlightFileWithBg(content, editResult.FilePath, er.styleApplier.DiffRemoveBg())
 			default:
-				if lang != "" {
-					styled = er.highlighter.Highlight(content, lang)
-				} else {
-					styled = content
-				}
+				styled = er.highlighter.HighlightFile(content, editResult.FilePath)
 			}
 
 			// Output with separators: ⎿ 123 │ + code

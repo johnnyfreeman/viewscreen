@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
@@ -161,55 +160,20 @@ func (c *CodeRenderer) HighlightWithBg(code, language string, bgColor lipgloss.C
 	return c.formatWith(code, lexer, bgFormatter{bgColor: bgColor})
 }
 
-// DetectLanguageFromPath returns a language hint from a file path
-func DetectLanguageFromPath(path string) string {
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".go":
-		return "go"
-	case ".py":
-		return "python"
-	case ".js":
-		return "javascript"
-	case ".ts":
-		return "typescript"
-	case ".jsx":
-		return "jsx"
-	case ".tsx":
-		return "tsx"
-	case ".rb":
-		return "ruby"
-	case ".rs":
-		return "rust"
-	case ".java":
-		return "java"
-	case ".c", ".h":
-		return "c"
-	case ".cpp", ".cc", ".hpp":
-		return "cpp"
-	case ".cs":
-		return "csharp"
-	case ".php":
-		return "php"
-	case ".sh", ".bash":
-		return "bash"
-	case ".sql":
-		return "sql"
-	case ".json":
-		return "json"
-	case ".yaml", ".yml":
-		return "yaml"
-	case ".xml":
-		return "xml"
-	case ".html", ".htm":
-		return "html"
-	case ".css":
-		return "css"
-	case ".scss":
-		return "scss"
-	case ".md":
-		return "markdown"
-	default:
-		return ""
+// HighlightFileWithBg highlights code with a background color, detecting language from filename.
+// Returns the original code if no lexer can be determined.
+func (c *CodeRenderer) HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string {
+	if c.shouldSkip(code) {
+		return code
 	}
+
+	lexer := lexers.Match(filename)
+	if lexer == nil {
+		lexer = lexers.Analyse(code)
+	}
+	if lexer == nil {
+		return code
+	}
+
+	return c.formatWith(code, lexer, bgFormatter{bgColor: bgColor})
 }

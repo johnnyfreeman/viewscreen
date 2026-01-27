@@ -443,6 +443,9 @@ func (m mockCodeHighlighter) HighlightFile(code, filename string) string {
 func (m mockCodeHighlighter) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
 	return code
 }
+func (m mockCodeHighlighter) HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string {
+	return code
+}
 
 func TestRenderer_SetToolContext(t *testing.T) {
 	r := NewRendererWithOptions(
@@ -841,13 +844,13 @@ func TestRenderer_Render_StripsSystemReminders(t *testing.T) {
 }
 
 func TestRenderer_highlightContent_WithToolContext(t *testing.T) {
-	highlightCalled := false
-	var capturedLang string
+	highlightFileCalled := false
+	var capturedFilename string
 
 	mockHighlighter := &trackingHighlighter{
-		highlightFunc: func(code, language string) string {
-			highlightCalled = true
-			capturedLang = language
+		highlightFileFunc: func(code, filename string) string {
+			highlightFileCalled = true
+			capturedFilename = filename
 			return code
 		},
 	}
@@ -860,11 +863,11 @@ func TestRenderer_highlightContent_WithToolContext(t *testing.T) {
 
 	r.highlightContent("package main")
 
-	if !highlightCalled {
-		t.Error("Expected Highlight to be called")
+	if !highlightFileCalled {
+		t.Error("Expected HighlightFile to be called")
 	}
-	if capturedLang != "go" {
-		t.Errorf("Expected language 'go', got %q", capturedLang)
+	if capturedFilename != "/path/to/file.go" {
+		t.Errorf("Expected filename '/path/to/file.go', got %q", capturedFilename)
 	}
 }
 
@@ -891,7 +894,11 @@ func (t *trackingHighlighter) HighlightWithBg(code, language string, bgColor lip
 	return code
 }
 
-func TestRenderer_highlightContent_FallsBackToHighlightFile(t *testing.T) {
+func (t *trackingHighlighter) HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string {
+	return code
+}
+
+func TestRenderer_highlightContent_WithUnknownExtension(t *testing.T) {
 	highlightFileCalled := false
 
 	mockHighlighter := &trackingHighlighter{
@@ -910,7 +917,7 @@ func TestRenderer_highlightContent_FallsBackToHighlightFile(t *testing.T) {
 	r.highlightContent("some content")
 
 	if !highlightFileCalled {
-		t.Error("Expected HighlightFile to be called as fallback")
+		t.Error("Expected HighlightFile to be called")
 	}
 }
 

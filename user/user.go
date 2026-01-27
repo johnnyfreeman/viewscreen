@@ -67,6 +67,7 @@ type CodeHighlighter interface {
 	Highlight(code, language string) string
 	HighlightFile(code, filename string) string
 	HighlightWithBg(code, language string, bgColor lipgloss.Color) string
+	HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string
 }
 
 // DefaultCodeHighlighter uses the actual render package
@@ -90,6 +91,10 @@ func (d *DefaultCodeHighlighter) HighlightFile(code, filename string) string {
 
 func (d *DefaultCodeHighlighter) HighlightWithBg(code, language string, bgColor lipgloss.Color) string {
 	return d.renderer.HighlightWithBg(code, language, bgColor)
+}
+
+func (d *DefaultCodeHighlighter) HighlightFileWithBg(code, filename string, bgColor lipgloss.Color) string {
+	return d.renderer.HighlightFileWithBg(code, filename, bgColor)
 }
 
 // MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
@@ -320,15 +325,7 @@ func (r *Renderer) renderSyntheticMessageTo(out *render.Output, event Event) {
 
 // highlightContent applies syntax highlighting based on context
 func (r *Renderer) highlightContent(content string) string {
-	// Try to detect language from the last tool's file path
-	if r.toolContext != nil && r.toolContext.FilePath != "" {
-		lang := render.DetectLanguageFromPath(r.toolContext.FilePath)
-		if lang != "" {
-			return r.highlighter.Highlight(content, lang)
-		}
-	}
-
-	// Try to auto-detect from content
+	// Use file path for language detection (chroma handles this internally)
 	path := ""
 	if r.toolContext != nil {
 		path = r.toolContext.FilePath
