@@ -14,248 +14,169 @@ import (
 	"github.com/lucasb-eyer/go-colorful"
 )
 
+// TextStyle defines a text style with foreground color and optional attributes.
+// This allows defining styles declaratively and applying them consistently.
+type TextStyle struct {
+	// FgColor is either a theme Color (hex string) or a direct color.RGBA.
+	// Use ColorFromTheme() or ColorRGBA() to set this.
+	fgHex  *Color      // Hex color from theme
+	fgRGBA *color.RGBA // Direct RGBA color
+
+	Attrs     uint8          // uv.AttrBold, uv.AttrItalic, etc.
+	Underline ansi.Underline // Underline style (e.g., ansi.UnderlineDotted)
+}
+
+// styled applies a TextStyle to text. This is the core styling function.
+func styled(text string, s TextStyle) string {
+	if noColor {
+		return text
+	}
+
+	var fg color.RGBA
+	if s.fgHex != nil {
+		fg = hexToRGBA(string(*s.fgHex))
+	} else if s.fgRGBA != nil {
+		fg = *s.fgRGBA
+	}
+
+	style := &uv.Style{
+		Fg:        fg,
+		Attrs:     s.Attrs,
+		Underline: s.Underline,
+	}
+	return style.Styled(text)
+}
+
+// themeStyle creates a TextStyle from a theme color.
+func themeStyle(c Color, attrs uint8) TextStyle {
+	return TextStyle{fgHex: &c, Attrs: attrs}
+}
+
+// rgbaStyle creates a TextStyle from an RGBA color.
+func rgbaStyle(c color.RGBA, attrs uint8) TextStyle {
+	return TextStyle{fgRGBA: &c, Attrs: attrs}
+}
+
+// Common RGBA colors for sidebar (matching ANSI 24x colors).
+var (
+	colorANSI245 = color.RGBA{R: 142, G: 142, B: 142, A: 255} // Gray, ANSI 245
+	colorANSI255 = color.RGBA{R: 238, G: 238, B: 238, A: 255} // Bright white, ANSI 255
+	colorANSI241 = color.RGBA{R: 102, G: 102, B: 102, A: 255} // Dim gray, ANSI 241
+	colorANSI242 = color.RGBA{R: 108, G: 108, B: 108, A: 255} // Dark gray, ANSI 242
+)
+
+// Semantic text styling functions using theme colors.
+
 // MutedDottedUnderline applies both muted foreground color and dotted underline
-// to text in a single ANSI sequence. This avoids the broken styling that occurs
-// when DottedUnderline() output is passed to Muted.Render().
+// to text in a single ANSI sequence.
 func MutedDottedUnderline(text string) string {
 	if noColor {
 		return text
 	}
-
-	style := &uv.Style{
-		Fg:        hexToRGBA(string(CurrentTheme.FgMuted)),
+	return styled(text, TextStyle{
+		fgHex:     &CurrentTheme.FgMuted,
 		Underline: ansi.UnderlineDotted,
-	}
-	return style.Styled(text)
+	})
 }
 
-// SuccessText applies success (green) foreground color using Ultraviolet.
-// Use this instead of lipgloss when the text might be composed with other styles.
+// SuccessText applies success (green) foreground color.
 func SuccessText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: hexToRGBA(string(CurrentTheme.Success)),
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.Success, 0))
 }
 
-// WarningText applies warning (yellow) foreground color using Ultraviolet.
-// Use this instead of lipgloss when the text might be composed with other styles.
+// WarningText applies warning (yellow) foreground color.
 func WarningText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: hexToRGBA(string(CurrentTheme.Warning)),
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.Warning, 0))
 }
 
-// MutedText applies muted foreground color using Ultraviolet.
-// Use this instead of lipgloss when the text might be composed with other styles.
+// MutedText applies muted foreground color.
 func MutedText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: hexToRGBA(string(CurrentTheme.FgMuted)),
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.FgMuted, 0))
 }
 
-// ErrorText applies error (red) foreground color using Ultraviolet.
-// Use this instead of lipgloss when the text might be composed with other styles.
+// ErrorText applies error (red) foreground color.
 func ErrorText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: hexToRGBA(string(CurrentTheme.Error)),
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.Error, 0))
 }
 
-// ErrorBoldText applies error (red) foreground color with bold using Ultraviolet.
-// Use this for error headers when styling needs to be composition-safe.
+// ErrorBoldText applies error (red) foreground color with bold.
 func ErrorBoldText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg:    hexToRGBA(string(CurrentTheme.Error)),
-		Attrs: uv.AttrBold,
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.Error, uv.AttrBold))
 }
 
-// SuccessBoldText applies success (green) foreground color with bold using Ultraviolet.
-// Use this for success headers when styling needs to be composition-safe.
+// SuccessBoldText applies success (green) foreground color with bold.
 func SuccessBoldText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg:    hexToRGBA(string(CurrentTheme.Success)),
-		Attrs: uv.AttrBold,
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.Success, uv.AttrBold))
 }
 
-// Sidebar styling functions using Ultraviolet for proper style/content separation.
-// These use specific color codes matching the original lipgloss SidebarStyles.
-
-// SidebarHeaderText applies sidebar header/label color (gray-ish, #245).
-func SidebarHeaderText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: color.RGBA{R: 142, G: 142, B: 142, A: 255}, // ANSI 245 equivalent
-	}
-	return style.Styled(text)
-}
-
-// SidebarValueText applies sidebar value color (bright white-ish, #255).
-func SidebarValueText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: color.RGBA{R: 238, G: 238, B: 238, A: 255}, // ANSI 255 equivalent
-	}
-	return style.Styled(text)
-}
-
-// SidebarTodoPendingText applies pending todo color (dim gray, #241).
-func SidebarTodoPendingText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: color.RGBA{R: 102, G: 102, B: 102, A: 255}, // ANSI 241 equivalent
-	}
-	return style.Styled(text)
-}
-
-// SidebarTodoActiveText applies active/in-progress todo color (white, #255).
-func SidebarTodoActiveText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: color.RGBA{R: 238, G: 238, B: 238, A: 255}, // ANSI 255 equivalent
-	}
-	return style.Styled(text)
-}
-
-// SidebarTodoDoneText applies completed todo color (muted, #245).
-func SidebarTodoDoneText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: color.RGBA{R: 142, G: 142, B: 142, A: 255}, // ANSI 245 equivalent
-	}
-	return style.Styled(text)
-}
-
-// SidebarPromptText applies prompt text style (italic, gray #245).
-func SidebarPromptText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg:    color.RGBA{R: 142, G: 142, B: 142, A: 255}, // ANSI 245 equivalent
-		Attrs: uv.AttrItalic,
-	}
-	return style.Styled(text)
-}
-
-// SidebarDecoText applies decoration text color (dark gray, #242).
-func SidebarDecoText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: color.RGBA{R: 108, G: 108, B: 108, A: 255}, // ANSI 242 equivalent
-	}
-	return style.Styled(text)
-}
-
-// LineNumberText applies line number styling (subtle foreground) using Ultraviolet.
-// Use this for diff/edit line numbers to avoid escape sequence conflicts.
-func LineNumberText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: hexToRGBA(string(CurrentTheme.FgSubtle)),
-	}
-	return style.Styled(text)
-}
-
-// LineNumberSepText applies line number separator styling (info/cyan foreground) using Ultraviolet.
-// Use this for the separator between line numbers and content.
-func LineNumberSepText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: hexToRGBA(string(CurrentTheme.Info)),
-	}
-	return style.Styled(text)
-}
-
-// InfoBoldText applies info (cyan) foreground color with bold using Ultraviolet.
-// Use this for info headers when styling needs to be composition-safe.
+// InfoBoldText applies info (cyan) foreground color with bold.
 func InfoBoldText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg:    hexToRGBA(string(CurrentTheme.Info)),
-		Attrs: uv.AttrBold,
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.Info, uv.AttrBold))
 }
 
-// BoldText applies bold styling using Ultraviolet without any color.
-// Use this for bold text when styling needs to be composition-safe.
+// BoldText applies bold styling without any color.
 func BoldText(text string) string {
 	if noColor {
 		return text
 	}
-	style := &uv.Style{
-		Attrs: uv.AttrBold,
-	}
-	return style.Styled(text)
+	return styled(text, TextStyle{Attrs: uv.AttrBold})
 }
 
-// AccentText applies accent (purple) foreground color using Ultraviolet.
-// Use this for branded/accent elements when styling needs to be composition-safe.
+// AccentText applies accent (purple) foreground color.
 func AccentText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: hexToRGBA(string(CurrentTheme.Accent)),
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.Accent, 0))
 }
 
-// SpinnerText applies spinner styling (accent color) using Ultraviolet.
-// Use this to style bubbles spinner output instead of lipgloss.Style,
-// ensuring proper style/content separation and avoiding escape sequence conflicts.
+// SpinnerText applies spinner styling (accent color).
 func SpinnerText(text string) string {
-	if noColor {
-		return text
-	}
-	style := &uv.Style{
-		Fg: hexToRGBA(string(CurrentTheme.Accent)),
-	}
-	return style.Styled(text)
+	return styled(text, themeStyle(CurrentTheme.Accent, 0))
+}
+
+// LineNumberText applies line number styling (subtle foreground).
+func LineNumberText(text string) string {
+	return styled(text, themeStyle(CurrentTheme.FgSubtle, 0))
+}
+
+// LineNumberSepText applies line number separator styling (info/cyan foreground).
+func LineNumberSepText(text string) string {
+	return styled(text, themeStyle(CurrentTheme.Info, 0))
+}
+
+// Sidebar styling functions using fixed RGBA colors.
+
+// SidebarHeaderText applies sidebar header/label color (gray, ANSI 245).
+func SidebarHeaderText(text string) string {
+	return styled(text, rgbaStyle(colorANSI245, 0))
+}
+
+// SidebarValueText applies sidebar value color (bright white, ANSI 255).
+func SidebarValueText(text string) string {
+	return styled(text, rgbaStyle(colorANSI255, 0))
+}
+
+// SidebarTodoPendingText applies pending todo color (dim gray, ANSI 241).
+func SidebarTodoPendingText(text string) string {
+	return styled(text, rgbaStyle(colorANSI241, 0))
+}
+
+// SidebarTodoActiveText applies active/in-progress todo color (white, ANSI 255).
+func SidebarTodoActiveText(text string) string {
+	return styled(text, rgbaStyle(colorANSI255, 0))
+}
+
+// SidebarTodoDoneText applies completed todo color (muted, ANSI 245).
+func SidebarTodoDoneText(text string) string {
+	return styled(text, rgbaStyle(colorANSI245, 0))
+}
+
+// SidebarPromptText applies prompt text style (italic, gray ANSI 245).
+func SidebarPromptText(text string) string {
+	return styled(text, rgbaStyle(colorANSI245, uv.AttrItalic))
+}
+
+// SidebarDecoText applies decoration text color (dark gray, ANSI 242).
+func SidebarDecoText(text string) string {
+	return styled(text, rgbaStyle(colorANSI242, 0))
 }
 
 // hexToRGBA converts a hex color string to color.RGBA.
