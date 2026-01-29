@@ -242,3 +242,10 @@ func (r *Renderer) InToolUseBlock() bool {
 func (r *Renderer) CurrentBlockType() string {
 	return r.block.Type().String()
 }
+
+// SetWidth updates the word-wrap width of the markdown renderer.
+// This is called when the viewport resizes.
+func (r *Renderer) SetWidth(width int) {
+	r.width = width
+	r.markdownRenderer.SetWidth(width)
+}

@@ -11,8 +11,9 @@ import (
 
 // mockMarkdownRenderer is a test double for MarkdownRenderer
 type mockMarkdownRenderer struct {
-	renderCalls []string
-	returnValue string
+	renderCalls   []string
+	returnValue   string
+	setWidthCalls []int
 }
 
 func (m *mockMarkdownRenderer) Render(content string) string {
@@ -21,6 +22,10 @@ func (m *mockMarkdownRenderer) Render(content string) string {
 		return m.returnValue
 	}
 	return content
+}
+
+func (m *mockMarkdownRenderer) SetWidth(width int) {
+	m.setWidthCalls = append(m.setWidthCalls, width)
 }
 
 // mockIndicator is a test double for IndicatorInterface

@@ -32,3 +32,10 @@ func NewRendererSet() *RendererSet {
 		PendingTools: tools.NewToolUseTracker(),
 	}
 }
+
+// SetWidth updates the word-wrap width for all markdown renderers.
+// This is called when the viewport resizes.
+func (rs *RendererSet) SetWidth(width int) {
+	rs.Stream.SetWidth(width)
+	rs.Assistant.SetWidth(width)
+}

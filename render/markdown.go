@@ -82,6 +82,43 @@ func (m *MarkdownRenderer) RenderMuted(content string) string {
 	return strings.TrimSpace(rendered) + "\n"
 }
 
+// SetWidth recreates the renderers with a new word-wrap width.
+// This is called when the viewport resizes.
+func (m *MarkdownRenderer) SetWidth(width int) {
+	if m.noColor {
+		r, err := glamour.NewTermRenderer(
+			glamour.WithStylePath("notty"),
+			glamour.WithWordWrap(width),
+		)
+		if err == nil {
+			m.full = r
+			m.muted = r
+		}
+		return
+	}
+
+	// Full styled renderer
+	full, err := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(width),
+	)
+	if err == nil {
+		m.full = full
+	}
+
+	// Muted renderer for secondary content
+	mutedStyle := getMutedStyle()
+	muted, err := glamour.NewTermRenderer(
+		glamour.WithStyles(mutedStyle),
+		glamour.WithWordWrap(width),
+	)
+	if err == nil {
+		m.muted = muted
+	} else {
+		m.muted = m.full
+	}
+}
+
 // getMutedStyle returns a glamour style config with muted colors
 func getMutedStyle() ansi.StyleConfig {
 	// Start with a dark base style and tone down the colors

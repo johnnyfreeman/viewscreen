@@ -146,3 +146,9 @@ func (r *Renderer) RenderToString(event Event, inTextBlock, inToolUseBlock bool)
 	r.renderTo(out, event, inTextBlock, inToolUseBlock)
 	return out.String()
 }
+
+// SetWidth updates the word-wrap width of the markdown renderer.
+// This is called when the viewport resizes.
+func (r *Renderer) SetWidth(width int) {
+	r.markdownRenderer.SetWidth(width)
+}

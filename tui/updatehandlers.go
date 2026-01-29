@@ -90,6 +90,9 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 		m.viewport.SetHeight(contentHeight)
 	}
 
+	// Update markdown renderer width so text reflows to fit visible viewport
+	m.processor.SetWidth(contentWidth)
+
 	// Update viewport content
 	m.viewport.SetContent(m.content.String())
 

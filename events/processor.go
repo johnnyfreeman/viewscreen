@@ -51,6 +51,12 @@ func (p *EventProcessor) Renderers() *RendererSet {
 	return p.renderers
 }
 
+// SetWidth updates the word-wrap width for all markdown renderers.
+// This is called when the viewport resizes.
+func (p *EventProcessor) SetWidth(width int) {
+	p.renderers.SetWidth(width)
+}
+
 // Process handles a parsed event and returns the rendered result.
 func (p *EventProcessor) Process(event Event) ProcessResult {
 	switch e := event.(type) {

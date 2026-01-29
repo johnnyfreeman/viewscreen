@@ -5,4 +5,5 @@ package types
 // dependency injection of the markdown rendering implementation.
 type MarkdownRenderer interface {
 	Render(content string) string
+	SetWidth(width int)
 }

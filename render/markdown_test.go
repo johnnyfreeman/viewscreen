@@ -302,6 +302,58 @@ func TestMarkdownRenderer_WidthRespected(t *testing.T) {
 	}
 }
 
+func TestMarkdownRenderer_SetWidth(t *testing.T) {
+	// Test that SetWidth changes the word-wrap width
+	longLine := "This is a very long line that should be wrapped when using a narrow terminal width setting in the markdown renderer"
+
+	mr := NewMarkdownRenderer(true, 200)
+	wideResult := mr.Render(longLine)
+
+	// Now set to narrow width
+	mr.SetWidth(40)
+	narrowResult := mr.Render(longLine)
+
+	// Narrow result should have more lines due to wrapping
+	narrowLines := strings.Count(narrowResult, "\n")
+	wideLines := strings.Count(wideResult, "\n")
+
+	if narrowLines <= wideLines {
+		t.Errorf("after SetWidth(40), should produce more lines than wide width\nnarrow lines: %d, wide lines: %d", narrowLines, wideLines)
+	}
+}
+
+func TestMarkdownRenderer_SetWidth_NoColor(t *testing.T) {
+	// Test that SetWidth works in no-color mode
+	longLine := "This is a very long line that needs wrapping"
+
+	mr := NewMarkdownRenderer(true, 200)
+	wideResult := mr.Render(longLine)
+
+	mr.SetWidth(20)
+	narrowResult := mr.Render(longLine)
+
+	// After SetWidth, rendering should use new width
+	if strings.Count(narrowResult, "\n") <= strings.Count(wideResult, "\n") {
+		t.Error("SetWidth should affect line wrapping in no-color mode")
+	}
+}
+
+func TestMarkdownRenderer_SetWidth_WithColor(t *testing.T) {
+	// Test that SetWidth works with color enabled
+	longLine := "This is a very long line that needs wrapping when colors are enabled"
+
+	mr := NewMarkdownRenderer(false, 200)
+	wideResult := mr.Render(longLine)
+
+	mr.SetWidth(30)
+	narrowResult := mr.Render(longLine)
+
+	// After SetWidth, rendering should use new width
+	if strings.Count(narrowResult, "\n") <= strings.Count(wideResult, "\n") {
+		t.Error("SetWidth should affect line wrapping with color enabled")
+	}
+}
+
 func TestGetMutedStyle(t *testing.T) {
 	// Test that getMutedStyle returns a valid style config
 	style := getMutedStyle()
