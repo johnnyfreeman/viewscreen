@@ -7,17 +7,25 @@ import (
 )
 
 const (
-	// Bullet is the prefix for tool/action lines
-	Bullet = "● "
+	// Bullet is the icon for tool/action lines (without trailing space)
+	Bullet = "●"
 	// OutputPrefix is the prefix for tool output lines
 	OutputPrefix = "  ⎿  "
 	// OutputContinue is the prefix for continued output lines
 	OutputContinue = "     "
 
-	// Nested prefixes for sub-agent tool calls
-	NestedPrefix         = "  │ "     // Prefix for nested tool headers (before bullet)
-	NestedOutputPrefix   = "  │   ⎿  " // Prefix for nested tool results
-	NestedOutputContinue = "  │      " // Continued nested output
+	// Nested prefix pipe character (unstyled, for composition)
+	nestedPipe = "│"
+)
+
+var (
+	// NestedPrefix is the prefix for nested tool headers (before bullet).
+	// The pipe character is styled with subtle/dark gray color.
+	NestedPrefix string
+	// NestedOutputPrefix is the prefix for nested tool results.
+	NestedOutputPrefix string
+	// NestedOutputContinue is the prefix for continued nested output.
+	NestedOutputContinue string
 )
 
 var (
@@ -46,6 +54,9 @@ func Init(disableColor bool) {
 		lipgloss.Writer.Profile = colorprofile.TrueColor
 	}
 
+	// Initialize nested prefixes with styled pipe character
+	initNestedPrefixes()
+
 	if noColor {
 		DiffAddBg = ""
 		DiffRemoveBg = ""
@@ -55,6 +66,14 @@ func Init(disableColor bool) {
 	t := CurrentTheme
 	DiffAddBg = t.DiffAddBg
 	DiffRemoveBg = t.DiffRemoveBg
+}
+
+// initNestedPrefixes initializes the nested prefix strings with styled pipe characters.
+func initNestedPrefixes() {
+	styledPipe := SubtleText(nestedPipe)
+	NestedPrefix = "  " + styledPipe + " "
+	NestedOutputPrefix = "  " + styledPipe + "   ⎿  "
+	NestedOutputContinue = "  " + styledPipe + "      "
 }
 
 // NoColor returns whether color output is disabled

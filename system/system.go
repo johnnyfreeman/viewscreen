@@ -8,6 +8,7 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
@@ -75,14 +76,7 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 
 // renderTo writes the system event to the given output
 func (r *Renderer) renderTo(out *render.Output, event Event) {
-	// Use gradient for session header when color is enabled
-	header := fmt.Sprintf("%sSession Started", r.styleApplier.Bullet())
-	if !r.styleApplier.NoColor() {
-		header = r.styleApplier.ApplyThemeBoldGradient(header)
-	} else {
-		header = r.styleApplier.SessionHeaderRender(header)
-	}
-	fmt.Fprintln(out, header)
+	fmt.Fprintln(out, style.BulletHeader("Session Started"))
 	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedText("Model:"), event.Model)
 	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Version:"), event.ClaudeCodeVersion)
 	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("CWD:"), event.CWD)

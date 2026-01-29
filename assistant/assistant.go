@@ -109,7 +109,7 @@ func NewRendererWithOptions(opts ...RendererOption) *Renderer {
 // This eliminates duplication between Render and RenderToString.
 func (r *Renderer) renderTo(out *render.Output, event Event, inTextBlock, inToolUseBlock bool) {
 	if event.Error != "" {
-		fmt.Fprintln(out, style.ApplyErrorGradient(style.Bullet+"Error"))
+		fmt.Fprintln(out, style.BulletErrorHeader("Error"))
 		fmt.Fprintf(out, "%s%s\n", style.OutputPrefix, style.ErrorText(event.Error))
 	}
 

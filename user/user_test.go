@@ -1312,7 +1312,6 @@ func TestDefaultStyleApplier(t *testing.T) {
 	_ = sa.SuccessBoldText("test")
 	_ = sa.OutputPrefix()
 	_ = sa.OutputContinue()
-	_ = sa.Bullet()
 	_ = sa.LineNumberRender("test")
 	_ = sa.LineNumberSepRender("│")
 	_ = sa.DiffAddBg()

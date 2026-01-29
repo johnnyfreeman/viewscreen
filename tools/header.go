@@ -16,9 +16,10 @@ import (
 // It provides a cleaner API than the individual RenderToolUse/RenderToolHeader functions,
 // consolidating nested/non-nested and icon variations into a single composable type.
 type HeaderRenderer struct {
-	output io.Writer
-	icon   string
-	prefix string
+	output         io.Writer
+	icon           string
+	prefix         string
+	iconInGradient bool // true when icon should be included in the gradient (default bullet)
 }
 
 // HeaderRendererOption configures a HeaderRenderer.
@@ -32,9 +33,11 @@ func WithOutput(w io.Writer) HeaderRendererOption {
 }
 
 // WithIcon sets the icon prefix (e.g., spinner frames).
+// Custom icons are rendered separately from the gradient (assumed pre-styled).
 func WithIcon(icon string) HeaderRendererOption {
 	return func(r *HeaderRenderer) {
 		r.icon = icon
+		r.iconInGradient = false
 	}
 }
 
@@ -55,9 +58,10 @@ func WithPrefix(prefix string) HeaderRendererOption {
 // NewHeaderRenderer creates a HeaderRenderer with the given options.
 func NewHeaderRenderer(opts ...HeaderRendererOption) *HeaderRenderer {
 	r := &HeaderRenderer{
-		output: os.Stdout,
-		icon:   style.Bullet,
-		prefix: "",
+		output:         os.Stdout,
+		icon:           style.Bullet,
+		prefix:         "",
+		iconInGradient: true, // Default bullet is included in gradient
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -104,12 +108,20 @@ func (r *HeaderRenderer) renderTo(out *render.Output, toolName string, input map
 	}
 
 	// Build header: [prefix][icon] ToolName args
-	// Icon is printed separately since it may already have styling (e.g., spinner)
 	icon := r.icon
 	if icon == "" {
 		icon = style.Bullet
 	}
-	fmt.Fprint(out, r.prefix+icon+" "+style.ApplyThemeBoldGradient(toolName))
+
+	// Render prefix, icon, and tool name
+	fmt.Fprint(out, r.prefix)
+	if r.iconInGradient {
+		// Include icon in gradient (default bullet case)
+		fmt.Fprint(out, style.ApplyThemeBoldGradient(icon+" "+toolName))
+	} else {
+		// Icon is pre-styled (e.g., spinner frames), print separately
+		fmt.Fprint(out, icon+" "+style.ApplyThemeBoldGradient(toolName))
+	}
 
 	// Style args: file paths get muted color + dotted underline (combined in single
 	// ANSI sequence via Ultraviolet), other args get just muted color

@@ -114,3 +114,21 @@ func ApplySuccessGradient(text string) string {
 func ApplyErrorGradient(text string) string {
 	return ApplyBoldGradient(text, CurrentTheme.ErrorGradientStart, CurrentTheme.ErrorGradientEnd)
 }
+
+// BulletHeader returns a gradient-styled header with bullet prefix.
+// Format: "● text" with theme gradient applied.
+func BulletHeader(text string) string {
+	return ApplyThemeBoldGradient(Bullet + " " + text)
+}
+
+// BulletErrorHeader returns an error-styled header with bullet prefix.
+// Format: "● text" with error gradient applied.
+func BulletErrorHeader(text string) string {
+	return ApplyErrorGradient(Bullet + " " + text)
+}
+
+// BulletSuccessHeader returns a success-styled header with bullet prefix.
+// Format: "● text" with success gradient applied.
+func BulletSuccessHeader(text string) string {
+	return ApplySuccessGradient(Bullet + " " + text)
+}

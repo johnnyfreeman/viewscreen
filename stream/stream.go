@@ -188,7 +188,7 @@ func (r *Renderer) renderTo(out *render.Output, event Event, showIndicator bool)
 				out.WriteString(str)
 			} else {
 				// Fallback if JSON parse fails
-				fmt.Fprintln(out, style.ApplyThemeBoldGradient(style.Bullet+r.block.ToolName()))
+				fmt.Fprintln(out, style.BulletHeader(r.block.ToolName()))
 			}
 		}
 

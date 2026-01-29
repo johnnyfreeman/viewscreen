@@ -413,8 +413,8 @@ func TestNoColorThemeColors(t *testing.T) {
 
 func TestStyleConstants(t *testing.T) {
 	// Test that style constants are defined correctly
-	if Bullet != "● " {
-		t.Errorf("Bullet = %q, want %q", Bullet, "● ")
+	if Bullet != "●" {
+		t.Errorf("Bullet = %q, want %q", Bullet, "●")
 	}
 	if OutputPrefix != "  ⎿  " {
 		t.Errorf("OutputPrefix = %q, want %q", OutputPrefix, "  ⎿  ")

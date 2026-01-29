@@ -132,9 +132,14 @@ func SpinnerText(text string) string {
 	return styled(text, themeStyle(CurrentTheme.Accent, 0))
 }
 
+// SubtleText applies subtle foreground color (dark gray).
+func SubtleText(text string) string {
+	return styled(text, themeStyle(CurrentTheme.FgSubtle, 0))
+}
+
 // LineNumberText applies line number styling (subtle foreground).
 func LineNumberText(text string) string {
-	return styled(text, themeStyle(CurrentTheme.FgSubtle, 0))
+	return SubtleText(text)
 }
 
 // LineNumberSepText applies line number separator styling (info/cyan foreground).

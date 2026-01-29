@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/testutil"
 )
 
@@ -81,6 +82,9 @@ func TestNewRendererWithOptions(t *testing.T) {
 }
 
 func TestRenderer_Render_Success(t *testing.T) {
+	style.Init(true) // No color for predictable output
+	defer style.Init(false)
+
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
@@ -125,6 +129,9 @@ func TestRenderer_Render_Success(t *testing.T) {
 }
 
 func TestRenderer_Render_Error(t *testing.T) {
+	style.Init(true) // No color for predictable output
+	defer style.Init(false)
+
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
@@ -311,6 +318,9 @@ func TestRenderer_Render_NoPermissionDenials(t *testing.T) {
 }
 
 func TestRenderer_Render_ZeroValues(t *testing.T) {
+	style.Init(true) // No color for predictable output
+	defer style.Init(false)
+
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
@@ -489,11 +499,13 @@ func TestEvent_Fields(t *testing.T) {
 }
 
 func TestRenderer_Render_WithColor(t *testing.T) {
+	style.Init(false) // Enable color
+
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
 		WithConfigProvider(testutil.MockConfigProvider{ShowUsageVal: false}),
-		WithStyleApplier(testutil.MockStyleApplier{NoColorVal: false}), // Color enabled
+		WithStyleApplier(testutil.MockStyleApplier{NoColorVal: false}),
 	)
 
 	event := Event{
@@ -507,19 +519,22 @@ func TestRenderer_Render_WithColor(t *testing.T) {
 	r.Render(event)
 
 	output := buf.String()
+	stripped := testutil.StripANSI(output)
 
-	// Should contain Session Complete (with or without ANSI codes)
-	if !strings.Contains(output, "Session Complete") {
-		t.Error("expected 'Session Complete' in output")
+	// Should contain Session Complete (strip ANSI to verify text content)
+	if !strings.Contains(stripped, "Session Complete") {
+		t.Errorf("expected 'Session Complete' in output, got: %s", stripped)
 	}
 }
 
 func TestRenderer_Render_ErrorWithColor(t *testing.T) {
+	style.Init(false) // Enable color
+
 	buf := &bytes.Buffer{}
 	r := NewRenderer(
 		WithOutput(buf),
 		WithConfigProvider(testutil.MockConfigProvider{ShowUsageVal: false}),
-		WithStyleApplier(testutil.MockStyleApplier{NoColorVal: false}), // Color enabled
+		WithStyleApplier(testutil.MockStyleApplier{NoColorVal: false}),
 	)
 
 	event := Event{
@@ -534,10 +549,11 @@ func TestRenderer_Render_ErrorWithColor(t *testing.T) {
 	r.Render(event)
 
 	output := buf.String()
+	stripped := testutil.StripANSI(output)
 
-	// Should contain Session Error (with or without ANSI codes)
-	if !strings.Contains(output, "Session Error") {
-		t.Error("expected 'Session Error' in output")
+	// Should contain Session Error (strip ANSI to verify text content)
+	if !strings.Contains(stripped, "Session Error") {
+		t.Errorf("expected 'Session Error' in output, got: %s", stripped)
 	}
 	if !strings.Contains(output, "Test error") {
 		t.Error("expected error message in output")

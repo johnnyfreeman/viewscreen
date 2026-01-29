@@ -8,6 +8,7 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/testutil"
 )
 
@@ -83,8 +84,9 @@ func TestNewRendererWithOptions(t *testing.T) {
 }
 
 func TestRenderer_Render_BasicEvent(t *testing.T) {
+	style.Init(false) // Enable color
 	output := &bytes.Buffer{}
-	styleMock := &testutil.TrackingStyleApplier{MockStyleApplier: testutil.MockStyleApplier{NoColorVal: false}}
+	styleMock := testutil.MockStyleApplier{NoColorVal: false}
 	configMock := testutil.MockConfigProvider{VerboseVal: false}
 
 	r := NewRendererWithOptions(
@@ -103,13 +105,14 @@ func TestRenderer_Render_BasicEvent(t *testing.T) {
 	r.Render(event)
 
 	result := output.String()
+	stripped := testutil.StripANSI(result)
 
-	// Check header with gradient (since noColor is false)
-	if !strings.Contains(result, "[GRADIENT:● Session Started]") {
-		t.Error("expected gradient header in output")
+	// Check header content (gradient applied, so strip ANSI to verify text)
+	if !strings.Contains(stripped, "Session Started") {
+		t.Errorf("expected 'Session Started' in output, got: %s", stripped)
 	}
 
-	// Check model line
+	// Check model line (uses mock, so expect mock output)
 	if !strings.Contains(result, "[MUTED:Model:] claude-3-opus") {
 		t.Errorf("expected model line in output, got: %s", result)
 	}
@@ -128,16 +131,14 @@ func TestRenderer_Render_BasicEvent(t *testing.T) {
 	if !strings.Contains(result, "[MUTED:Tools:] 3 available") {
 		t.Error("expected tools count in output")
 	}
-
-	// Check that gradient was applied to header
-	if len(styleMock.GradientCalls) != 1 {
-		t.Errorf("expected gradient to be called once, got %d", len(styleMock.GradientCalls))
-	}
 }
 
 func TestRenderer_Render_NoColorMode(t *testing.T) {
+	style.Init(true) // Disable color
+	defer style.Init(false) // Restore for other tests
+
 	output := &bytes.Buffer{}
-	styleMock := &testutil.TrackingStyleApplier{MockStyleApplier: testutil.MockStyleApplier{NoColorVal: true}}
+	styleMock := testutil.MockStyleApplier{NoColorVal: true}
 	configMock := testutil.MockConfigProvider{VerboseVal: false}
 
 	r := NewRendererWithOptions(
@@ -157,25 +158,23 @@ func TestRenderer_Render_NoColorMode(t *testing.T) {
 
 	result := output.String()
 
-	// Check header uses SessionHeaderRender instead of gradient
-	if !strings.Contains(result, "[HEADER:● Session Started]") {
-		t.Errorf("expected session header style in no-color mode, got: %s", result)
+	// In no-color mode, header should be plain text (bold only, no color codes)
+	if !strings.Contains(result, "Session Started") {
+		t.Errorf("expected 'Session Started' in output, got: %s", result)
 	}
 
-	// Gradient should not be called
-	if len(styleMock.GradientCalls) != 0 {
-		t.Error("gradient should not be called in no-color mode")
-	}
-
-	// SessionHeader should be called
-	if len(styleMock.SessionHeaderCalls) != 1 {
-		t.Errorf("expected session header to be called once, got %d", len(styleMock.SessionHeaderCalls))
+	// Should not contain color escape sequences (only bold \x1b[1m is allowed)
+	if strings.Contains(result, "\x1b[38") {
+		t.Error("no-color mode should not have color codes")
 	}
 }
 
 func TestRenderer_Render_VerboseWithAgents(t *testing.T) {
+	style.Init(true) // No color for predictable output
+	defer style.Init(false)
+
 	output := &bytes.Buffer{}
-	styleMock := &testutil.TrackingStyleApplier{MockStyleApplier: testutil.MockStyleApplier{NoColorVal: true}}
+	styleMock := testutil.MockStyleApplier{NoColorVal: true}
 	configMock := testutil.MockConfigProvider{VerboseVal: true}
 
 	r := NewRendererWithOptions(
@@ -461,10 +460,6 @@ func TestDefaultStyleApplier(t *testing.T) {
 	_ = dsa.ApplyThemeBoldGradient("test")
 	_ = dsa.SessionHeaderRender("test")
 	_ = dsa.MutedText("test")
-
-	if dsa.Bullet() != "● " {
-		t.Errorf("expected bullet '● ', got %q", dsa.Bullet())
-	}
 
 	if dsa.OutputPrefix() != "  ⎿  " {
 		t.Errorf("expected output prefix '  ⎿  ', got %q", dsa.OutputPrefix())

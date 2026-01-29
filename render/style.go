@@ -23,7 +23,6 @@ type StyleApplier interface {
 	// Output prefixes
 	OutputPrefix() string
 	OutputContinue() string
-	Bullet() string
 
 	// Diff-related styles
 	LineNumberRender(text string) string
@@ -56,7 +55,6 @@ func (d DefaultStyleApplier) SuccessBoldText(text string) string { return style.
 // Output prefixes
 func (d DefaultStyleApplier) OutputPrefix() string   { return style.OutputPrefix }
 func (d DefaultStyleApplier) OutputContinue() string { return style.OutputContinue }
-func (d DefaultStyleApplier) Bullet() string         { return style.Bullet }
 
 // Diff-related styles
 func (d DefaultStyleApplier) LineNumberRender(text string) string    { return style.LineNumberText(text) }

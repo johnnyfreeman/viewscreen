@@ -8,6 +8,7 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
@@ -102,26 +103,12 @@ func (r *Renderer) renderTo(out *render.Output, event Event) {
 	sa := r.styleApplier
 	fmt.Fprintln(out)
 	if event.IsError {
-		// Error header with gradient (or bold fallback for no-color mode)
-		header := fmt.Sprintf("%sSession Error", sa.Bullet())
-		if !sa.NoColor() {
-			header = sa.ApplyErrorGradient(header)
-		} else {
-			header = sa.ErrorBoldText(header)
-		}
-		fmt.Fprintln(out, header)
+		fmt.Fprintln(out, style.BulletErrorHeader("Session Error"))
 		for _, err := range event.Errors {
 			fmt.Fprintf(out, "%s%s\n", sa.OutputPrefix(), sa.ErrorText(err))
 		}
 	} else {
-		// Success header with gradient (or bold fallback for no-color mode)
-		header := fmt.Sprintf("%sSession Complete", sa.Bullet())
-		if !sa.NoColor() {
-			header = sa.ApplySuccessGradient(header)
-		} else {
-			header = sa.SuccessBoldText(header)
-		}
-		fmt.Fprintln(out, header)
+		fmt.Fprintln(out, style.BulletSuccessHeader("Session Complete"))
 	}
 
 	fmt.Fprintf(out, "%s%s %.2fs (API: %.2fs)\n",

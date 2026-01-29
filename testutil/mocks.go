@@ -23,7 +23,6 @@ func (m MockStyleApplier) SuccessBoldText(text string) string { return "[SUCCESS
 // Output prefixes
 func (m MockStyleApplier) OutputPrefix() string   { return "  ⎿  " }
 func (m MockStyleApplier) OutputContinue() string { return "     " }
-func (m MockStyleApplier) Bullet() string         { return "● " }
 
 // Diff-related styles
 func (m MockStyleApplier) LineNumberRender(text string) string    { return "[LN:" + text + "]" }
@@ -86,3 +85,28 @@ type MockConfigProvider struct {
 func (m MockConfigProvider) IsVerbose() bool { return m.VerboseVal }
 func (m MockConfigProvider) NoColor() bool   { return m.NoColorVal }
 func (m MockConfigProvider) ShowUsage() bool { return m.ShowUsageVal }
+
+// StripANSI removes ANSI escape sequences from a string.
+// Useful for testing output that may contain color codes.
+func StripANSI(s string) string {
+	// Match ANSI escape sequences: ESC [ ... m (SGR sequences)
+	// This covers color codes, bold, underline, etc.
+	result := make([]byte, 0, len(s))
+	i := 0
+	for i < len(s) {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
+			// Skip until 'm' (end of SGR sequence)
+			j := i + 2
+			for j < len(s) && s[j] != 'm' {
+				j++
+			}
+			if j < len(s) {
+				i = j + 1
+				continue
+			}
+		}
+		result = append(result, s[i])
+		i++
+	}
+	return string(result)
+}
