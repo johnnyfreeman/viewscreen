@@ -33,13 +33,15 @@ type PendingTool struct {
 // It buffers tool invocations until their results arrive, enabling proper
 // pairing of tool headers with tool outputs.
 type ToolUseTracker struct {
-	pending map[string]PendingTool
+	pending        map[string]PendingTool
+	headerRendered map[string]bool // tracks tools whose headers were rendered early
 }
 
 // NewToolUseTracker creates a new tracker.
 func NewToolUseTracker() *ToolUseTracker {
 	return &ToolUseTracker{
-		pending: make(map[string]PendingTool),
+		pending:        make(map[string]PendingTool),
+		headerRendered: make(map[string]bool),
 	}
 }
 
@@ -60,6 +62,18 @@ func (t *ToolUseTracker) Get(id string) (PendingTool, bool) {
 // Remove deletes a pending tool by ID.
 func (t *ToolUseTracker) Remove(id string) {
 	delete(t.pending, id)
+	delete(t.headerRendered, id)
+}
+
+// MarkHeaderRendered marks a tool's header as already rendered.
+// This is used when a sub-agent prompt triggers early header rendering.
+func (t *ToolUseTracker) MarkHeaderRendered(id string) {
+	t.headerRendered[id] = true
+}
+
+// IsHeaderRendered checks if a tool's header was already rendered.
+func (t *ToolUseTracker) IsHeaderRendered(id string) bool {
+	return t.headerRendered[id]
 }
 
 // IsParentPending checks if a parent tool_use is still pending (waiting for result).
@@ -88,6 +102,7 @@ func (t *ToolUseTracker) ForEach(fn func(id string, pending PendingTool)) {
 // Clear removes all pending tools.
 func (t *ToolUseTracker) Clear() {
 	t.pending = make(map[string]PendingTool)
+	t.headerRendered = make(map[string]bool)
 }
 
 // ResolvedTool contains the data for a tool that has been matched or orphaned.
@@ -100,6 +115,7 @@ type ResolvedTool struct {
 // MatchedTool represents a tool_use block matched with its result.
 type MatchedTool struct {
 	ResolvedTool
+	HeaderRendered bool // true if header was already rendered (e.g., by sub-agent prompt)
 }
 
 // OrphanedTool represents a pending tool that has no matching result.
@@ -117,11 +133,13 @@ func (t *ToolUseTracker) MatchAndRemove(toolUseIDs []string) []MatchedTool {
 	for _, id := range toolUseIDs {
 		if pending, ok := t.Get(id); ok {
 			isNested := t.IsNested(pending)
+			headerRendered := t.IsHeaderRendered(id)
 			matched = append(matched, MatchedTool{
 				ResolvedTool: ResolvedTool{
 					Block:    pending.Block,
 					IsNested: isNested,
 				},
+				HeaderRendered: headerRendered,
 			})
 			t.Remove(id)
 		}
@@ -174,4 +192,20 @@ func (t *ToolUseTracker) MatchFromUserMessage(msg UserMessage) []MatchedTool {
 		}
 	}
 	return t.MatchAndRemove(toolUseIDs)
+}
+
+// ResolveParentEarly finds a pending tool by ID, marks its header as rendered,
+// and returns the resolved tool data for early header rendering.
+// This is used when a sub-agent prompt triggers early rendering of the parent tool.
+// Returns nil if the tool is not found or its header was already rendered.
+func (t *ToolUseTracker) ResolveParentEarly(parentID string) *ResolvedTool {
+	pending, ok := t.Get(parentID)
+	if !ok || t.IsHeaderRendered(parentID) {
+		return nil
+	}
+	t.MarkHeaderRendered(parentID)
+	return &ResolvedTool{
+		Block:    pending.Block,
+		IsNested: t.IsNested(pending),
+	}
 }

@@ -139,6 +139,29 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 	p.state.UpdateFromToolUseResult(event.ToolUseResult)
 	r := p.renderers
 
+	var content strings.Builder
+	var isNested bool
+
+	// Check if this is a sub-agent prompt (text content with parent_tool_use_id)
+	if event.ParentToolUseID != nil && p.isSubAgentPrompt(event) {
+		// Resolve the parent tool early and render its header
+		if resolved := r.PendingTools.ResolveParentEarly(*event.ParentToolUseID); resolved != nil {
+			isNested = resolved.IsNested
+			str, _ := tools.RenderResolved(*resolved)
+			content.WriteString(str)
+		}
+		// Render the prompt text with truncation
+		if isNested {
+			content.WriteString(r.User.RenderNestedSubAgentPromptToString(event))
+		} else {
+			content.WriteString(r.User.RenderSubAgentPromptToString(event))
+		}
+		return ProcessResult{
+			Rendered:        content.String(),
+			HasPendingTools: r.PendingTools.Len() > 0,
+		}
+	}
+
 	// Match tool results with pending tools using the tracker's method
 	msg := tools.UserMessage{
 		Content: make([]tools.UserToolResult, len(event.Message.Content)),
@@ -151,15 +174,18 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 	}
 	matched := r.PendingTools.MatchFromUserMessage(msg)
 
-	var content strings.Builder
-	var isNested bool
-
-	// Render matched tool headers and set context
+	// Render matched tool headers (unless already rendered) and set context
 	for _, match := range matched {
 		isNested = match.IsNested
-		str, ctx := tools.RenderResolved(match.ResolvedTool)
-		content.WriteString(str)
-		r.User.SetToolContext(ctx)
+		if !match.HeaderRendered {
+			str, ctx := tools.RenderResolved(match.ResolvedTool)
+			content.WriteString(str)
+			r.User.SetToolContext(ctx)
+		} else {
+			// Header was rendered early, just set context
+			_, ctx := tools.RenderResolved(match.ResolvedTool)
+			r.User.SetToolContext(ctx)
+		}
 	}
 
 	// Clear tool state if no more pending tools
@@ -178,6 +204,18 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 		Rendered:        content.String(),
 		HasPendingTools: r.PendingTools.Len() > 0,
 	}
+}
+
+// isSubAgentPrompt checks if a user event is a sub-agent prompt.
+// Sub-agent prompts have text content (not tool_result) and are used to pass
+// the prompt to a Task sub-agent.
+func (p *EventProcessor) isSubAgentPrompt(event user.Event) bool {
+	for _, c := range event.Message.Content {
+		if c.Type == "text" {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *EventProcessor) processStream(event stream.Event) ProcessResult {

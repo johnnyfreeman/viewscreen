@@ -332,3 +332,66 @@ func (r *Renderer) RenderToString(event Event) string {
 	r.renderTo(out, event, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
 	return out.String()
 }
+
+// SubAgentPromptMaxLines is the maximum number of lines to show for a sub-agent prompt.
+const SubAgentPromptMaxLines = 3
+
+// RenderSubAgentPromptToString renders a sub-agent prompt with truncation.
+// Shows the first few lines of the prompt followed by a line count indicator.
+func (r *Renderer) RenderSubAgentPromptToString(event Event) string {
+	out := render.StringOutput()
+	r.renderSubAgentPromptTo(out, event, r.styleApplier.OutputPrefix(), r.styleApplier.OutputContinue())
+	return out.String()
+}
+
+// RenderNestedSubAgentPromptToString renders a nested sub-agent prompt with truncation.
+func (r *Renderer) RenderNestedSubAgentPromptToString(event Event) string {
+	out := render.StringOutput()
+	r.renderSubAgentPromptTo(out, event, style.NestedOutputPrefix, style.NestedOutputContinue)
+	return out.String()
+}
+
+// renderSubAgentPromptTo renders a sub-agent prompt with truncation to any output.
+func (r *Renderer) renderSubAgentPromptTo(out *render.Output, event Event, outputPrefix, outputContinue string) {
+	for _, content := range event.Message.Content {
+		if content.Type != "text" {
+			continue
+		}
+		text := content.Text
+		if text == "" {
+			text = content.Content()
+		}
+		if text == "" {
+			continue
+		}
+
+		// Clean and split into lines
+		cleaned := r.contentCleaner.Clean(text)
+		lines := strings.Split(cleaned, "\n")
+
+		// Remove trailing empty lines
+		for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+			lines = lines[:len(lines)-1]
+		}
+
+		totalLines := len(lines)
+		if totalLines == 0 {
+			continue
+		}
+
+		pw := textutil.NewPrefixedWriter(out, outputPrefix, outputContinue)
+
+		if totalLines <= SubAgentPromptMaxLines {
+			// Show all lines
+			for _, line := range lines {
+				pw.WriteLine(r.styleApplier.MutedText(line))
+			}
+		} else {
+			// Show first lines, then truncation indicator
+			for i := 0; i < SubAgentPromptMaxLines; i++ {
+				pw.WriteLine(r.styleApplier.MutedText(lines[i]))
+			}
+			pw.WriteLine(r.styleApplier.MutedText(fmt.Sprintf("(%d lines)", totalLines)))
+		}
+	}
+}
