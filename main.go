@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -75,6 +76,18 @@ func (r *Runner) Run() {
 	useTUI := !config.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
 
 	if useTUI {
+		// Auto-enable --auto-exit when stdin is piped (loop-friendly default).
+		// When stdin is a pipe, the user is running something like:
+		//   while :; do cat ... | claude ... | viewscreen; done
+		// In this case, auto-exit prevents the TUI from blocking after each iteration.
+		if !term.IsTerminal(int(os.Stdin.Fd())) && !config.AutoExit {
+			config.AutoExit = true
+			// Auto-enable dump too (same logic as the flag)
+			if !isFlagExplicitlySet("dump") {
+				config.Dump = true
+			}
+		}
+
 		content, err := tui.Run()
 		if err != nil {
 			fmt.Fprintf(r.errOutput, "TUI error: %v\n", err)
@@ -92,6 +105,17 @@ func (r *Runner) Run() {
 		fmt.Fprintf(r.errOutput, "%v\n", err)
 		r.exitFunc(1)
 	}
+}
+
+// isFlagExplicitlySet checks if a flag was explicitly set on the command line.
+func isFlagExplicitlySet(name string) bool {
+	found := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
 }
 
 func main() {

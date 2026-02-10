@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"flag"
 	"strings"
 	"testing"
 
@@ -292,4 +293,37 @@ func TestWithParseFlags(t *testing.T) {
 	if !called {
 		t.Error("expected parseFlags to be callable")
 	}
+}
+
+func TestIsFlagExplicitlySet(t *testing.T) {
+	t.Run("returns false for unset flag", func(t *testing.T) {
+		// Reset flag.CommandLine to avoid pollution between tests
+		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+		flag.Bool("dump", false, "test flag")
+		flag.CommandLine.Parse([]string{})
+
+		if isFlagExplicitlySet("dump") {
+			t.Error("expected dump to not be explicitly set")
+		}
+	})
+
+	t.Run("returns true for explicitly set flag", func(t *testing.T) {
+		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+		flag.Bool("dump", false, "test flag")
+		flag.CommandLine.Parse([]string{"-dump"})
+
+		if !isFlagExplicitlySet("dump") {
+			t.Error("expected dump to be explicitly set")
+		}
+	})
+
+	t.Run("returns false for unknown flag", func(t *testing.T) {
+		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
+		flag.Bool("dump", false, "test flag")
+		flag.CommandLine.Parse([]string{"-dump"})
+
+		if isFlagExplicitlySet("nonexistent") {
+			t.Error("expected nonexistent flag to not be set")
+		}
+	})
 }
