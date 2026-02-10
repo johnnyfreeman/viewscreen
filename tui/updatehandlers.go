@@ -10,6 +10,11 @@ import (
 
 // handleKeyMsg processes keyboard input and returns the model and any command.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
+	// When prompt editor is active, capture all keys for prompt editing
+	if m.promptEditor.Active {
+		return m.handlePromptEditorKeyMsg(msg)
+	}
+
 	// When search input is active, capture all keys for the search query
 	if m.search.Active {
 		return m.handleSearchKeyMsg(msg)
@@ -76,6 +81,11 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.search.PrevMatch()
 			m.scrollToSearchMatch()
 		}
+	case "e":
+		// Enter prompt editing mode (only when stream is done)
+		if !m.showDetailsModal && !m.showHelpModal && m.stdinDone {
+			m.promptEditor.Enter(m.state.Prompt)
+		}
 	case "up", "k":
 		if !m.showDetailsModal && !m.showHelpModal {
 			m.followMode = false
@@ -103,6 +113,39 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if !m.showDetailsModal && !m.showHelpModal {
 			m.followMode = true
 			m.viewport.GotoBottom()
+		}
+	}
+	return m, nil
+}
+
+// handlePromptEditorKeyMsg processes keyboard input while prompt editing is active.
+func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		// Cancel editing, restore original prompt
+		m.promptEditor.Cancel(m.state.Prompt)
+	case "enter":
+		// Confirm the edited prompt
+		m.state.Prompt = m.promptEditor.Value
+		m.promptEditor.Exit()
+	case "backspace":
+		m.promptEditor.Backspace()
+	case "delete":
+		m.promptEditor.Delete()
+	case "left":
+		m.promptEditor.CursorLeft()
+	case "right":
+		m.promptEditor.CursorRight()
+	case "home", "ctrl+a":
+		m.promptEditor.CursorHome()
+	case "end", "ctrl+e":
+		m.promptEditor.CursorEnd()
+	case "ctrl+c":
+		return m, tea.Quit
+	default:
+		text := msg.String()
+		if len(text) == 1 {
+			m.promptEditor.TypeRune(rune(text[0]))
 		}
 	}
 	return m, nil
@@ -172,6 +215,11 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 
 	// Reserve space for search bar when active
 	if m.search.Active || m.search.HasQuery() {
+		contentHeight--
+	}
+
+	// Reserve space for prompt editor when active
+	if m.promptEditor.Active {
 		contentHeight--
 	}
 

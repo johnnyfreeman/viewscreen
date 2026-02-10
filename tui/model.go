@@ -36,6 +36,7 @@ type Model struct {
 	ready            bool
 	processor        *events.EventProcessor
 	search            Search
+	promptEditor      PromptEditor
 	followMode        bool // auto-scroll to bottom on new content
 	autoExit          bool // --auto-exit flag enabled
 	autoExitRemaining int  // seconds left in countdown, 0 = inactive
@@ -68,6 +69,7 @@ func NewModel() Model {
 		layoutMode:    LayoutSidebar, // default to sidebar mode
 		processor:     events.NewEventProcessor(st),
 		search:        NewSearch(),
+		promptEditor:  NewPromptEditor(),
 		followMode:    true, // auto-scroll to bottom by default
 		autoExit:      config.AutoExit,
 	}
@@ -203,8 +205,9 @@ func (m Model) renderLayout() string {
 		return RenderHelpModal(m.width, m.height, m.headerStyles, m.autoExitRemaining > 0)
 	}
 
-	// Render search bar if active or has a query
+	// Render search bar and prompt bar if active
 	searchBar := RenderSearchBar(m.search, m.viewport.Width())
+	promptBar := RenderPromptBar(m.promptEditor, m.viewport.Width())
 	scrollPos := m.scrollPosition()
 
 	switch m.layoutMode {
@@ -214,6 +217,9 @@ func (m Model) renderLayout() string {
 		parts := []string{header, m.viewport.View()}
 		if searchBar != "" {
 			parts = append(parts, searchBar)
+		}
+		if promptBar != "" {
+			parts = append(parts, promptBar)
 		}
 		layout := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
@@ -230,9 +236,20 @@ func (m Model) renderLayout() string {
 		if searchBar != "" {
 			mainParts = append(mainParts, searchBar)
 		}
+		if promptBar != "" {
+			mainParts = append(mainParts, promptBar)
+		}
 		mainContent := lipgloss.JoinVertical(lipgloss.Left, mainParts...)
 		return lipgloss.JoinHorizontal(lipgloss.Top, mainContent, sidebar)
 	}
+}
+
+// Prompt returns the current prompt value from the editor (or state).
+func (m Model) Prompt() string {
+	if m.promptEditor.Value != "" {
+		return m.promptEditor.Value
+	}
+	return m.state.Prompt
 }
 
 // Run starts the TUI and returns the final rendered content for optional dumping.

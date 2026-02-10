@@ -437,6 +437,7 @@ func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool
 		{"f", "Toggle follow mode"},
 		{"d", "Toggle details"},
 		{"?", "Toggle help"},
+		{"e", "Edit prompt"},
 		{"q", "Quit"},
 	}
 
