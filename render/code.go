@@ -85,6 +85,15 @@ func hexToRGBA(hex string) color.RGBA {
 	}
 }
 
+// CodeHighlighter abstracts code highlighting for testability.
+// *CodeRenderer satisfies this interface.
+type CodeHighlighter interface {
+	Highlight(code, language string) string
+	HighlightFile(code, filename string) string
+	HighlightWithBg(code, language string, bgColor style.Color) string
+	HighlightFileWithBg(code, filename string, bgColor style.Color) string
+}
+
 // CodeRenderer handles syntax highlighting with chroma
 type CodeRenderer struct {
 	formatter chroma.Formatter

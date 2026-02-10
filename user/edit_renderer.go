@@ -28,11 +28,11 @@ type EditResult struct {
 // EditRenderer handles rendering of edit results with syntax-highlighted diffs.
 type EditRenderer struct {
 	styleApplier render.StyleApplier
-	highlighter  CodeHighlighter
+	highlighter  render.CodeHighlighter
 }
 
 // NewEditRenderer creates a new EditRenderer with the given dependencies.
-func NewEditRenderer(styleApplier render.StyleApplier, highlighter CodeHighlighter) *EditRenderer {
+func NewEditRenderer(styleApplier render.StyleApplier, highlighter render.CodeHighlighter) *EditRenderer {
 	return &EditRenderer{
 		styleApplier: styleApplier,
 		highlighter:  highlighter,

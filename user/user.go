@@ -50,41 +50,6 @@ type Event struct {
 }
 
 
-// CodeHighlighter abstracts code highlighting for testability
-type CodeHighlighter interface {
-	Highlight(code, language string) string
-	HighlightFile(code, filename string) string
-	HighlightWithBg(code, language string, bgColor style.Color) string
-	HighlightFileWithBg(code, filename string, bgColor style.Color) string
-}
-
-// DefaultCodeHighlighter uses the actual render package
-type DefaultCodeHighlighter struct {
-	renderer *render.CodeRenderer
-}
-
-func NewDefaultCodeHighlighter(noColor bool) *DefaultCodeHighlighter {
-	return &DefaultCodeHighlighter{
-		renderer: render.NewCodeRenderer(noColor),
-	}
-}
-
-func (d *DefaultCodeHighlighter) Highlight(code, language string) string {
-	return d.renderer.Highlight(code, language)
-}
-
-func (d *DefaultCodeHighlighter) HighlightFile(code, filename string) string {
-	return d.renderer.HighlightFile(code, filename)
-}
-
-func (d *DefaultCodeHighlighter) HighlightWithBg(code, language string, bgColor style.Color) string {
-	return d.renderer.HighlightWithBg(code, language, bgColor)
-}
-
-func (d *DefaultCodeHighlighter) HighlightFileWithBg(code, filename string, bgColor style.Color) string {
-	return d.renderer.HighlightFileWithBg(code, filename, bgColor)
-}
-
 // MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
 type MarkdownRenderer = types.MarkdownRenderer
 
@@ -93,7 +58,7 @@ type Renderer struct {
 	output           io.Writer
 	config           config.Provider
 	styleApplier     render.StyleApplier
-	highlighter      CodeHighlighter
+	highlighter      render.CodeHighlighter
 	markdownRenderer MarkdownRenderer
 	toolContext      *tools.ToolContext
 	contentCleaner   *textutil.ContentCleaner
@@ -126,7 +91,7 @@ func WithStyleApplier(sa render.StyleApplier) RendererOption {
 }
 
 // WithCodeHighlighter sets a custom code highlighter
-func WithCodeHighlighter(ch CodeHighlighter) RendererOption {
+func WithCodeHighlighter(ch render.CodeHighlighter) RendererOption {
 	return func(r *Renderer) {
 		r.highlighter = ch
 	}
@@ -157,7 +122,7 @@ func WithContentCleaner(cc *textutil.ContentCleaner) RendererOption {
 func NewRenderer() *Renderer {
 	cfg := config.Get()
 	sa := render.DefaultStyleApplier{}
-	ch := NewDefaultCodeHighlighter(cfg.NoColor())
+	ch := render.NewCodeRenderer(cfg.NoColor())
 
 	// Build the result registry with renderers in priority order
 	registry := NewResultRegistry()
