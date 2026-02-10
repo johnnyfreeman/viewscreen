@@ -1,11 +1,16 @@
 package tui
 
 import (
+	"bufio"
+	"strings"
+
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	claudepkg "github.com/johnnyfreeman/viewscreen/claude"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
+	"github.com/johnnyfreeman/viewscreen/state"
 )
 
 // handleKeyMsg processes keyboard input and returns the model and any command.
@@ -127,7 +132,11 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "enter":
 		// Confirm the edited prompt
 		m.state.Prompt = m.promptEditor.Value
+		m.prompt = m.promptEditor.Value
 		m.promptEditor.Exit()
+		if m.claudeProcess != nil {
+			return m, func() tea.Msg { return RerunMsg{Prompt: m.state.Prompt} }
+		}
 	case "backspace":
 		m.promptEditor.Backspace()
 	case "delete":
@@ -282,11 +291,59 @@ func (m Model) handleRawLine(msg RawLineMsg) (Model, tea.Cmd) {
 // handleStdinClosed processes the stdin closed signal.
 func (m Model) handleStdinClosed() (Model, tea.Cmd) {
 	m.stdinDone = true
+	// In subprocess mode, don't auto-exit — user may want to browse or re-run
+	if m.claudeProcess != nil {
+		return m, nil
+	}
 	if m.autoExit {
 		m.autoExitRemaining = 5
 		return m, AutoExitTick()
 	}
 	return m, nil
+}
+
+// handleRerun kills the old claude process, resets state, and spawns a new run.
+func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
+	// Kill old process
+	if m.claudeProcess != nil {
+		m.claudeProcess.Kill()
+		m.claudeProcess.Wait()
+	}
+
+	// Reset state
+	m.content = &strings.Builder{}
+	m.stdinDone = false
+	m.autoExitRemaining = 0
+	st := state.NewState()
+	st.Prompt = msg.Prompt
+	m.state = st
+	m.processor = events.NewEventProcessor(st)
+	m.prompt = msg.Prompt
+	m.followMode = true
+	m.search.Clear()
+
+	// Spawn new claude process
+	proc, err := claudepkg.Start(msg.Prompt, nil)
+	if err != nil {
+		m.content.WriteString("Error starting claude: " + err.Error() + "\n")
+		m.viewport.SetContent(m.content.String())
+		m.stdinDone = true
+		return m, nil
+	}
+
+	m.claudeProcess = proc
+	m.inputReader = proc.Stdout()
+
+	// Create new scanner
+	m.scanner = bufio.NewScanner(m.inputReader)
+	const maxCapacity = 10 * 1024 * 1024
+	buf := make([]byte, maxCapacity)
+	m.scanner.Buffer(buf, maxCapacity)
+
+	// Clear viewport
+	m.viewport.SetContent("")
+
+	return m, ReadStdinLine(m.scanner)
 }
 
 // handleAutoExitTick processes a countdown tick for auto-exit.

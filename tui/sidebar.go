@@ -414,12 +414,19 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 }
 
 // RenderHelpModal renders the keybindings help modal overlay.
-func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool) string {
+// When subprocessMode is true, "e" shows "Edit prompt & re-run" instead of "Edit prompt".
+func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, subprocessMode ...bool) string {
 	var sb strings.Builder
 
 	// Title
 	sb.WriteString(style.SidebarValueText("Keybindings"))
 	sb.WriteString("\n\n")
+
+	// Determine prompt edit description
+	editPromptDesc := "Edit prompt"
+	if len(subprocessMode) > 0 && subprocessMode[0] {
+		editPromptDesc = "Edit prompt & re-run"
+	}
 
 	// Keybinding entries
 	bindings := []struct {
@@ -437,7 +444,7 @@ func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool
 		{"f", "Toggle follow mode"},
 		{"d", "Toggle details"},
 		{"?", "Toggle help"},
-		{"e", "Edit prompt"},
+		{"e", editPromptDesc},
 		{"q", "Quit"},
 	}
 

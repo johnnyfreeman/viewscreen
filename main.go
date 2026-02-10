@@ -12,6 +12,10 @@ import (
 	"golang.org/x/term"
 )
 
+// stdinReader is used for reading stdin as prompt text.
+// It can be overridden in tests.
+var stdinReader io.Reader = os.Stdin
+
 // Runner encapsulates application dependencies for testability
 type Runner struct {
 	errOutput     io.Writer
@@ -69,6 +73,15 @@ func NewRunner(opts ...RunnerOption) *Runner {
 func (r *Runner) Run() {
 	r.parseFlags()
 
+	// Resolve prompt: positional args take priority, then -p reads stdin
+	prompt := config.Prompt
+	if prompt == "" && config.PromptMode {
+		data, err := io.ReadAll(stdinReader)
+		if err == nil {
+			prompt = string(data)
+		}
+	}
+
 	// Determine if we should use TUI mode
 	// TUI mode is used when:
 	// 1. --no-tui flag is NOT set, AND
@@ -76,6 +89,19 @@ func (r *Runner) Run() {
 	useTUI := !config.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
 
 	if useTUI {
+		// If we have a prompt, spawn claude and stream into the TUI
+		if prompt != "" {
+			content, err := tui.RunWithPrompt(prompt)
+			if err != nil {
+				fmt.Fprintf(r.errOutput, "TUI error: %v\n", err)
+				r.exitFunc(1)
+			}
+			if config.Dump && content != "" {
+				fmt.Print(content)
+			}
+			return
+		}
+
 		// Auto-enable --auto-exit when stdin is piped (loop-friendly default).
 		// When stdin is a pipe, the user is running something like:
 		//   while :; do cat ... | claude ... | viewscreen; done

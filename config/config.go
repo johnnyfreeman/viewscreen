@@ -3,17 +3,20 @@ package config
 import (
 	"flag"
 	"io"
+	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/style"
 )
 
 var (
-	Verbose   bool
-	NoColor   bool
-	ShowUsage bool
-	NoTUI     bool
-	AutoExit  bool
-	Dump      bool
+	Verbose    bool
+	NoColor    bool
+	ShowUsage  bool
+	NoTUI      bool
+	AutoExit   bool
+	Dump       bool
+	PromptMode bool
+	Prompt     string
 )
 
 // Provider abstracts config access for testability.
@@ -47,12 +50,14 @@ func (DefaultStyleInitializer) Init(disableColor bool) {
 
 // Config holds the parsed configuration
 type Config struct {
-	Verbose   bool
-	NoColor   bool
-	ShowUsage bool
-	NoTUI     bool
-	AutoExit  bool
-	Dump      bool
+	Verbose    bool
+	NoColor    bool
+	ShowUsage  bool
+	NoTUI      bool
+	AutoExit   bool
+	Dump       bool
+	PromptMode bool
+	Prompt     string
 }
 
 // Option is a functional option for configuring the parser
@@ -122,9 +127,15 @@ func Parse(opts ...Option) (*Config, error) {
 	p.flagSet.BoolVar(&cfg.NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
 	p.flagSet.BoolVar(&cfg.AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
 	p.flagSet.BoolVar(&cfg.Dump, "dump", false, "Print content to stdout on TUI exit (preserves output in scrollback)")
+	p.flagSet.BoolVar(&cfg.PromptMode, "p", false, "Treat stdin as a prompt (not a JSON stream)")
 
 	if err := p.flagSet.Parse(p.args); err != nil {
 		return nil, err
+	}
+
+	// Capture positional args as prompt text
+	if args := p.flagSet.Args(); len(args) > 0 {
+		cfg.Prompt = strings.Join(args, " ")
 	}
 
 	// Auto-enable dump when auto-exit is set (loop-friendly default)
@@ -157,7 +168,13 @@ func ParseFlags() {
 	flag.BoolVar(&NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
 	flag.BoolVar(&AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
 	flag.BoolVar(&Dump, "dump", false, "Print content to stdout on TUI exit (preserves output in scrollback)")
+	flag.BoolVar(&PromptMode, "p", false, "Treat stdin as a prompt (not a JSON stream)")
 	flag.Parse()
+
+	// Capture positional args as prompt text
+	if args := flag.Args(); len(args) > 0 {
+		Prompt = strings.Join(args, " ")
+	}
 
 	// Auto-enable dump when auto-exit is set (loop-friendly default)
 	if AutoExit && !isFlagSet(flag.CommandLine, "dump") {

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	claudepkg "github.com/johnnyfreeman/viewscreen/claude"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/render"
@@ -40,10 +42,37 @@ type Model struct {
 	followMode        bool // auto-scroll to bottom on new content
 	autoExit          bool // --auto-exit flag enabled
 	autoExitRemaining int  // seconds left in countdown, 0 = inactive
+	claudeProcess     *claudepkg.Process // non-nil when we spawned claude
+	prompt            string             // the prompt used to spawn claude
+	inputReader       io.Reader          // where to read stream-json lines (defaults to os.Stdin)
+}
+
+// ModelOption is a functional option for configuring the Model.
+type ModelOption func(*Model)
+
+// WithInputReader sets the reader for stream-json input (defaults to os.Stdin).
+func WithInputReader(r io.Reader) ModelOption {
+	return func(m *Model) {
+		m.inputReader = r
+	}
+}
+
+// WithClaudeProcess attaches a spawned claude subprocess to the model.
+func WithClaudeProcess(p *claudepkg.Process) ModelOption {
+	return func(m *Model) {
+		m.claudeProcess = p
+	}
+}
+
+// WithPrompt sets the initial prompt.
+func WithPrompt(prompt string) ModelOption {
+	return func(m *Model) {
+		m.prompt = prompt
+	}
 }
 
 // NewModel creates a new TUI model
-func NewModel() Model {
+func NewModel(opts ...ModelOption) Model {
 	// Initialize spinner with Dot spinner and lipgloss styling.
 	// We use lipgloss here (not Ultraviolet) because the spinner output
 	// goes through bubbletea/lipgloss rendering pipeline.
@@ -52,18 +81,11 @@ func NewModel() Model {
 		spinner.WithStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(string(style.CurrentTheme.Accent)))),
 	)
 
-	// Create scanner for stdin with large buffer
-	scanner := bufio.NewScanner(os.Stdin)
-	const maxCapacity = 10 * 1024 * 1024 // 10MB
-	buf := make([]byte, maxCapacity)
-	scanner.Buffer(buf, maxCapacity)
-
 	st := state.NewState()
-	return Model{
+	m := Model{
 		spinner:       s,
 		state:         st,
 		content:       &strings.Builder{},
-		scanner:       scanner,
 		sidebarStyles: NewSidebarStyles(),
 		headerStyles:  NewHeaderStyles(),
 		layoutMode:    LayoutSidebar, // default to sidebar mode
@@ -73,6 +95,28 @@ func NewModel() Model {
 		followMode:    true, // auto-scroll to bottom by default
 		autoExit:      config.AutoExit,
 	}
+
+	for _, opt := range opts {
+		opt(&m)
+	}
+
+	// Set prompt on state if provided
+	if m.prompt != "" {
+		m.state.Prompt = m.prompt
+	}
+
+	// Default input reader to os.Stdin
+	if m.inputReader == nil {
+		m.inputReader = os.Stdin
+	}
+
+	// Create scanner with large buffer
+	m.scanner = bufio.NewScanner(m.inputReader)
+	const maxCapacity = 10 * 1024 * 1024 // 10MB
+	buf := make([]byte, maxCapacity)
+	m.scanner.Buffer(buf, maxCapacity)
+
+	return m
 }
 
 // Init initializes the model
@@ -120,6 +164,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, cmd = m.handleAutoExitTick()
 		if cmd != nil {
 			return m, cmd
+		}
+
+	case RerunMsg:
+		m, cmd = m.handleRerun(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
 		}
 
 	case events.ParseError:
@@ -202,7 +252,7 @@ func (m Model) scrollPosition() ScrollPosition {
 func (m Model) renderLayout() string {
 	// Help modal overlays both layout modes
 	if m.showHelpModal {
-		return RenderHelpModal(m.width, m.height, m.headerStyles, m.autoExitRemaining > 0)
+		return RenderHelpModal(m.width, m.height, m.headerStyles, m.autoExitRemaining > 0, m.claudeProcess != nil)
 	}
 
 	// Render search bar and prompt bar if active
@@ -284,6 +334,53 @@ func Run() (string, error) {
 		return m.content.String(), nil
 	}
 	return "", nil
+}
+
+// RunWithPrompt spawns claude with the given prompt and runs the TUI on its output.
+func RunWithPrompt(prompt string) (string, error) {
+	// Initialize styles (needed for renderers)
+	cfg := config.DefaultProvider{}
+	render.NewMarkdownRenderer(cfg.NoColor(), 80)
+
+	proc, err := claudepkg.Start(prompt, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// Keyboard input comes from /dev/tty since stdin is not available
+	var teaOpts []tea.ProgramOption
+	tty, err := os.Open("/dev/tty")
+	if err == nil {
+		teaOpts = append(teaOpts, tea.WithInput(tty))
+		defer tty.Close()
+	}
+
+	model := NewModel(
+		WithInputReader(proc.Stdout()),
+		WithClaudeProcess(proc),
+		WithPrompt(prompt),
+	)
+
+	p := tea.NewProgram(model, teaOpts...)
+
+	finalModel, err := p.Run()
+	if err != nil {
+		proc.Kill()
+		return "", err
+	}
+
+	// Wait for the subprocess to finish
+	proc.Wait()
+
+	if m, ok := finalModel.(Model); ok {
+		return m.content.String(), nil
+	}
+	return "", nil
+}
+
+// RunWithStdinPrompt spawns claude with a prompt read from a reader and runs the TUI.
+func RunWithStdinPrompt(prompt string) (string, error) {
+	return RunWithPrompt(prompt)
 }
 
 // isatty returns true if the file descriptor is a terminal.
