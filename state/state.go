@@ -71,6 +71,17 @@ func (s *State) Elapsed() time.Duration {
 	return time.Since(s.StartTime)
 }
 
+// CostRate returns the cost per minute based on total cost and elapsed time.
+// Returns 0 if elapsed time is less than 1 second (to avoid division by zero
+// and noisy early values).
+func (s *State) CostRate() float64 {
+	elapsed := s.Elapsed()
+	if elapsed < time.Second {
+		return 0
+	}
+	return s.TotalCost / elapsed.Minutes()
+}
+
 // UpdateFromSystemEvent extracts state from a system event
 func (s *State) UpdateFromSystemEvent(event system.Event) {
 	s.Model = event.Model

@@ -148,6 +148,27 @@ func (r *SidebarRenderer) RenderElapsed(elapsed time.Duration) string {
 	return r.RenderLabelValue("Elapsed", formatDuration(elapsed))
 }
 
+// RenderCostRate renders the cost rate ($/min) section.
+func (r *SidebarRenderer) RenderCostRate(costRate float64) string {
+	if costRate == 0 {
+		return ""
+	}
+	return r.RenderLabelValue("Rate", formatCostRate(costRate))
+}
+
+// formatCostRate formats a cost-per-minute value as a compact string.
+// Uses different precision based on the magnitude.
+func formatCostRate(rate float64) string {
+	switch {
+	case rate >= 1.0:
+		return fmt.Sprintf("$%.2f/min", rate)
+	case rate >= 0.01:
+		return fmt.Sprintf("$%.3f/min", rate)
+	default:
+		return fmt.Sprintf("$%.4f/min", rate)
+	}
+}
+
 // formatDuration formats a duration as a compact human-readable string.
 // Examples: "5s", "1m 23s", "1h 5m"
 func formatDuration(d time.Duration) string {
@@ -247,6 +268,7 @@ func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, sc
 	sb.WriteString(r.RenderFollowIndicator(followMode))
 	sb.WriteString(r.RenderPrompt(s.Prompt))
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+	sb.WriteString(r.RenderCostRate(s.CostRate()))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
 	sb.WriteString(r.RenderScrollPosition(scrollPos))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
@@ -443,6 +465,7 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 
 	// Session info
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+	sb.WriteString(r.RenderCostRate(s.CostRate()))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
 	sb.WriteString(r.RenderScrollPosition(scrollPos))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))

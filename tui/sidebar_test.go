@@ -628,6 +628,123 @@ func TestSidebarRenderer_RenderCacheUsage(t *testing.T) {
 	})
 }
 
+func TestFormatCostRate(t *testing.T) {
+	tests := []struct {
+		input float64
+		want  string
+	}{
+		{0, "$0.0000/min"},
+		{0.001, "$0.0010/min"},
+		{0.0099, "$0.0099/min"},
+		{0.01, "$0.010/min"},
+		{0.05, "$0.050/min"},
+		{0.123, "$0.123/min"},
+		{0.999, "$0.999/min"},
+		{1.0, "$1.00/min"},
+		{2.5, "$2.50/min"},
+	}
+
+	for _, tt := range tests {
+		got := formatCostRate(tt.input)
+		if got != tt.want {
+			t.Errorf("formatCostRate(%f) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestSidebarRenderer_RenderCostRate(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("zero rate returns empty string", func(t *testing.T) {
+		output := r.RenderCostRate(0)
+		if output != "" {
+			t.Errorf("expected empty string for zero rate, got %q", output)
+		}
+	})
+
+	t.Run("renders rate with label", func(t *testing.T) {
+		output := r.RenderCostRate(0.05)
+
+		if !strings.Contains(output, "Rate") {
+			t.Error("expected 'Rate' label in output")
+		}
+		if !strings.Contains(output, "$0.050/min") {
+			t.Errorf("expected '$0.050/min' in output, got %q", output)
+		}
+	})
+
+	t.Run("renders small rate", func(t *testing.T) {
+		output := r.RenderCostRate(0.001)
+
+		if !strings.Contains(output, "$0.0010/min") {
+			t.Errorf("expected '$0.0010/min' in output, got %q", output)
+		}
+	})
+
+	t.Run("renders large rate", func(t *testing.T) {
+		output := r.RenderCostRate(2.5)
+
+		if !strings.Contains(output, "$2.50/min") {
+			t.Errorf("expected '$2.50/min' in output, got %q", output)
+		}
+	})
+}
+
+func TestSidebarRenderer_Render_WithCostRate(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("shows rate when cost and elapsed present", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "claude-3-opus"
+		s.TurnCount = 5
+		s.TotalCost = 0.30
+		s.StartTime = s.StartTime.Add(-3 * time.Minute) // 3 min ago -> ~$0.10/min
+
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+
+		if !strings.Contains(output, "Rate") {
+			t.Error("expected Rate section in sidebar with cost data")
+		}
+		if !strings.Contains(output, "/min") {
+			t.Error("expected '/min' in sidebar rate display")
+		}
+	})
+
+	t.Run("omits rate when no cost", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "claude-3-opus"
+		s.TurnCount = 1
+		s.TotalCost = 0
+		s.StartTime = s.StartTime.Add(-5 * time.Minute)
+
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+
+		if strings.Contains(output, "Rate") {
+			t.Error("expected no Rate section when cost is zero")
+		}
+	})
+}
+
+func TestDetailsModal_WithCostRate(t *testing.T) {
+	s := state.NewState()
+	s.Model = "claude-opus"
+	s.TurnCount = 5
+	s.TotalCost = 0.50
+	s.StartTime = s.StartTime.Add(-5 * time.Minute) // 5 min ago -> ~$0.10/min
+
+	styles := NewHeaderStyles()
+	sp := newTestSpinner()
+
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true})
+
+	if !strings.Contains(output, "Rate") {
+		t.Error("expected Rate section in details modal")
+	}
+	if !strings.Contains(output, "/min") {
+		t.Error("expected '/min' in details modal rate display")
+	}
+}
+
 func TestSidebarRenderer_RenderTokenUsage(t *testing.T) {
 	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
 

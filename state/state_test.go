@@ -103,6 +103,39 @@ func TestState_Elapsed(t *testing.T) {
 	}
 }
 
+func TestState_CostRate(t *testing.T) {
+	t.Run("returns zero when elapsed less than 1 second", func(t *testing.T) {
+		s := NewState()
+		s.TotalCost = 0.10
+		// StartTime is now, so elapsed < 1s
+		rate := s.CostRate()
+		if rate != 0 {
+			t.Errorf("CostRate() = %f, want 0 for < 1s elapsed", rate)
+		}
+	})
+
+	t.Run("returns zero when no cost", func(t *testing.T) {
+		s := NewState()
+		s.StartTime = time.Now().Add(-5 * time.Minute)
+		s.TotalCost = 0
+		rate := s.CostRate()
+		if rate != 0 {
+			t.Errorf("CostRate() = %f, want 0", rate)
+		}
+	})
+
+	t.Run("calculates correct rate", func(t *testing.T) {
+		s := NewState()
+		s.StartTime = time.Now().Add(-2 * time.Minute)
+		s.TotalCost = 0.10
+		rate := s.CostRate()
+		// Should be approximately $0.05/min
+		if rate < 0.04 || rate > 0.06 {
+			t.Errorf("CostRate() = %f, want ~0.05", rate)
+		}
+	})
+}
+
 func TestState_TodoProgress(t *testing.T) {
 	t.Run("empty todos", func(t *testing.T) {
 		s := NewState()
