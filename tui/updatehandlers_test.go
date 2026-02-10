@@ -458,6 +458,28 @@ func TestAutoExitCancelOnKeyPress(t *testing.T) {
 			t.Error("expected quit command on ctrl+c during countdown")
 		}
 	})
+
+	t.Run("space skips countdown and exits", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+
+		if cmd == nil {
+			t.Error("expected quit command on space during countdown")
+		}
+	})
+
+	t.Run("enter skips countdown and exits", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+		if cmd == nil {
+			t.Error("expected quit command on enter during countdown")
+		}
+	})
 }
 
 func TestHandleParseError(t *testing.T) {

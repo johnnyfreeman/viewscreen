@@ -235,7 +235,7 @@ func (r *SidebarRenderer) RenderAutoExitStatus(stdinDone bool, autoExitRemaining
 	}
 	if autoExitRemaining > 0 {
 		return style.MutedText(fmt.Sprintf("Exiting in %ds...", autoExitRemaining)) + "\n" +
-			style.MutedText("any key to cancel") + "\n\n"
+			style.MutedText("space to skip") + "\n\n"
 	}
 	return style.MutedText("Stream complete") + "\n\n"
 }
@@ -443,7 +443,8 @@ func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool
 	if autoExitActive {
 		// Insert before the last entry (quit)
 		bindings = append(bindings[:len(bindings)-1],
-			struct{ key, desc string }{"any key", "Cancel auto-exit"},
+			struct{ key, desc string }{"space", "Skip countdown"},
+			struct{ key, desc string }{"any key", "Cancel and browse"},
 			bindings[len(bindings)-1],
 		)
 	}

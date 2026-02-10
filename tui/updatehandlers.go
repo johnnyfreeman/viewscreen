@@ -15,10 +15,15 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.handleSearchKeyMsg(msg)
 	}
 
-	// Cancel auto-exit countdown on any key except q/ctrl+c
+	// During auto-exit countdown:
+	// - q/ctrl+c: quit immediately
+	// - space/enter: skip countdown and exit (continue the loop)
+	// - any other key: cancel countdown and browse
 	if m.autoExitRemaining > 0 {
 		switch msg.String() {
 		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "space", "enter":
 			return m, tea.Quit
 		default:
 			m.autoExitRemaining = 0
