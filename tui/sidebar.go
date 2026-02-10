@@ -207,8 +207,39 @@ func (r *SidebarRenderer) RenderFollowIndicator(followMode bool) string {
 	return style.WarningText("⏸ Paused") + " " + style.MutedText("[f]") + "\n\n"
 }
 
+// ScrollPosition holds the viewport scroll state for display.
+type ScrollPosition struct {
+	AtTop   bool
+	AtBottom bool
+	Percent float64 // 0.0 to 1.0
+}
+
+// FormatScrollPosition returns a compact scroll position string.
+// Returns "Top", "Bot", or "XX%" based on the scroll position.
+func FormatScrollPosition(pos ScrollPosition) string {
+	if pos.AtTop {
+		return "Top"
+	}
+	if pos.AtBottom {
+		return "Bot"
+	}
+	pct := int(pos.Percent * 100)
+	if pct < 1 {
+		pct = 1
+	}
+	if pct > 99 {
+		pct = 99
+	}
+	return fmt.Sprintf("%d%%", pct)
+}
+
+// RenderScrollPosition renders the scroll position indicator.
+func (r *SidebarRenderer) RenderScrollPosition(pos ScrollPosition) string {
+	return r.RenderLabelValue("Position", FormatScrollPosition(pos))
+}
+
 // Render renders the complete sidebar by composing all sections.
-func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool) string {
+func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, scrollPos ScrollPosition) string {
 	var sb strings.Builder
 
 	sb.WriteString(r.RenderLogo())
@@ -217,6 +248,7 @@ func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool) st
 	sb.WriteString(r.RenderPrompt(s.Prompt))
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
+	sb.WriteString(r.RenderScrollPosition(scrollPos))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
 	sb.WriteString(r.RenderCacheUsage(s.CacheRead, s.CacheCreated))
 
@@ -231,9 +263,9 @@ func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool) st
 
 // RenderSidebar renders the sidebar with session info and todos.
 // This is the main entry point, kept for backward compatibility.
-func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles, followMode bool) string {
+func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles, followMode bool, scrollPos ScrollPosition) string {
 	r := NewSidebarRenderer(styles, spinner)
-	return r.Render(s, height, followMode)
+	return r.Render(s, height, followMode, scrollPos)
 }
 
 // HeaderStyles holds the lipgloss styles for header layout.
@@ -255,8 +287,8 @@ func NewHeaderStyles() HeaderStyles {
 }
 
 // RenderHeader renders a single-line header for narrow terminals.
-// Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 ─── [?] ───
-func RenderHeader(s *state.State, width int, followMode bool) string {
+// Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 │ 42% ─── [?] ───
+func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPosition) string {
 	logo := NewLogoRenderer()
 
 	// Build the info section: model │ turns │ cost
@@ -267,14 +299,17 @@ func RenderHeader(s *state.State, width int, followMode bool) string {
 	}
 
 	elapsed := formatDuration(s.Elapsed())
-	info := fmt.Sprintf("%s %s %d %s $%.2f %s %s",
+	scrollStr := FormatScrollPosition(scrollPos)
+	info := fmt.Sprintf("%s %s %d %s $%.2f %s %s %s %s",
 		model,
 		style.MutedText("│"),
 		s.TurnCount,
 		style.MutedText("│"),
 		s.TotalCost,
 		style.MutedText("│"),
-		elapsed)
+		elapsed,
+		style.MutedText("│"),
+		scrollStr)
 
 	// Fixed parts
 	title := logo.RenderTitle()
@@ -291,7 +326,7 @@ func RenderHeader(s *state.State, width int, followMode bool) string {
 	// Calculate decoration lengths
 	// Raw lengths (without ANSI): "─── " + "VIEWSCREEN" + " ─── " + info + " ─── " + [paused] + "[?]" + " ───"
 	titleLen := 10 // "VIEWSCREEN"
-	infoLen := len(model) + 3 + len(fmt.Sprintf("%d", s.TurnCount)) + 3 + len(fmt.Sprintf("$%.2f", s.TotalCost)) + 3 + len(elapsed)
+	infoLen := len(model) + 3 + len(fmt.Sprintf("%d", s.TurnCount)) + 3 + len(fmt.Sprintf("$%.2f", s.TotalCost)) + 3 + len(elapsed) + 3 + len(scrollStr)
 	keyHintLen := 3 // "[?]"
 	pausedExtra := 0
 	if pausedLen > 0 {
@@ -389,7 +424,7 @@ func RenderHelpModal(width, height int, styles HeaderStyles) string {
 }
 
 // RenderDetailsModal renders the details modal overlay.
-func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles, followMode bool) string {
+func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles, followMode bool, scrollPos ScrollPosition) string {
 	r := NewSidebarRenderer(NewSidebarStyles(), sp)
 
 	var sb strings.Builder
@@ -409,6 +444,7 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	// Session info
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
+	sb.WriteString(r.RenderScrollPosition(scrollPos))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
 	sb.WriteString(r.RenderCacheUsage(s.CacheRead, s.CacheCreated))
 

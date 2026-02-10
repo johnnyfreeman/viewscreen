@@ -175,6 +175,15 @@ func (m *Model) updateViewportWithPendingTools() {
 	m.viewport.SetContent(content)
 }
 
+// scrollPosition returns the current scroll position from the viewport.
+func (m Model) scrollPosition() ScrollPosition {
+	return ScrollPosition{
+		AtTop:   m.viewport.AtTop(),
+		AtBottom: m.viewport.AtBottom(),
+		Percent: m.viewport.ScrollPercent(),
+	}
+}
+
 // renderLayout composes the main content area and sidebar/header
 func (m Model) renderLayout() string {
 	// Help modal overlays both layout modes
@@ -184,11 +193,12 @@ func (m Model) renderLayout() string {
 
 	// Render search bar if active or has a query
 	searchBar := RenderSearchBar(m.search, m.viewport.Width())
+	scrollPos := m.scrollPosition()
 
 	switch m.layoutMode {
 	case LayoutHeader:
 		// Header mode: single-line header on top, content below at full width
-		header := RenderHeader(m.state, m.width, m.followMode)
+		header := RenderHeader(m.state, m.width, m.followMode, scrollPos)
 		parts := []string{header, m.viewport.View()}
 		if searchBar != "" {
 			parts = append(parts, searchBar)
@@ -197,13 +207,13 @@ func (m Model) renderLayout() string {
 
 		// Overlay modal if showing details
 		if m.showDetailsModal {
-			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles, m.followMode)
+			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles, m.followMode, scrollPos)
 			return modal
 		}
 		return layout
 	default:
 		// Sidebar mode: content left, sidebar right
-		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles, m.followMode)
+		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles, m.followMode, scrollPos)
 		mainParts := []string{m.viewport.View()}
 		if searchBar != "" {
 			mainParts = append(mainParts, searchBar)
