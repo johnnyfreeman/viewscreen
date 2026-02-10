@@ -2,6 +2,7 @@ package state
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/system"
@@ -48,6 +49,9 @@ type State struct {
 	CacheCreated      int
 	CacheRead         int
 
+	// Session timing
+	StartTime         time.Time
+
 	// Session status
 	IsError           bool
 	DurationMS        int
@@ -57,8 +61,14 @@ type State struct {
 // NewState creates a new empty state
 func NewState() *State {
 	return &State{
-		Todos: make([]Todo, 0),
+		Todos:     make([]Todo, 0),
+		StartTime: time.Now(),
 	}
+}
+
+// Elapsed returns the duration since the session started.
+func (s *State) Elapsed() time.Duration {
+	return time.Since(s.StartTime)
 }
 
 // UpdateFromSystemEvent extracts state from a system event

@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
@@ -686,5 +687,96 @@ func TestDetailsModal_WithTokens(t *testing.T) {
 	}
 	if !strings.Contains(output, "25.0k") {
 		t.Error("expected formatted input tokens in details modal")
+	}
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		input time.Duration
+		want  string
+	}{
+		{0, "0s"},
+		{500 * time.Millisecond, "1s"},
+		{499 * time.Millisecond, "0s"},
+		{1 * time.Second, "1s"},
+		{5 * time.Second, "5s"},
+		{59 * time.Second, "59s"},
+		{60 * time.Second, "1m 0s"},
+		{61 * time.Second, "1m 1s"},
+		{90 * time.Second, "1m 30s"},
+		{5*time.Minute + 23*time.Second, "5m 23s"},
+		{59*time.Minute + 59*time.Second, "59m 59s"},
+		{1 * time.Hour, "1h 0m"},
+		{1*time.Hour + 5*time.Minute, "1h 5m"},
+		{2*time.Hour + 30*time.Minute, "2h 30m"},
+	}
+
+	for _, tt := range tests {
+		got := formatDuration(tt.input)
+		if got != tt.want {
+			t.Errorf("formatDuration(%v) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestSidebarRenderer_RenderElapsed(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("renders elapsed time with label", func(t *testing.T) {
+		output := r.RenderElapsed(5 * time.Minute)
+
+		if !strings.Contains(output, "Elapsed") {
+			t.Error("expected 'Elapsed' label in output")
+		}
+		if !strings.Contains(output, "5m 0s") {
+			t.Errorf("expected '5m 0s' in output, got %q", output)
+		}
+	})
+
+	t.Run("renders seconds only", func(t *testing.T) {
+		output := r.RenderElapsed(30 * time.Second)
+
+		if !strings.Contains(output, "30s") {
+			t.Errorf("expected '30s' in output, got %q", output)
+		}
+	})
+
+	t.Run("renders hours", func(t *testing.T) {
+		output := r.RenderElapsed(1*time.Hour + 15*time.Minute)
+
+		if !strings.Contains(output, "1h 15m") {
+			t.Errorf("expected '1h 15m' in output, got %q", output)
+		}
+	})
+}
+
+func TestSidebarRenderer_Render_WithElapsed(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	s := state.NewState()
+	s.Model = "claude-3-opus"
+	s.TurnCount = 5
+	s.TotalCost = 0.1234
+
+	output := r.Render(s, 40)
+
+	if !strings.Contains(output, "Elapsed") {
+		t.Error("expected Elapsed section in sidebar")
+	}
+}
+
+func TestDetailsModal_WithElapsed(t *testing.T) {
+	s := state.NewState()
+	s.Model = "claude-opus"
+	s.TurnCount = 5
+	s.TotalCost = 0.1234
+
+	styles := NewHeaderStyles()
+	sp := newTestSpinner()
+
+	output := RenderDetailsModal(s, sp, 100, 40, styles)
+
+	if !strings.Contains(output, "Elapsed") {
+		t.Error("expected Elapsed section in details modal")
 	}
 }

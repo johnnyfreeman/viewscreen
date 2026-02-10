@@ -9,6 +9,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
@@ -132,6 +133,29 @@ func formatTokenCount(n int) string {
 	}
 }
 
+// RenderElapsed renders the session elapsed time.
+func (r *SidebarRenderer) RenderElapsed(elapsed time.Duration) string {
+	return r.RenderLabelValue("Elapsed", formatDuration(elapsed))
+}
+
+// formatDuration formats a duration as a compact human-readable string.
+// Examples: "5s", "1m 23s", "1h 5m"
+func formatDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+
+	switch {
+	case h > 0:
+		return fmt.Sprintf("%dh %dm", h, m)
+	case m > 0:
+		return fmt.Sprintf("%dm %ds", m, s)
+	default:
+		return fmt.Sprintf("%ds", s)
+	}
+}
+
 // RenderCurrentTool renders the currently running tool with spinner.
 func (r *SidebarRenderer) RenderCurrentTool(toolName, toolInput string) string {
 	if toolName == "" {
@@ -173,6 +197,7 @@ func (r *SidebarRenderer) Render(s *state.State, height int) string {
 	sb.WriteString("\n")
 	sb.WriteString(r.RenderPrompt(s.Prompt))
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+	sb.WriteString(r.RenderElapsed(s.Elapsed()))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
 
 	if s.ToolInProgress {
@@ -221,12 +246,15 @@ func RenderHeader(s *state.State, width int) string {
 		model = model[:maxModelLen-2] + ".."
 	}
 
-	info := fmt.Sprintf("%s %s %d %s $%.2f",
+	elapsed := formatDuration(s.Elapsed())
+	info := fmt.Sprintf("%s %s %d %s $%.2f %s %s",
 		model,
 		style.MutedText("│"),
 		s.TurnCount,
 		style.MutedText("│"),
-		s.TotalCost)
+		s.TotalCost,
+		style.MutedText("│"),
+		elapsed)
 
 	// Fixed parts
 	title := logo.RenderTitle()
@@ -235,7 +263,7 @@ func RenderHeader(s *state.State, width int) string {
 	// Calculate decoration lengths
 	// Raw lengths (without ANSI): "─── " + "VIEWSCREEN" + " ─── " + info + " ─── " + "[?]" + " ───"
 	titleLen := 10 // "VIEWSCREEN"
-	infoLen := len(model) + 3 + len(fmt.Sprintf("%d", s.TurnCount)) + 3 + len(fmt.Sprintf("$%.2f", s.TotalCost))
+	infoLen := len(model) + 3 + len(fmt.Sprintf("%d", s.TurnCount)) + 3 + len(fmt.Sprintf("$%.2f", s.TotalCost)) + 3 + len(elapsed)
 	keyHintLen := 3 // "[?]"
 	fixedLen := 4 + titleLen + 5 + infoLen + 5 + keyHintLen + 4 // decorations + spaces
 
@@ -333,6 +361,7 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 
 	// Session info
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+	sb.WriteString(r.RenderElapsed(s.Elapsed()))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
 
 	// Current tool

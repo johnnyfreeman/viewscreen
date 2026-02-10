@@ -2,6 +2,7 @@ package state
 
 import (
 	"testing"
+	"time"
 
 	"github.com/johnnyfreeman/viewscreen/result"
 )
@@ -75,5 +76,29 @@ func TestAccumulateUsage_ThenResultOverrides(t *testing.T) {
 	}
 	if s.OutputTokens != 200 {
 		t.Errorf("OutputTokens = %d, want 200 (should be overridden by result)", s.OutputTokens)
+	}
+}
+
+func TestNewState_HasStartTime(t *testing.T) {
+	before := time.Now()
+	s := NewState()
+	after := time.Now()
+
+	if s.StartTime.Before(before) || s.StartTime.After(after) {
+		t.Errorf("StartTime = %v, expected between %v and %v", s.StartTime, before, after)
+	}
+}
+
+func TestState_Elapsed(t *testing.T) {
+	s := NewState()
+	// Set start time to a known value in the past
+	s.StartTime = time.Now().Add(-5 * time.Second)
+
+	elapsed := s.Elapsed()
+	if elapsed < 5*time.Second {
+		t.Errorf("Elapsed() = %v, expected >= 5s", elapsed)
+	}
+	if elapsed > 6*time.Second {
+		t.Errorf("Elapsed() = %v, expected < 6s", elapsed)
 	}
 }
