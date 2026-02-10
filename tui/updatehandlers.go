@@ -35,6 +35,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		} else if m.search.HasQuery() {
 			m.search.Clear()
 		}
+	case "f":
+		// Toggle follow mode (auto-scroll)
+		if !m.showDetailsModal && !m.showHelpModal {
+			m.followMode = !m.followMode
+			if m.followMode {
+				m.viewport.GotoBottom()
+			}
+		}
 	case "/":
 		// Enter search mode
 		if !m.showDetailsModal && !m.showHelpModal {
@@ -54,6 +62,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "up", "k":
 		if !m.showDetailsModal && !m.showHelpModal {
+			m.followMode = false
 			m.viewport.ScrollUp(1)
 		}
 	case "down", "j":
@@ -62,6 +71,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "pgup":
 		if !m.showDetailsModal && !m.showHelpModal {
+			m.followMode = false
 			m.viewport.HalfPageUp()
 		}
 	case "pgdown":
@@ -70,10 +80,12 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "home", "g":
 		if !m.showDetailsModal && !m.showHelpModal {
+			m.followMode = false
 			m.viewport.GotoTop()
 		}
 	case "end", "G":
 		if !m.showDetailsModal && !m.showHelpModal {
+			m.followMode = true
 			m.viewport.GotoBottom()
 		}
 	}
@@ -217,7 +229,9 @@ func (m Model) handleParseError(msg events.ParseError) Model {
 	if cfg.IsVerbose() {
 		m.content.WriteString("Parse error: " + msg.Line + "\n")
 		m.viewport.SetContent(m.content.String())
-		m.viewport.GotoBottom()
+		if m.followMode {
+			m.viewport.GotoBottom()
+		}
 	}
 	return m
 }

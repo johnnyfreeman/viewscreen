@@ -189,12 +189,21 @@ func (r *SidebarRenderer) RenderTodos(todos []state.Todo) string {
 	return r.todo.RenderList(todos)
 }
 
+// RenderFollowIndicator renders the follow mode status indicator.
+func (r *SidebarRenderer) RenderFollowIndicator(followMode bool) string {
+	if followMode {
+		return ""
+	}
+	return style.WarningText("⏸ Paused") + " " + style.MutedText("[f]") + "\n\n"
+}
+
 // Render renders the complete sidebar by composing all sections.
-func (r *SidebarRenderer) Render(s *state.State, height int) string {
+func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool) string {
 	var sb strings.Builder
 
 	sb.WriteString(r.RenderLogo())
 	sb.WriteString("\n")
+	sb.WriteString(r.RenderFollowIndicator(followMode))
 	sb.WriteString(r.RenderPrompt(s.Prompt))
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
@@ -211,9 +220,9 @@ func (r *SidebarRenderer) Render(s *state.State, height int) string {
 
 // RenderSidebar renders the sidebar with session info and todos.
 // This is the main entry point, kept for backward compatibility.
-func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles) string {
+func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles, followMode bool) string {
 	r := NewSidebarRenderer(styles, spinner)
-	return r.Render(s, height)
+	return r.Render(s, height, followMode)
 }
 
 // HeaderStyles holds the lipgloss styles for header layout.
@@ -235,8 +244,8 @@ func NewHeaderStyles() HeaderStyles {
 }
 
 // RenderHeader renders a single-line header for narrow terminals.
-// Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 ─── [d] ───
-func RenderHeader(s *state.State, width int) string {
+// Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 ─── [?] ───
+func RenderHeader(s *state.State, width int, followMode bool) string {
 	logo := NewLogoRenderer()
 
 	// Build the info section: model │ turns │ cost
@@ -260,12 +269,24 @@ func RenderHeader(s *state.State, width int) string {
 	title := logo.RenderTitle()
 	keyHint := style.MutedText("[?]")
 
+	// Paused indicator when follow mode is off
+	pausedHint := ""
+	pausedLen := 0
+	if !followMode {
+		pausedHint = style.WarningText("⏸")
+		pausedLen = 1 // single character width
+	}
+
 	// Calculate decoration lengths
-	// Raw lengths (without ANSI): "─── " + "VIEWSCREEN" + " ─── " + info + " ─── " + "[?]" + " ───"
+	// Raw lengths (without ANSI): "─── " + "VIEWSCREEN" + " ─── " + info + " ─── " + [paused] + "[?]" + " ───"
 	titleLen := 10 // "VIEWSCREEN"
 	infoLen := len(model) + 3 + len(fmt.Sprintf("%d", s.TurnCount)) + 3 + len(fmt.Sprintf("$%.2f", s.TotalCost)) + 3 + len(elapsed)
 	keyHintLen := 3 // "[?]"
-	fixedLen := 4 + titleLen + 5 + infoLen + 5 + keyHintLen + 4 // decorations + spaces
+	pausedExtra := 0
+	if pausedLen > 0 {
+		pausedExtra = pausedLen + 1 // pause icon + space
+	}
+	fixedLen := 4 + titleLen + 5 + infoLen + 5 + pausedExtra + keyHintLen + 4 // decorations + spaces
 
 	// Remaining space for decorations
 	remaining := max(width-fixedLen, 4)
@@ -275,6 +296,17 @@ func RenderHeader(s *state.State, width int) string {
 	midDeco := strings.Repeat("─", 3)
 	rightDeco := strings.Repeat("─", max(remaining, 1))
 
+	if pausedHint != "" {
+		return fmt.Sprintf("%s %s %s %s %s %s %s %s",
+			style.MutedText(leftDeco),
+			title,
+			style.MutedText(midDeco),
+			info,
+			style.MutedText(midDeco),
+			pausedHint,
+			keyHint,
+			style.MutedText(rightDeco))
+	}
 	return fmt.Sprintf("%s %s %s %s %s %s %s",
 		style.MutedText(leftDeco),
 		title,
@@ -306,6 +338,7 @@ func RenderHelpModal(width, height int, styles HeaderStyles) string {
 		{"G / End", "Go to bottom"},
 		{"/", "Search"},
 		{"n / N", "Next / prev match"},
+		{"f", "Toggle follow mode"},
 		{"d", "Toggle details"},
 		{"?", "Toggle help"},
 		{"q", "Quit"},
@@ -345,7 +378,7 @@ func RenderHelpModal(width, height int, styles HeaderStyles) string {
 }
 
 // RenderDetailsModal renders the details modal overlay.
-func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles) string {
+func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles, followMode bool) string {
 	r := NewSidebarRenderer(NewSidebarStyles(), sp)
 
 	var sb strings.Builder
@@ -353,6 +386,9 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	// Logo
 	sb.WriteString(r.RenderLogo())
 	sb.WriteString("\n")
+
+	// Follow mode indicator
+	sb.WriteString(r.RenderFollowIndicator(followMode))
 
 	// Prompt if available
 	if s.Prompt != "" {

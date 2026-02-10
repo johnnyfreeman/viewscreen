@@ -314,7 +314,7 @@ func TestSidebarRenderer_Render(t *testing.T) {
 			{Subject: "Task 1", Status: "completed"},
 		}
 
-		output := r.Render(s, 40)
+		output := r.Render(s, 40, true)
 
 		// Check all sections are present
 		if !strings.Contains(output, "claude") {
@@ -340,7 +340,7 @@ func TestSidebarRenderer_Render(t *testing.T) {
 		s.CurrentTool = "Read"
 		s.CurrentToolInput = "test.go"
 
-		output := r.Render(s, 40)
+		output := r.Render(s, 40, true)
 
 		if !strings.Contains(output, "Running") {
 			t.Error("expected Running header in output")
@@ -355,7 +355,7 @@ func TestSidebarRenderer_Render(t *testing.T) {
 		s.ToolInProgress = false
 		s.CurrentTool = "Read" // Set but not in progress
 
-		output := r.Render(s, 40)
+		output := r.Render(s, 40, true)
 
 		// Running header should not appear
 		if strings.Contains(output, "Running") {
@@ -374,7 +374,7 @@ func TestRenderSidebar(t *testing.T) {
 	styles := NewSidebarStyles()
 	sp := newTestSpinner()
 
-	output := RenderSidebar(s, sp, 40, styles)
+	output := RenderSidebar(s, sp, 40, styles, true)
 
 	if output == "" {
 		t.Error("expected non-empty output from RenderSidebar")
@@ -410,7 +410,7 @@ func TestRenderHeader(t *testing.T) {
 		s.TurnCount = 3
 		s.TotalCost = 0.05
 
-		output := RenderHeader(s, 100)
+		output := RenderHeader(s, 100, true)
 
 		if output == "" {
 			t.Error("expected non-empty output from RenderHeader")
@@ -441,7 +441,7 @@ func TestRenderHeader(t *testing.T) {
 		s.TurnCount = 1
 		s.TotalCost = 0
 
-		output := RenderHeader(s, 100)
+		output := RenderHeader(s, 100, true)
 
 		// Should not contain the full model name
 		if strings.Contains(output, "very-long-model-name-that-exceeds-limit") {
@@ -469,7 +469,7 @@ func TestRenderDetailsModal(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles)
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true)
 
 	// Check all sections are present
 	if !strings.Contains(output, "claude") {
@@ -541,7 +541,7 @@ func TestRenderHeader_HelpHint(t *testing.T) {
 	s.TurnCount = 1
 	s.TotalCost = 0
 
-	output := RenderHeader(s, 100)
+	output := RenderHeader(s, 100, true)
 
 	if !strings.Contains(output, "[?]") {
 		t.Error("expected key hint [?] in output")
@@ -656,7 +656,7 @@ func TestSidebarRenderer_Render_WithTokens(t *testing.T) {
 	s.InputTokens = 15000
 	s.OutputTokens = 3000
 
-	output := r.Render(s, 40)
+	output := r.Render(s, 40, true)
 
 	if !strings.Contains(output, "Tokens") {
 		t.Error("expected Tokens section in sidebar with token data")
@@ -680,7 +680,7 @@ func TestDetailsModal_WithTokens(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles)
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true)
 
 	if !strings.Contains(output, "Tokens") {
 		t.Error("expected Tokens section in details modal")
@@ -758,7 +758,7 @@ func TestSidebarRenderer_Render_WithElapsed(t *testing.T) {
 	s.TurnCount = 5
 	s.TotalCost = 0.1234
 
-	output := r.Render(s, 40)
+	output := r.Render(s, 40, true)
 
 	if !strings.Contains(output, "Elapsed") {
 		t.Error("expected Elapsed section in sidebar")
@@ -774,9 +774,108 @@ func TestDetailsModal_WithElapsed(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles)
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true)
 
 	if !strings.Contains(output, "Elapsed") {
 		t.Error("expected Elapsed section in details modal")
+	}
+}
+
+func TestSidebarRenderer_RenderFollowIndicator(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("follow mode on returns empty string", func(t *testing.T) {
+		output := r.RenderFollowIndicator(true)
+		if output != "" {
+			t.Errorf("expected empty string when follow mode is on, got %q", output)
+		}
+	})
+
+	t.Run("follow mode off shows paused indicator", func(t *testing.T) {
+		output := r.RenderFollowIndicator(false)
+		if !strings.Contains(output, "Paused") {
+			t.Error("expected 'Paused' in output when follow mode is off")
+		}
+		if !strings.Contains(output, "[f]") {
+			t.Error("expected '[f]' hint in output when follow mode is off")
+		}
+	})
+}
+
+func TestSidebarRenderer_Render_FollowMode(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("follow mode on hides paused indicator", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "test-model"
+		output := r.Render(s, 40, true)
+
+		if strings.Contains(output, "Paused") {
+			t.Error("expected no 'Paused' indicator when follow mode is on")
+		}
+	})
+
+	t.Run("follow mode off shows paused indicator", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "test-model"
+		output := r.Render(s, 40, false)
+
+		if !strings.Contains(output, "Paused") {
+			t.Error("expected 'Paused' indicator when follow mode is off")
+		}
+	})
+}
+
+func TestRenderHeader_FollowMode(t *testing.T) {
+	s := state.NewState()
+	s.Model = "test-model"
+	s.TurnCount = 1
+	s.TotalCost = 0
+
+	t.Run("follow mode on has no pause icon", func(t *testing.T) {
+		output := RenderHeader(s, 100, true)
+		if strings.Contains(output, "⏸") {
+			t.Error("expected no pause icon when follow mode is on")
+		}
+	})
+
+	t.Run("follow mode off shows pause icon", func(t *testing.T) {
+		output := RenderHeader(s, 100, false)
+		if !strings.Contains(output, "⏸") {
+			t.Error("expected pause icon when follow mode is off")
+		}
+	})
+}
+
+func TestRenderDetailsModal_FollowMode(t *testing.T) {
+	s := state.NewState()
+	s.Model = "claude-opus"
+	s.TurnCount = 1
+	s.TotalCost = 0
+
+	styles := NewHeaderStyles()
+	sp := newTestSpinner()
+
+	t.Run("follow mode on hides paused indicator", func(t *testing.T) {
+		output := RenderDetailsModal(s, sp, 100, 40, styles, true)
+		if strings.Contains(output, "Paused") {
+			t.Error("expected no 'Paused' indicator when follow mode is on")
+		}
+	})
+
+	t.Run("follow mode off shows paused indicator", func(t *testing.T) {
+		output := RenderDetailsModal(s, sp, 100, 40, styles, false)
+		if !strings.Contains(output, "Paused") {
+			t.Error("expected 'Paused' indicator when follow mode is off")
+		}
+	})
+}
+
+func TestRenderHelpModal_FollowKeybinding(t *testing.T) {
+	styles := NewHeaderStyles()
+	output := RenderHelpModal(100, 40, styles)
+
+	if !strings.Contains(output, "Toggle follow") {
+		t.Error("expected 'Toggle follow' in help modal keybindings")
 	}
 }

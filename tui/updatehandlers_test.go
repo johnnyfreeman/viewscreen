@@ -362,3 +362,104 @@ func TestHandleParseError(t *testing.T) {
 		}
 	})
 }
+
+func TestFollowMode(t *testing.T) {
+	t.Run("default follow mode is on", func(t *testing.T) {
+		m := newTestModel()
+		if !m.followMode {
+			t.Error("expected follow mode to be on by default")
+		}
+	})
+
+	t.Run("f toggles follow mode off", func(t *testing.T) {
+		m := newTestModel()
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "f"})
+		if m.followMode {
+			t.Error("expected follow mode to be off after pressing f")
+		}
+	})
+
+	t.Run("f toggles follow mode back on", func(t *testing.T) {
+		m := newTestModel()
+		m.followMode = false
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "f"})
+		if !m.followMode {
+			t.Error("expected follow mode to be on after pressing f")
+		}
+	})
+
+	t.Run("f disabled when help modal open", func(t *testing.T) {
+		m := newTestModel()
+		m.showHelpModal = true
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "f"})
+		if !m.followMode {
+			t.Error("expected follow mode unchanged when help modal is open")
+		}
+	})
+
+	t.Run("f disabled when details modal open", func(t *testing.T) {
+		m := newTestModel()
+		m.showDetailsModal = true
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "f"})
+		if !m.followMode {
+			t.Error("expected follow mode unchanged when details modal is open")
+		}
+	})
+
+	t.Run("scroll up disables follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.followMode = true
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "k"})
+		if m.followMode {
+			t.Error("expected follow mode to be off after scrolling up")
+		}
+	})
+
+	t.Run("scroll down does not change follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.followMode = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
+		if m.followMode {
+			t.Error("expected follow mode to remain off after scrolling down")
+		}
+	})
+
+	t.Run("G re-enables follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.followMode = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "G"})
+		if !m.followMode {
+			t.Error("expected follow mode to be on after pressing G")
+		}
+	})
+
+	t.Run("g disables follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.followMode = true
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "g"})
+		if m.followMode {
+			t.Error("expected follow mode to be off after pressing g")
+		}
+	})
+
+	t.Run("pgup disables follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.followMode = true
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyPgUp})
+		if m.followMode {
+			t.Error("expected follow mode to be off after page up")
+		}
+	})
+}

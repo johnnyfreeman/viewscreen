@@ -36,6 +36,7 @@ type Model struct {
 	ready            bool
 	processor        *events.EventProcessor
 	search           Search
+	followMode       bool // auto-scroll to bottom on new content
 }
 
 // NewModel creates a new TUI model
@@ -65,6 +66,7 @@ func NewModel() Model {
 		layoutMode:    LayoutSidebar, // default to sidebar mode
 		processor:     events.NewEventProcessor(st),
 		search:        NewSearch(),
+		followMode:    true, // auto-scroll to bottom by default
 	}
 }
 
@@ -141,7 +143,9 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 	} else {
 		m.viewport.SetContent(m.content.String())
 	}
-	m.viewport.GotoBottom()
+	if m.followMode {
+		m.viewport.GotoBottom()
+	}
 
 	return m, nil
 }
@@ -184,7 +188,7 @@ func (m Model) renderLayout() string {
 	switch m.layoutMode {
 	case LayoutHeader:
 		// Header mode: single-line header on top, content below at full width
-		header := RenderHeader(m.state, m.width)
+		header := RenderHeader(m.state, m.width, m.followMode)
 		parts := []string{header, m.viewport.View()}
 		if searchBar != "" {
 			parts = append(parts, searchBar)
@@ -193,13 +197,13 @@ func (m Model) renderLayout() string {
 
 		// Overlay modal if showing details
 		if m.showDetailsModal {
-			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles)
+			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles, m.followMode)
 			return modal
 		}
 		return layout
 	default:
 		// Sidebar mode: content left, sidebar right
-		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles)
+		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles, m.followMode)
 		mainParts := []string{m.viewport.View()}
 		if searchBar != "" {
 			mainParts = append(mainParts, searchBar)
