@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
-	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	claudepkg "github.com/johnnyfreeman/viewscreen/claude"
 	"github.com/johnnyfreeman/viewscreen/config"
@@ -41,19 +40,19 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	}
 
+	// Keys that work regardless of modal state
 	switch msg.String() {
 	case "q", "ctrl+c":
-		return m, tea.Quit // tea.Quit is a func() Msg, which is a Cmd
+		return m, tea.Quit
 	case "?":
-		// Toggle help modal
 		m.showHelpModal = !m.showHelpModal
+		return m, nil
 	case "d":
-		// Toggle details modal (only in header mode)
 		if m.layoutMode == LayoutHeader {
 			m.showDetailsModal = !m.showDetailsModal
 		}
+		return m, nil
 	case "esc":
-		// Close any open modal or clear search
 		if m.showHelpModal {
 			m.showHelpModal = false
 		} else if m.showDetailsModal {
@@ -61,64 +60,52 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		} else if m.search.HasQuery() {
 			m.search.Clear()
 		}
+		return m, nil
+	}
+
+	// All remaining keys are navigation/action keys blocked by modals
+	if m.showDetailsModal || m.showHelpModal {
+		return m, nil
+	}
+
+	switch msg.String() {
 	case "f":
-		// Toggle follow mode (auto-scroll)
-		if !m.showDetailsModal && !m.showHelpModal {
-			m.followMode = !m.followMode
-			if m.followMode {
-				m.viewport.GotoBottom()
-			}
+		m.followMode = !m.followMode
+		if m.followMode {
+			m.viewport.GotoBottom()
 		}
 	case "/":
-		// Enter search mode
-		if !m.showDetailsModal && !m.showHelpModal {
-			m.search.Enter()
-		}
+		m.search.Enter()
 	case "n":
-		// Next search match
-		if !m.showDetailsModal && !m.showHelpModal && m.search.HasQuery() {
+		if m.search.HasQuery() {
 			m.search.NextMatch()
 			m.scrollToSearchMatch()
 		}
 	case "N":
-		// Previous search match
-		if !m.showDetailsModal && !m.showHelpModal && m.search.HasQuery() {
+		if m.search.HasQuery() {
 			m.search.PrevMatch()
 			m.scrollToSearchMatch()
 		}
 	case "e":
-		// Enter prompt editing mode (only when stream is done)
-		if !m.showDetailsModal && !m.showHelpModal && m.stdinDone {
+		if m.stdinDone {
 			m.promptEditor.Enter(m.state.Prompt)
 		}
 	case "up", "k":
-		if !m.showDetailsModal && !m.showHelpModal {
-			m.followMode = false
-			m.viewport.ScrollUp(1)
-		}
+		m.followMode = false
+		m.viewport.ScrollUp(1)
 	case "down", "j":
-		if !m.showDetailsModal && !m.showHelpModal {
-			m.viewport.ScrollDown(1)
-		}
+		m.viewport.ScrollDown(1)
 	case "pgup":
-		if !m.showDetailsModal && !m.showHelpModal {
-			m.followMode = false
-			m.viewport.HalfPageUp()
-		}
+		m.followMode = false
+		m.viewport.HalfPageUp()
 	case "pgdown":
-		if !m.showDetailsModal && !m.showHelpModal {
-			m.viewport.HalfPageDown()
-		}
+		m.viewport.HalfPageDown()
 	case "home", "g":
-		if !m.showDetailsModal && !m.showHelpModal {
-			m.followMode = false
-			m.viewport.GotoTop()
-		}
+		m.followMode = false
+		m.viewport.GotoTop()
 	case "end", "G":
-		if !m.showDetailsModal && !m.showHelpModal {
-			m.followMode = true
-			m.viewport.GotoBottom()
-		}
+		m.followMode = true
+		m.viewport.GotoBottom()
 	}
 	return m, nil
 }
@@ -232,18 +219,8 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 		contentHeight--
 	}
 
-	if !m.ready {
-		// First time setup - use functional options for v2 API
-		m.viewport = viewport.New(
-			viewport.WithWidth(contentWidth),
-			viewport.WithHeight(contentHeight),
-		)
-		m.viewport.YPosition = 0
-		m.ready = true
-	} else {
-		m.viewport.SetWidth(contentWidth)
-		m.viewport.SetHeight(contentHeight)
-	}
+	m.viewport.SetWidth(contentWidth)
+	m.viewport.SetHeight(contentHeight)
 
 	// Update markdown renderer width so text reflows to fit visible viewport
 	m.processor.SetWidth(contentWidth)

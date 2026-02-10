@@ -35,7 +35,6 @@ type Model struct {
 	layoutMode       LayoutMode
 	showDetailsModal bool
 	showHelpModal    bool
-	ready            bool
 	processor        *events.EventProcessor
 	search            Search
 	promptEditor      PromptEditor
@@ -82,10 +81,13 @@ func NewModel(opts ...ModelOption) Model {
 	)
 
 	st := state.NewState()
+	vp := viewport.New()
+	vp.KeyMap = viewport.KeyMap{} // Disable viewport key handling; model handles all keys
 	m := Model{
 		spinner:       s,
 		state:         st,
 		content:       &strings.Builder{},
+		viewport:      vp,
 		sidebarStyles: NewSidebarStyles(),
 		headerStyles:  NewHeaderStyles(),
 		layoutMode:    LayoutSidebar, // default to sidebar mode
@@ -219,11 +221,6 @@ func (m Model) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
-
-	if !m.ready {
-		v.SetContent("Initializing...")
-		return v
-	}
 	v.SetContent(m.renderLayout())
 	return v
 }
@@ -376,11 +373,6 @@ func RunWithPrompt(prompt string) (string, error) {
 		return m.content.String(), nil
 	}
 	return "", nil
-}
-
-// RunWithStdinPrompt spawns claude with a prompt read from a reader and runs the TUI.
-func RunWithStdinPrompt(prompt string) (string, error) {
-	return RunWithPrompt(prompt)
 }
 
 // isatty returns true if the file descriptor is a terminal.

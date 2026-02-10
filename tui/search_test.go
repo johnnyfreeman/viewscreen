@@ -418,7 +418,6 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 func TestSearchViewportHeight(t *testing.T) {
 	t.Run("viewport height reduced when search active", func(t *testing.T) {
 		m := NewModel()
-		m.ready = false
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
 
 		heightWithout := m.viewport.Height()

@@ -14,7 +14,8 @@ func newTestModel() Model {
 	// Simulate window size to initialize viewport
 	m.width = 100
 	m.height = 40
-	m.ready = true
+	m.viewport.SetWidth(100)
+	m.viewport.SetHeight(40)
 	return m
 }
 
@@ -218,15 +219,11 @@ func TestHandleKeyMsg(t *testing.T) {
 }
 
 func TestHandleWindowSizeMsg(t *testing.T) {
-	t.Run("initializes viewport on first size message", func(t *testing.T) {
+	t.Run("sets dimensions on size message", func(t *testing.T) {
 		m := NewModel()
-		m.ready = false
 
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
 
-		if !m.ready {
-			t.Error("expected ready to be true after window size")
-		}
 		if m.width != 120 {
 			t.Errorf("width = %d, want 120", m.width)
 		}
@@ -250,7 +247,6 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 
 	t.Run("calculates content width", func(t *testing.T) {
 		m := NewModel()
-		m.ready = false
 
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
 
@@ -263,7 +259,6 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 
 	t.Run("uses sidebar mode for wide terminals", func(t *testing.T) {
 		m := NewModel()
-		m.ready = false
 
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
 
@@ -274,7 +269,6 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 
 	t.Run("uses header mode for narrow terminals", func(t *testing.T) {
 		m := NewModel()
-		m.ready = false
 
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 70, Height: 50})
 
@@ -285,7 +279,6 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 
 	t.Run("header mode uses full width", func(t *testing.T) {
 		m := NewModel()
-		m.ready = false
 
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 70, Height: 50})
 
@@ -298,7 +291,6 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 
 	t.Run("header mode adjusts height for header", func(t *testing.T) {
 		m := NewModel()
-		m.ready = false
 
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 70, Height: 50})
 
