@@ -35,6 +35,7 @@ type Model struct {
 	showHelpModal    bool
 	ready            bool
 	processor        *events.EventProcessor
+	search           Search
 }
 
 // NewModel creates a new TUI model
@@ -63,6 +64,7 @@ func NewModel() Model {
 		headerStyles:  NewHeaderStyles(),
 		layoutMode:    LayoutSidebar, // default to sidebar mode
 		processor:     events.NewEventProcessor(st),
+		search:        NewSearch(),
 	}
 }
 
@@ -176,11 +178,18 @@ func (m Model) renderLayout() string {
 		return RenderHelpModal(m.width, m.height, m.headerStyles)
 	}
 
+	// Render search bar if active or has a query
+	searchBar := RenderSearchBar(m.search, m.viewport.Width())
+
 	switch m.layoutMode {
 	case LayoutHeader:
 		// Header mode: single-line header on top, content below at full width
 		header := RenderHeader(m.state, m.width)
-		layout := lipgloss.JoinVertical(lipgloss.Left, header, m.viewport.View())
+		parts := []string{header, m.viewport.View()}
+		if searchBar != "" {
+			parts = append(parts, searchBar)
+		}
+		layout := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 		// Overlay modal if showing details
 		if m.showDetailsModal {
@@ -191,7 +200,11 @@ func (m Model) renderLayout() string {
 	default:
 		// Sidebar mode: content left, sidebar right
 		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles)
-		mainContent := m.viewport.View()
+		mainParts := []string{m.viewport.View()}
+		if searchBar != "" {
+			mainParts = append(mainParts, searchBar)
+		}
+		mainContent := lipgloss.JoinVertical(lipgloss.Left, mainParts...)
 		return lipgloss.JoinHorizontal(lipgloss.Top, mainContent, sidebar)
 	}
 }

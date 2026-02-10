@@ -10,6 +10,11 @@ import (
 
 // handleKeyMsg processes keyboard input and returns the model and any command.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
+	// When search input is active, capture all keys for the search query
+	if m.search.Active {
+		return m.handleSearchKeyMsg(msg)
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit // tea.Quit is a func() Msg, which is a Cmd
@@ -22,11 +27,30 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.showDetailsModal = !m.showDetailsModal
 		}
 	case "esc":
-		// Close any open modal
+		// Close any open modal or clear search
 		if m.showHelpModal {
 			m.showHelpModal = false
 		} else if m.showDetailsModal {
 			m.showDetailsModal = false
+		} else if m.search.HasQuery() {
+			m.search.Clear()
+		}
+	case "/":
+		// Enter search mode
+		if !m.showDetailsModal && !m.showHelpModal {
+			m.search.Enter()
+		}
+	case "n":
+		// Next search match
+		if !m.showDetailsModal && !m.showHelpModal && m.search.HasQuery() {
+			m.search.NextMatch()
+			m.scrollToSearchMatch()
+		}
+	case "N":
+		// Previous search match
+		if !m.showDetailsModal && !m.showHelpModal && m.search.HasQuery() {
+			m.search.PrevMatch()
+			m.scrollToSearchMatch()
 		}
 	case "up", "k":
 		if !m.showDetailsModal && !m.showHelpModal {
@@ -56,6 +80,42 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleSearchKeyMsg processes keyboard input while search mode is active.
+func (m Model) handleSearchKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		// Cancel search, clear query
+		m.search.Clear()
+	case "enter":
+		// Confirm search, exit input mode but keep query
+		m.search.Exit()
+	case "backspace":
+		m.search.Backspace()
+		m.search.UpdateMatches(m.content.String())
+		m.scrollToSearchMatch()
+	case "ctrl+c":
+		return m, tea.Quit
+	default:
+		// Type character into search query
+		text := msg.String()
+		if len(text) == 1 {
+			m.search.TypeRune(rune(text[0]))
+			m.search.UpdateMatches(m.content.String())
+			m.scrollToSearchMatch()
+		}
+	}
+	return m, nil
+}
+
+// scrollToSearchMatch scrolls the viewport to show the current search match.
+func (m *Model) scrollToSearchMatch() {
+	line := m.search.CurrentLine()
+	if line < 0 {
+		return
+	}
+	m.viewport.SetYOffset(line)
+}
+
 // handleWindowSizeMsg processes terminal resize events.
 func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 	m.width = msg.Width
@@ -80,6 +140,11 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 		// Width minus sidebar and border
 		contentWidth = max(m.width-sidebarWidth-3, 20)
 		contentHeight = m.height - 2
+	}
+
+	// Reserve space for search bar when active
+	if m.search.Active || m.search.HasQuery() {
+		contentHeight--
 	}
 
 	if !m.ready {

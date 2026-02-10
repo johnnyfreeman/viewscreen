@@ -251,6 +251,8 @@ func RenderHelpModal(width, height int, styles HeaderStyles) string {
 		{"PgUp", "Half page up"},
 		{"g / Home", "Go to top"},
 		{"G / End", "Go to bottom"},
+		{"/", "Search"},
+		{"n / N", "Next / prev match"},
 		{"d", "Toggle details"},
 		{"?", "Toggle help"},
 		{"q", "Quit"},
