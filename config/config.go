@@ -12,6 +12,7 @@ var (
 	NoColor   bool
 	ShowUsage bool
 	NoTUI     bool
+	AutoExit  bool
 )
 
 // Provider abstracts config access for testability.
@@ -49,6 +50,7 @@ type Config struct {
 	NoColor   bool
 	ShowUsage bool
 	NoTUI     bool
+	AutoExit  bool
 }
 
 // Option is a functional option for configuring the parser
@@ -116,6 +118,7 @@ func Parse(opts ...Option) (*Config, error) {
 	p.flagSet.BoolVar(&cfg.NoColor, "no-color", false, "Disable colored output")
 	p.flagSet.BoolVar(&cfg.ShowUsage, "usage", true, "Show token usage in result")
 	p.flagSet.BoolVar(&cfg.NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
+	p.flagSet.BoolVar(&cfg.AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
 
 	if err := p.flagSet.Parse(p.args); err != nil {
 		return nil, err
@@ -133,6 +136,7 @@ func ParseFlags() {
 	flag.BoolVar(&NoColor, "no-color", false, "Disable colored output")
 	flag.BoolVar(&ShowUsage, "usage", true, "Show token usage in result")
 	flag.BoolVar(&NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
+	flag.BoolVar(&AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
 	flag.Parse()
 
 	style.Init(NoColor)

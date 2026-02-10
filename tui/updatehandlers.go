@@ -15,6 +15,17 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.handleSearchKeyMsg(msg)
 	}
 
+	// Cancel auto-exit countdown on any key except q/ctrl+c
+	if m.autoExitRemaining > 0 {
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		default:
+			m.autoExitRemaining = 0
+			return m, nil
+		}
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit // tea.Quit is a func() Msg, which is a Cmd
@@ -216,11 +227,25 @@ func (m Model) handleRawLine(msg RawLineMsg) (Model, tea.Cmd) {
 }
 
 // handleStdinClosed processes the stdin closed signal.
-func (m Model) handleStdinClosed() Model {
+func (m Model) handleStdinClosed() (Model, tea.Cmd) {
 	m.stdinDone = true
-	// Don't quit immediately - let user view the content
-	// They can press 'q' to quit
-	return m
+	if m.autoExit {
+		m.autoExitRemaining = 5
+		return m, AutoExitTick()
+	}
+	return m, nil
+}
+
+// handleAutoExitTick processes a countdown tick for auto-exit.
+func (m Model) handleAutoExitTick() (Model, tea.Cmd) {
+	if m.autoExitRemaining <= 0 {
+		return m, nil
+	}
+	m.autoExitRemaining--
+	if m.autoExitRemaining <= 0 {
+		return m, tea.Quit
+	}
+	return m, AutoExitTick()
 }
 
 // handleParseError processes event parsing errors.

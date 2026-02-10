@@ -342,10 +342,120 @@ func TestHandleStdinClosed(t *testing.T) {
 	t.Run("sets stdinDone", func(t *testing.T) {
 		m := newTestModel()
 
-		m = m.handleStdinClosed()
+		m, _ = m.handleStdinClosed()
 
 		if !m.stdinDone {
 			t.Error("expected stdinDone to be true")
+		}
+	})
+
+	t.Run("starts countdown when autoExit enabled", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = true
+
+		m, cmd := m.handleStdinClosed()
+
+		if !m.stdinDone {
+			t.Error("expected stdinDone to be true")
+		}
+		if m.autoExitRemaining != 5 {
+			t.Errorf("expected autoExitRemaining=5, got %d", m.autoExitRemaining)
+		}
+		if cmd == nil {
+			t.Error("expected tick command when autoExit enabled")
+		}
+	})
+
+	t.Run("no countdown when autoExit disabled", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = false
+
+		m, cmd := m.handleStdinClosed()
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0, got %d", m.autoExitRemaining)
+		}
+		if cmd != nil {
+			t.Error("expected no command when autoExit disabled")
+		}
+	})
+}
+
+func TestHandleAutoExitTick(t *testing.T) {
+	t.Run("decrements remaining and continues", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+
+		m, cmd := m.handleAutoExitTick()
+
+		if m.autoExitRemaining != 2 {
+			t.Errorf("expected autoExitRemaining=2, got %d", m.autoExitRemaining)
+		}
+		if cmd == nil {
+			t.Error("expected tick command to continue countdown")
+		}
+	})
+
+	t.Run("quits at zero", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 1
+
+		m, cmd := m.handleAutoExitTick()
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0, got %d", m.autoExitRemaining)
+		}
+		if cmd == nil {
+			t.Error("expected quit command at zero")
+		}
+	})
+
+	t.Run("no-op when already inactive", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 0
+
+		m, cmd := m.handleAutoExitTick()
+
+		if cmd != nil {
+			t.Error("expected no command when countdown inactive")
+		}
+	})
+}
+
+func TestAutoExitCancelOnKeyPress(t *testing.T) {
+	t.Run("any key cancels countdown", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 after key press, got %d", m.autoExitRemaining)
+		}
+		if cmd != nil {
+			t.Error("expected no command after cancelling countdown")
+		}
+	})
+
+	t.Run("q still quits during countdown", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
+
+		if cmd == nil {
+			t.Error("expected quit command on q during countdown")
+		}
+	})
+
+	t.Run("ctrl+c still quits during countdown", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+
+		if cmd == nil {
+			t.Error("expected quit command on ctrl+c during countdown")
 		}
 	})
 }

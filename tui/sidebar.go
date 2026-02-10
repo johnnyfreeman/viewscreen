@@ -228,6 +228,18 @@ func (r *SidebarRenderer) RenderFollowIndicator(followMode bool) string {
 	return style.WarningText("⏸ Paused") + " " + style.MutedText("[f]") + "\n\n"
 }
 
+// RenderAutoExitStatus renders the auto-exit countdown or stream complete status.
+func (r *SidebarRenderer) RenderAutoExitStatus(stdinDone bool, autoExitRemaining int) string {
+	if !stdinDone {
+		return ""
+	}
+	if autoExitRemaining > 0 {
+		return style.MutedText(fmt.Sprintf("Exiting in %ds...", autoExitRemaining)) + "\n" +
+			style.MutedText("any key to cancel") + "\n\n"
+	}
+	return style.MutedText("Stream complete") + "\n\n"
+}
+
 // ScrollPosition holds the viewport scroll state for display.
 type ScrollPosition struct {
 	AtTop   bool
@@ -260,11 +272,12 @@ func (r *SidebarRenderer) RenderScrollPosition(pos ScrollPosition) string {
 }
 
 // Render renders the complete sidebar by composing all sections.
-func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, scrollPos ScrollPosition) string {
+func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int) string {
 	var sb strings.Builder
 
 	sb.WriteString(r.RenderLogo())
 	sb.WriteString("\n")
+	sb.WriteString(r.RenderAutoExitStatus(stdinDone, autoExitRemaining))
 	sb.WriteString(r.RenderFollowIndicator(followMode))
 	sb.WriteString(r.RenderPrompt(s.Prompt))
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
@@ -285,9 +298,9 @@ func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, sc
 
 // RenderSidebar renders the sidebar with session info and todos.
 // This is the main entry point, kept for backward compatibility.
-func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles, followMode bool, scrollPos ScrollPosition) string {
+func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int) string {
 	r := NewSidebarRenderer(styles, spinner)
-	return r.Render(s, height, followMode, scrollPos)
+	return r.Render(s, height, followMode, scrollPos, stdinDone, autoExitRemaining)
 }
 
 // HeaderStyles holds the lipgloss styles for header layout.
@@ -310,7 +323,7 @@ func NewHeaderStyles() HeaderStyles {
 
 // RenderHeader renders a single-line header for narrow terminals.
 // Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 │ 42% ─── [?] ───
-func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPosition) string {
+func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int) string {
 	logo := NewLogoRenderer()
 
 	// Build the info section: model │ turns │ cost
@@ -333,6 +346,17 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 		style.MutedText("│"),
 		scrollStr)
 
+	// Auto-exit hint
+	autoExitHint := ""
+	autoExitHintLen := 0
+	if stdinDone && autoExitRemaining > 0 {
+		autoExitHint = style.MutedText(fmt.Sprintf("Exit %ds", autoExitRemaining))
+		autoExitHintLen = 6 + len(fmt.Sprintf("%d", autoExitRemaining)) // "Exit " + N + "s"
+	} else if stdinDone {
+		autoExitHint = style.MutedText("Done")
+		autoExitHintLen = 4
+	}
+
 	// Fixed parts
 	title := logo.RenderTitle()
 	keyHint := style.MutedText("[?]")
@@ -354,7 +378,11 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 	if pausedLen > 0 {
 		pausedExtra = pausedLen + 1 // pause icon + space
 	}
-	fixedLen := 4 + titleLen + 5 + infoLen + 5 + pausedExtra + keyHintLen + 4 // decorations + spaces
+	autoExitExtra := 0
+	if autoExitHintLen > 0 {
+		autoExitExtra = autoExitHintLen + 1 // hint + space
+	}
+	fixedLen := 4 + titleLen + 5 + infoLen + 5 + pausedExtra + autoExitExtra + keyHintLen + 4 // decorations + spaces
 
 	// Remaining space for decorations
 	remaining := max(width-fixedLen, 4)
@@ -364,29 +392,29 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 	midDeco := strings.Repeat("─", 3)
 	rightDeco := strings.Repeat("─", max(remaining, 1))
 
-	if pausedHint != "" {
-		return fmt.Sprintf("%s %s %s %s %s %s %s %s",
-			style.MutedText(leftDeco),
-			title,
-			style.MutedText(midDeco),
-			info,
-			style.MutedText(midDeco),
-			pausedHint,
-			keyHint,
-			style.MutedText(rightDeco))
+	// Build trailing indicators: [autoExit] [paused] [?]
+	var trailing []string
+	if autoExitHint != "" {
+		trailing = append(trailing, autoExitHint)
 	}
+	if pausedHint != "" {
+		trailing = append(trailing, pausedHint)
+	}
+	trailing = append(trailing, keyHint)
+	trailingStr := strings.Join(trailing, " ")
+
 	return fmt.Sprintf("%s %s %s %s %s %s %s",
 		style.MutedText(leftDeco),
 		title,
 		style.MutedText(midDeco),
 		info,
 		style.MutedText(midDeco),
-		keyHint,
+		trailingStr,
 		style.MutedText(rightDeco))
 }
 
 // RenderHelpModal renders the keybindings help modal overlay.
-func RenderHelpModal(width, height int, styles HeaderStyles) string {
+func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool) string {
 	var sb strings.Builder
 
 	// Title
@@ -410,6 +438,14 @@ func RenderHelpModal(width, height int, styles HeaderStyles) string {
 		{"d", "Toggle details"},
 		{"?", "Toggle help"},
 		{"q", "Quit"},
+	}
+
+	if autoExitActive {
+		// Insert before the last entry (quit)
+		bindings = append(bindings[:len(bindings)-1],
+			struct{ key, desc string }{"any key", "Cancel auto-exit"},
+			bindings[len(bindings)-1],
+		)
 	}
 
 	for _, b := range bindings {
@@ -446,7 +482,7 @@ func RenderHelpModal(width, height int, styles HeaderStyles) string {
 }
 
 // RenderDetailsModal renders the details modal overlay.
-func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles, followMode bool, scrollPos ScrollPosition) string {
+func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int) string {
 	r := NewSidebarRenderer(NewSidebarStyles(), sp)
 
 	var sb strings.Builder
@@ -454,6 +490,9 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	// Logo
 	sb.WriteString(r.RenderLogo())
 	sb.WriteString("\n")
+
+	// Auto-exit status
+	sb.WriteString(r.RenderAutoExitStatus(stdinDone, autoExitRemaining))
 
 	// Follow mode indicator
 	sb.WriteString(r.RenderFollowIndicator(followMode))

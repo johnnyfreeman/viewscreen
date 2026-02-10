@@ -35,8 +35,10 @@ type Model struct {
 	showHelpModal    bool
 	ready            bool
 	processor        *events.EventProcessor
-	search           Search
-	followMode       bool // auto-scroll to bottom on new content
+	search            Search
+	followMode        bool // auto-scroll to bottom on new content
+	autoExit          bool // --auto-exit flag enabled
+	autoExitRemaining int  // seconds left in countdown, 0 = inactive
 }
 
 // NewModel creates a new TUI model
@@ -67,6 +69,7 @@ func NewModel() Model {
 		processor:     events.NewEventProcessor(st),
 		search:        NewSearch(),
 		followMode:    true, // auto-scroll to bottom by default
+		autoExit:      config.AutoExit,
 	}
 }
 
@@ -106,7 +109,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case StdinClosedMsg:
-		m = m.handleStdinClosed()
+		m, cmd = m.handleStdinClosed()
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+	case AutoExitTickMsg:
+		m, cmd = m.handleAutoExitTick()
+		if cmd != nil {
+			return m, cmd
+		}
 
 	case events.ParseError:
 		m = m.handleParseError(msg)
@@ -188,7 +200,7 @@ func (m Model) scrollPosition() ScrollPosition {
 func (m Model) renderLayout() string {
 	// Help modal overlays both layout modes
 	if m.showHelpModal {
-		return RenderHelpModal(m.width, m.height, m.headerStyles)
+		return RenderHelpModal(m.width, m.height, m.headerStyles, m.autoExitRemaining > 0)
 	}
 
 	// Render search bar if active or has a query
@@ -198,7 +210,7 @@ func (m Model) renderLayout() string {
 	switch m.layoutMode {
 	case LayoutHeader:
 		// Header mode: single-line header on top, content below at full width
-		header := RenderHeader(m.state, m.width, m.followMode, scrollPos)
+		header := RenderHeader(m.state, m.width, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining)
 		parts := []string{header, m.viewport.View()}
 		if searchBar != "" {
 			parts = append(parts, searchBar)
@@ -207,13 +219,13 @@ func (m Model) renderLayout() string {
 
 		// Overlay modal if showing details
 		if m.showDetailsModal {
-			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles, m.followMode, scrollPos)
+			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining)
 			return modal
 		}
 		return layout
 	default:
 		// Sidebar mode: content left, sidebar right
-		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles, m.followMode, scrollPos)
+		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining)
 		mainParts := []string{m.viewport.View()}
 		if searchBar != "" {
 			mainParts = append(mainParts, searchBar)

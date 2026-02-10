@@ -539,6 +539,53 @@ func TestParse_HelpFlag(t *testing.T) {
 	}
 }
 
+func TestParse_AutoExitFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected bool
+	}{
+		{
+			name:     "not set",
+			args:     []string{},
+			expected: false,
+		},
+		{
+			name:     "flag set",
+			args:     []string{"-auto-exit"},
+			expected: true,
+		},
+		{
+			name:     "explicit true",
+			args:     []string{"-auto-exit=true"},
+			expected: true,
+		},
+		{
+			name:     "explicit false",
+			args:     []string{"-auto-exit=false"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &MockStyleInitializer{}
+			cfg, err := Parse(
+				WithArgs(tt.args),
+				WithStyleInitializer(mock),
+			)
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if cfg.AutoExit != tt.expected {
+				t.Errorf("AutoExit: got %v, want %v", cfg.AutoExit, tt.expected)
+			}
+		})
+	}
+}
+
 func TestParse_FlagOrderIndependent(t *testing.T) {
 	tests := []struct {
 		name string

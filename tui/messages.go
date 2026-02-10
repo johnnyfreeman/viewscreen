@@ -9,3 +9,6 @@ type RawLineMsg struct {
 type StdinClosedMsg struct {
 	Err error
 }
+
+// AutoExitTickMsg is sent each second during the auto-exit countdown.
+type AutoExitTickMsg struct{}

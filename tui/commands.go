@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/johnnyfreeman/viewscreen/events"
@@ -21,4 +22,12 @@ func ReadStdinLine(scanner *bufio.Scanner) tea.Cmd {
 // Returns the events.Event directly since it already implements the tea.Msg interface.
 func ParseEvent(line string) tea.Msg {
 	return events.Parse(line)
+}
+
+// AutoExitTick returns a command that sends an AutoExitTickMsg after 1 second.
+func AutoExitTick() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(1 * time.Second)
+		return AutoExitTickMsg{}
+	}
 }

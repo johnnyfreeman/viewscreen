@@ -314,7 +314,7 @@ func TestSidebarRenderer_Render(t *testing.T) {
 			{Subject: "Task 1", Status: "completed"},
 		}
 
-		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 		// Check all sections are present
 		if !strings.Contains(output, "claude") {
@@ -340,7 +340,7 @@ func TestSidebarRenderer_Render(t *testing.T) {
 		s.CurrentTool = "Read"
 		s.CurrentToolInput = "test.go"
 
-		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 		if !strings.Contains(output, "Running") {
 			t.Error("expected Running header in output")
@@ -355,7 +355,7 @@ func TestSidebarRenderer_Render(t *testing.T) {
 		s.ToolInProgress = false
 		s.CurrentTool = "Read" // Set but not in progress
 
-		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 		// Running header should not appear
 		if strings.Contains(output, "Running") {
@@ -374,7 +374,7 @@ func TestRenderSidebar(t *testing.T) {
 	styles := NewSidebarStyles()
 	sp := newTestSpinner()
 
-	output := RenderSidebar(s, sp, 40, styles, true, ScrollPosition{AtTop: true})
+	output := RenderSidebar(s, sp, 40, styles, true, ScrollPosition{AtTop: true}, false, 0)
 
 	if output == "" {
 		t.Error("expected non-empty output from RenderSidebar")
@@ -410,7 +410,7 @@ func TestRenderHeader(t *testing.T) {
 		s.TurnCount = 3
 		s.TotalCost = 0.05
 
-		output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true})
+		output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true}, false, 0)
 
 		if output == "" {
 			t.Error("expected non-empty output from RenderHeader")
@@ -441,7 +441,7 @@ func TestRenderHeader(t *testing.T) {
 		s.TurnCount = 1
 		s.TotalCost = 0
 
-		output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true})
+		output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true}, false, 0)
 
 		// Should not contain the full model name
 		if strings.Contains(output, "very-long-model-name-that-exceeds-limit") {
@@ -469,7 +469,7 @@ func TestRenderDetailsModal(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true})
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true}, false, 0)
 
 	// Check all sections are present
 	if !strings.Contains(output, "claude") {
@@ -496,7 +496,7 @@ func TestRenderHelpModal(t *testing.T) {
 	styles := NewHeaderStyles()
 
 	t.Run("contains keybinding entries", func(t *testing.T) {
-		output := RenderHelpModal(100, 40, styles)
+		output := RenderHelpModal(100, 40, styles, false)
 
 		if !strings.Contains(output, "Keybindings") {
 			t.Error("expected 'Keybindings' title in output")
@@ -519,7 +519,7 @@ func TestRenderHelpModal(t *testing.T) {
 	})
 
 	t.Run("contains close hint", func(t *testing.T) {
-		output := RenderHelpModal(100, 40, styles)
+		output := RenderHelpModal(100, 40, styles, false)
 
 		if !strings.Contains(output, "Press ? or Esc to close") {
 			t.Error("expected close hint in output")
@@ -527,7 +527,7 @@ func TestRenderHelpModal(t *testing.T) {
 	})
 
 	t.Run("renders non-empty output", func(t *testing.T) {
-		output := RenderHelpModal(80, 30, styles)
+		output := RenderHelpModal(80, 30, styles, false)
 
 		if output == "" {
 			t.Error("expected non-empty output from RenderHelpModal")
@@ -541,7 +541,7 @@ func TestRenderHeader_HelpHint(t *testing.T) {
 	s.TurnCount = 1
 	s.TotalCost = 0
 
-	output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true})
+	output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true}, false, 0)
 
 	if !strings.Contains(output, "[?]") {
 		t.Error("expected key hint [?] in output")
@@ -700,7 +700,7 @@ func TestSidebarRenderer_Render_WithCostRate(t *testing.T) {
 		s.TotalCost = 0.30
 		s.StartTime = s.StartTime.Add(-3 * time.Minute) // 3 min ago -> ~$0.10/min
 
-		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 		if !strings.Contains(output, "Rate") {
 			t.Error("expected Rate section in sidebar with cost data")
@@ -717,7 +717,7 @@ func TestSidebarRenderer_Render_WithCostRate(t *testing.T) {
 		s.TotalCost = 0
 		s.StartTime = s.StartTime.Add(-5 * time.Minute)
 
-		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 		if strings.Contains(output, "Rate") {
 			t.Error("expected no Rate section when cost is zero")
@@ -735,7 +735,7 @@ func TestDetailsModal_WithCostRate(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true})
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true}, false, 0)
 
 	if !strings.Contains(output, "Rate") {
 		t.Error("expected Rate section in details modal")
@@ -834,7 +834,7 @@ func TestSidebarRenderer_Render_WithTokens(t *testing.T) {
 	s.InputTokens = 15000
 	s.OutputTokens = 3000
 
-	output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+	output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 	if !strings.Contains(output, "Tokens") {
 		t.Error("expected Tokens section in sidebar with token data")
@@ -858,7 +858,7 @@ func TestSidebarRenderer_Render_WithCache(t *testing.T) {
 		s.CacheRead = 8000
 		s.CacheCreated = 3000
 
-		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 		if !strings.Contains(output, "Cache") {
 			t.Error("expected Cache section in sidebar with cache data")
@@ -877,7 +877,7 @@ func TestSidebarRenderer_Render_WithCache(t *testing.T) {
 		s.TurnCount = 1
 		s.TotalCost = 0
 
-		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 		if strings.Contains(output, "Cache") {
 			t.Error("expected no Cache section when cache data is zero")
@@ -896,7 +896,7 @@ func TestDetailsModal_WithCache(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true})
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true}, false, 0)
 
 	if !strings.Contains(output, "Cache") {
 		t.Error("expected Cache section in details modal")
@@ -917,7 +917,7 @@ func TestDetailsModal_WithTokens(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true})
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true}, false, 0)
 
 	if !strings.Contains(output, "Tokens") {
 		t.Error("expected Tokens section in details modal")
@@ -995,7 +995,7 @@ func TestSidebarRenderer_Render_WithElapsed(t *testing.T) {
 	s.TurnCount = 5
 	s.TotalCost = 0.1234
 
-	output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+	output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 	if !strings.Contains(output, "Elapsed") {
 		t.Error("expected Elapsed section in sidebar")
@@ -1011,7 +1011,7 @@ func TestDetailsModal_WithElapsed(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true})
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true}, false, 0)
 
 	if !strings.Contains(output, "Elapsed") {
 		t.Error("expected Elapsed section in details modal")
@@ -1045,7 +1045,7 @@ func TestSidebarRenderer_Render_FollowMode(t *testing.T) {
 	t.Run("follow mode on hides paused indicator", func(t *testing.T) {
 		s := state.NewState()
 		s.Model = "test-model"
-		output := r.Render(s, 40, true, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
 
 		if strings.Contains(output, "Paused") {
 			t.Error("expected no 'Paused' indicator when follow mode is on")
@@ -1055,7 +1055,7 @@ func TestSidebarRenderer_Render_FollowMode(t *testing.T) {
 	t.Run("follow mode off shows paused indicator", func(t *testing.T) {
 		s := state.NewState()
 		s.Model = "test-model"
-		output := r.Render(s, 40, false, ScrollPosition{AtTop: true})
+		output := r.Render(s, 40, false, ScrollPosition{AtTop: true}, false, 0)
 
 		if !strings.Contains(output, "Paused") {
 			t.Error("expected 'Paused' indicator when follow mode is off")
@@ -1070,14 +1070,14 @@ func TestRenderHeader_FollowMode(t *testing.T) {
 	s.TotalCost = 0
 
 	t.Run("follow mode on has no pause icon", func(t *testing.T) {
-		output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true})
+		output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true}, false, 0)
 		if strings.Contains(output, "⏸") {
 			t.Error("expected no pause icon when follow mode is on")
 		}
 	})
 
 	t.Run("follow mode off shows pause icon", func(t *testing.T) {
-		output := RenderHeader(s, 100, false, ScrollPosition{AtTop: true})
+		output := RenderHeader(s, 100, false, ScrollPosition{AtTop: true}, false, 0)
 		if !strings.Contains(output, "⏸") {
 			t.Error("expected pause icon when follow mode is off")
 		}
@@ -1094,14 +1094,14 @@ func TestRenderDetailsModal_FollowMode(t *testing.T) {
 	sp := newTestSpinner()
 
 	t.Run("follow mode on hides paused indicator", func(t *testing.T) {
-		output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true})
+		output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{AtTop: true}, false, 0)
 		if strings.Contains(output, "Paused") {
 			t.Error("expected no 'Paused' indicator when follow mode is on")
 		}
 	})
 
 	t.Run("follow mode off shows paused indicator", func(t *testing.T) {
-		output := RenderDetailsModal(s, sp, 100, 40, styles, false, ScrollPosition{AtTop: true})
+		output := RenderDetailsModal(s, sp, 100, 40, styles, false, ScrollPosition{AtTop: true}, false, 0)
 		if !strings.Contains(output, "Paused") {
 			t.Error("expected 'Paused' indicator when follow mode is off")
 		}
@@ -1110,7 +1110,7 @@ func TestRenderDetailsModal_FollowMode(t *testing.T) {
 
 func TestRenderHelpModal_FollowKeybinding(t *testing.T) {
 	styles := NewHeaderStyles()
-	output := RenderHelpModal(100, 40, styles)
+	output := RenderHelpModal(100, 40, styles, false)
 
 	if !strings.Contains(output, "Toggle follow") {
 		t.Error("expected 'Toggle follow' in help modal keybindings")
@@ -1183,7 +1183,7 @@ func TestSidebarRenderer_Render_WithScrollPosition(t *testing.T) {
 	s.TurnCount = 5
 	s.TotalCost = 0.1234
 
-	output := r.Render(s, 40, true, ScrollPosition{Percent: 0.75})
+	output := r.Render(s, 40, true, ScrollPosition{Percent: 0.75}, false, 0)
 
 	if !strings.Contains(output, "Position") {
 		t.Error("expected Position section in sidebar")
@@ -1200,21 +1200,21 @@ func TestRenderHeader_WithScrollPosition(t *testing.T) {
 	s.TotalCost = 0.05
 
 	t.Run("shows Top when at top", func(t *testing.T) {
-		output := RenderHeader(s, 120, true, ScrollPosition{AtTop: true})
+		output := RenderHeader(s, 120, true, ScrollPosition{AtTop: true}, false, 0)
 		if !strings.Contains(output, "Top") {
 			t.Error("expected 'Top' in header output")
 		}
 	})
 
 	t.Run("shows Bot when at bottom", func(t *testing.T) {
-		output := RenderHeader(s, 120, true, ScrollPosition{AtBottom: true})
+		output := RenderHeader(s, 120, true, ScrollPosition{AtBottom: true}, false, 0)
 		if !strings.Contains(output, "Bot") {
 			t.Error("expected 'Bot' in header output")
 		}
 	})
 
 	t.Run("shows percentage in middle", func(t *testing.T) {
-		output := RenderHeader(s, 120, true, ScrollPosition{Percent: 0.42})
+		output := RenderHeader(s, 120, true, ScrollPosition{Percent: 0.42}, false, 0)
 		if !strings.Contains(output, "42%") {
 			t.Error("expected '42%' in header output")
 		}
@@ -1230,7 +1230,7 @@ func TestRenderDetailsModal_WithScrollPosition(t *testing.T) {
 	styles := NewHeaderStyles()
 	sp := newTestSpinner()
 
-	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{Percent: 0.33})
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true, ScrollPosition{Percent: 0.33}, false, 0)
 
 	if !strings.Contains(output, "Position") {
 		t.Error("expected Position section in details modal")
