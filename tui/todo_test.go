@@ -184,6 +184,99 @@ func TestTodoRenderer_RenderList(t *testing.T) {
 	})
 }
 
+func TestTodoRenderer_RenderProgressBar(t *testing.T) {
+	r := newTestTodoRenderer()
+
+	t.Run("zero total returns empty string", func(t *testing.T) {
+		output := r.RenderProgressBar(0, 0)
+		if output != "" {
+			t.Errorf("expected empty string for zero total, got %q", output)
+		}
+	})
+
+	t.Run("renders filled and empty blocks", func(t *testing.T) {
+		output := r.RenderProgressBar(3, 6)
+
+		if !strings.Contains(output, "█") {
+			t.Error("expected filled blocks in progress bar")
+		}
+		if !strings.Contains(output, "░") {
+			t.Error("expected empty blocks in progress bar")
+		}
+		if !strings.Contains(output, "3/6") {
+			t.Errorf("expected '3/6' count in output, got %q", output)
+		}
+	})
+
+	t.Run("all completed", func(t *testing.T) {
+		output := r.RenderProgressBar(5, 5)
+
+		if !strings.Contains(output, "█") {
+			t.Error("expected filled blocks in progress bar")
+		}
+		if strings.Contains(output, "░") {
+			t.Error("expected no empty blocks when fully complete")
+		}
+		if !strings.Contains(output, "5/5") {
+			t.Errorf("expected '5/5' count in output, got %q", output)
+		}
+	})
+
+	t.Run("none completed", func(t *testing.T) {
+		output := r.RenderProgressBar(0, 4)
+
+		if !strings.Contains(output, "░") {
+			t.Error("expected empty blocks in progress bar")
+		}
+		if !strings.Contains(output, "0/4") {
+			t.Errorf("expected '0/4' count in output, got %q", output)
+		}
+	})
+
+	t.Run("narrow width still renders", func(t *testing.T) {
+		narrow := NewTodoRenderer(10, newTestSpinner())
+		output := narrow.RenderProgressBar(1, 3)
+
+		if !strings.Contains(output, "1/3") {
+			t.Errorf("expected '1/3' count in narrow output, got %q", output)
+		}
+		if !strings.Contains(output, "█") {
+			t.Error("expected at least some filled blocks in narrow bar")
+		}
+	})
+}
+
+func TestTodoRenderer_RenderList_WithProgressBar(t *testing.T) {
+	r := newTestTodoRenderer()
+
+	t.Run("single todo has no progress bar", func(t *testing.T) {
+		todos := []state.Todo{
+			{Subject: "Only task", Status: "pending"},
+		}
+		output := r.RenderList(todos)
+
+		if strings.Contains(output, "█") || strings.Contains(output, "░") {
+			t.Error("expected no progress bar for single todo")
+		}
+	})
+
+	t.Run("two or more todos show progress bar", func(t *testing.T) {
+		todos := []state.Todo{
+			{Subject: "Task 1", Status: "completed"},
+			{Subject: "Task 2", Status: "pending"},
+			{Subject: "Task 3", Status: "pending"},
+		}
+		output := r.RenderList(todos)
+
+		if !strings.Contains(output, "1/3") {
+			t.Errorf("expected '1/3' progress in output, got %q", output)
+		}
+		if !strings.Contains(output, "█") {
+			t.Error("expected filled blocks in progress bar")
+		}
+	})
+}
+
 func TestTodoRenderer_Truncation(t *testing.T) {
 	r := NewTodoRenderer(20, newTestSpinner()) // narrow width
 

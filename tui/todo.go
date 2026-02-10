@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/bubbles/v2/spinner"
@@ -59,7 +60,34 @@ func (r *TodoRenderer) RenderItem(todo state.Todo) string {
 	return sb.String()
 }
 
-// RenderList renders a list of todos with a header.
+// RenderProgressBar renders a compact progress bar with completion count.
+// Format: ████░░░░░░ 3/8
+// The bar width adapts to the available space minus the count label.
+func (r *TodoRenderer) RenderProgressBar(completed, total int) string {
+	if total == 0 {
+		return ""
+	}
+
+	label := fmt.Sprintf(" %d/%d", completed, total)
+	barWidth := max(r.width-4-len(label), 4) // padding and label
+
+	filled := 0
+	if total > 0 {
+		filled = (completed * barWidth) / total
+	}
+	if filled > barWidth {
+		filled = barWidth
+	}
+
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+
+	if completed == total {
+		return style.SuccessText(bar) + style.SidebarTodoDoneText(label) + "\n"
+	}
+	return style.AccentText(bar) + style.SidebarHeaderText(label) + "\n"
+}
+
+// RenderList renders a list of todos with a header and progress bar.
 // Returns empty string if the list is empty.
 func (r *TodoRenderer) RenderList(todos []state.Todo) string {
 	if len(todos) == 0 {
@@ -69,6 +97,17 @@ func (r *TodoRenderer) RenderList(todos []state.Todo) string {
 	var sb strings.Builder
 	sb.WriteString(style.SidebarHeaderText("Tasks"))
 	sb.WriteString("\n")
+
+	// Progress bar when there are 2+ todos
+	if len(todos) >= 2 {
+		completed := 0
+		for _, todo := range todos {
+			if todo.Status == "completed" {
+				completed++
+			}
+		}
+		sb.WriteString(r.RenderProgressBar(completed, len(todos)))
+	}
 
 	for _, todo := range todos {
 		sb.WriteString(r.RenderItem(todo))

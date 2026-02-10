@@ -160,3 +160,14 @@ func (s *State) GetActiveTodo() *Todo {
 	}
 	return nil
 }
+
+// TodoProgress returns the number of completed todos and total todos.
+func (s *State) TodoProgress() (completed, total int) {
+	total = len(s.Todos)
+	for _, todo := range s.Todos {
+		if todo.Status == "completed" {
+			completed++
+		}
+	}
+	return completed, total
+}

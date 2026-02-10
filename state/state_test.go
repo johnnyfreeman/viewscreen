@@ -102,3 +102,51 @@ func TestState_Elapsed(t *testing.T) {
 		t.Errorf("Elapsed() = %v, expected < 6s", elapsed)
 	}
 }
+
+func TestState_TodoProgress(t *testing.T) {
+	t.Run("empty todos", func(t *testing.T) {
+		s := NewState()
+		completed, total := s.TodoProgress()
+		if completed != 0 || total != 0 {
+			t.Errorf("TodoProgress() = (%d, %d), want (0, 0)", completed, total)
+		}
+	})
+
+	t.Run("mixed statuses", func(t *testing.T) {
+		s := NewState()
+		s.Todos = []Todo{
+			{Subject: "A", Status: "completed"},
+			{Subject: "B", Status: "in_progress"},
+			{Subject: "C", Status: "completed"},
+			{Subject: "D", Status: "pending"},
+		}
+		completed, total := s.TodoProgress()
+		if completed != 2 || total != 4 {
+			t.Errorf("TodoProgress() = (%d, %d), want (2, 4)", completed, total)
+		}
+	})
+
+	t.Run("all completed", func(t *testing.T) {
+		s := NewState()
+		s.Todos = []Todo{
+			{Subject: "A", Status: "completed"},
+			{Subject: "B", Status: "completed"},
+		}
+		completed, total := s.TodoProgress()
+		if completed != 2 || total != 2 {
+			t.Errorf("TodoProgress() = (%d, %d), want (2, 2)", completed, total)
+		}
+	})
+
+	t.Run("none completed", func(t *testing.T) {
+		s := NewState()
+		s.Todos = []Todo{
+			{Subject: "A", Status: "pending"},
+			{Subject: "B", Status: "in_progress"},
+		}
+		completed, total := s.TodoProgress()
+		if completed != 0 || total != 2 {
+			t.Errorf("TodoProgress() = (%d, %d), want (0, 2)", completed, total)
+		}
+	})
+}
