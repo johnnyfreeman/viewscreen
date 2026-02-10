@@ -33,7 +33,7 @@ func (r *TodoRenderer) RenderItem(todo state.Todo) string {
 	switch todo.Status {
 	case "completed":
 		sb.WriteString(style.SuccessText("✓ "))
-		text := todo.Subject
+		text := todo.Content
 		if text == "" {
 			text = todo.ActiveForm
 		}
@@ -43,13 +43,13 @@ func (r *TodoRenderer) RenderItem(todo state.Todo) string {
 		sb.WriteString(r.spinner.View())
 		text := todo.ActiveForm
 		if text == "" {
-			text = todo.Subject
+			text = todo.Content
 		}
 		sb.WriteString(style.SidebarTodoActiveText(textutil.Truncate(text, maxWidth)))
 
 	default: // pending
 		sb.WriteString(style.SidebarTodoPendingText("○ "))
-		text := todo.Subject
+		text := todo.Content
 		if text == "" {
 			text = todo.ActiveForm
 		}

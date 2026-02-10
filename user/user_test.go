@@ -9,6 +9,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/content"
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/testutil"
 	"github.com/johnnyfreeman/viewscreen/tools"
@@ -1332,9 +1333,9 @@ func TestRenderer_Render_TodoResult(t *testing.T) {
 		WithCodeHighlighter(mockCodeHighlighter{}),
 	)
 
-	todoResult := TodoResult{
-		OldTodos: []Todo{},
-		NewTodos: []Todo{
+	todoResult := state.TodoResult{
+		OldTodos: []state.Todo{},
+		NewTodos: []state.Todo{
 			{Content: "Review code", Status: "completed", ActiveForm: "Reviewing code"},
 			{Content: "Write tests", Status: "in_progress", ActiveForm: "Writing tests"},
 			{Content: "Update docs", Status: "pending", ActiveForm: "Updating docs"},
@@ -1393,9 +1394,9 @@ func TestRenderer_Render_TodoResult_EmptyTodos(t *testing.T) {
 	)
 
 	// Empty todo result should fall through to regular rendering
-	todoResult := TodoResult{
-		OldTodos: []Todo{},
-		NewTodos: []Todo{},
+	todoResult := state.TodoResult{
+		OldTodos: []state.Todo{},
+		NewTodos: []state.Todo{},
 	}
 	toolUseResult, _ := json.Marshal(todoResult)
 
@@ -1426,28 +1427,28 @@ func TestTodo_Unmarshaling(t *testing.T) {
 	tests := []struct {
 		name     string
 		jsonData string
-		expected Todo
+		expected state.Todo
 	}{
 		{
 			name:     "complete todo",
 			jsonData: `{"content": "Review code", "status": "completed", "activeForm": "Reviewing code"}`,
-			expected: Todo{Content: "Review code", Status: "completed", ActiveForm: "Reviewing code"},
+			expected: state.Todo{Content: "Review code", Status: "completed", ActiveForm: "Reviewing code"},
 		},
 		{
 			name:     "pending todo",
 			jsonData: `{"content": "Write tests", "status": "pending", "activeForm": "Writing tests"}`,
-			expected: Todo{Content: "Write tests", Status: "pending", ActiveForm: "Writing tests"},
+			expected: state.Todo{Content: "Write tests", Status: "pending", ActiveForm: "Writing tests"},
 		},
 		{
 			name:     "in_progress todo",
 			jsonData: `{"content": "Update docs", "status": "in_progress", "activeForm": "Updating docs"}`,
-			expected: Todo{Content: "Update docs", Status: "in_progress", ActiveForm: "Updating docs"},
+			expected: state.Todo{Content: "Update docs", Status: "in_progress", ActiveForm: "Updating docs"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var result Todo
+			var result state.Todo
 			err := json.Unmarshal([]byte(tt.jsonData), &result)
 			if err != nil {
 				t.Fatalf("Failed to unmarshal: %v", err)
@@ -1477,7 +1478,7 @@ func TestTodoResult_Unmarshaling(t *testing.T) {
 		]
 	}`
 
-	var result TodoResult
+	var result state.TodoResult
 	err := json.Unmarshal([]byte(jsonData), &result)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)

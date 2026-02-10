@@ -4,21 +4,9 @@ import (
 	"encoding/json"
 
 	"github.com/johnnyfreeman/viewscreen/render"
+	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/textutil"
 )
-
-// Todo represents a single todo item
-type Todo struct {
-	Content    string `json:"content"`
-	Status     string `json:"status"` // "pending", "in_progress", "completed"
-	ActiveForm string `json:"activeForm"`
-}
-
-// TodoResult represents the tool_use_result for TodoWrite operations
-type TodoResult struct {
-	OldTodos []Todo `json:"oldTodos"`
-	NewTodos []Todo `json:"newTodos"`
-}
 
 // TodoRenderer handles rendering of todo results with visual status indicators.
 type TodoRenderer struct {
@@ -45,7 +33,7 @@ func (tr *TodoRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 		return false
 	}
 
-	var todoResult TodoResult
+	var todoResult state.TodoResult
 	if err := json.Unmarshal(toolUseResult, &todoResult); err != nil {
 		return false
 	}

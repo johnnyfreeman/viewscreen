@@ -148,10 +148,10 @@ func TestState_TodoProgress(t *testing.T) {
 	t.Run("mixed statuses", func(t *testing.T) {
 		s := NewState()
 		s.Todos = []Todo{
-			{Subject: "A", Status: "completed"},
-			{Subject: "B", Status: "in_progress"},
-			{Subject: "C", Status: "completed"},
-			{Subject: "D", Status: "pending"},
+			{Content: "A", Status: "completed"},
+			{Content: "B", Status: "in_progress"},
+			{Content: "C", Status: "completed"},
+			{Content: "D", Status: "pending"},
 		}
 		completed, total := s.TodoProgress()
 		if completed != 2 || total != 4 {
@@ -162,8 +162,8 @@ func TestState_TodoProgress(t *testing.T) {
 	t.Run("all completed", func(t *testing.T) {
 		s := NewState()
 		s.Todos = []Todo{
-			{Subject: "A", Status: "completed"},
-			{Subject: "B", Status: "completed"},
+			{Content: "A", Status: "completed"},
+			{Content: "B", Status: "completed"},
 		}
 		completed, total := s.TodoProgress()
 		if completed != 2 || total != 2 {
@@ -174,8 +174,8 @@ func TestState_TodoProgress(t *testing.T) {
 	t.Run("none completed", func(t *testing.T) {
 		s := NewState()
 		s.Todos = []Todo{
-			{Subject: "A", Status: "pending"},
-			{Subject: "B", Status: "in_progress"},
+			{Content: "A", Status: "pending"},
+			{Content: "B", Status: "in_progress"},
 		}
 		completed, total := s.TodoProgress()
 		if completed != 0 || total != 2 {

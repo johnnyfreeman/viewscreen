@@ -6,16 +6,19 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/system"
-	"github.com/johnnyfreeman/viewscreen/user"
 )
 
-// Todo represents a tracked task item
+// Todo represents a tracked task item from TodoWrite tool results.
 type Todo struct {
-	ID          string `json:"id"`
-	Subject     string `json:"subject"`
-	Description string `json:"description"`
-	Status      string `json:"status"` // "pending", "in_progress", "completed"
-	ActiveForm  string `json:"activeForm"`
+	Content    string `json:"content"`
+	Status     string `json:"status"` // "pending", "in_progress", "completed"
+	ActiveForm string `json:"activeForm"`
+}
+
+// TodoResult represents the tool_use_result for TodoWrite operations.
+type TodoResult struct {
+	OldTodos []Todo `json:"oldTodos"`
+	NewTodos []Todo `json:"newTodos"`
 }
 
 // State holds the centralized session state extracted from events
@@ -126,16 +129,9 @@ func (s *State) UpdateFromToolUseResult(toolUseResult json.RawMessage) {
 	s.ClearCurrentTool()
 
 	// Try to parse as todo result
-	var todoResult user.TodoResult
+	var todoResult TodoResult
 	if err := json.Unmarshal(toolUseResult, &todoResult); err == nil && len(todoResult.NewTodos) > 0 {
-		s.Todos = make([]Todo, len(todoResult.NewTodos))
-		for i, t := range todoResult.NewTodos {
-			s.Todos[i] = Todo{
-				Subject:    t.Content,
-				Status:     t.Status,
-				ActiveForm: t.ActiveForm,
-			}
-		}
+		s.Todos = todoResult.NewTodos
 	}
 }
 

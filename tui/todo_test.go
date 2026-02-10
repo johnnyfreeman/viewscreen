@@ -38,7 +38,7 @@ func TestTodoRenderer_RenderItem(t *testing.T) {
 
 	t.Run("renders completed todo with checkmark", func(t *testing.T) {
 		todo := state.Todo{
-			Subject: "Fix bug",
+			Content: "Fix bug",
 			Status:  "completed",
 		}
 		output := r.RenderItem(todo)
@@ -53,7 +53,7 @@ func TestTodoRenderer_RenderItem(t *testing.T) {
 
 	t.Run("completed todo uses activeForm fallback", func(t *testing.T) {
 		todo := state.Todo{
-			Subject:    "",
+			Content:    "",
 			ActiveForm: "Building project",
 			Status:     "completed",
 		}
@@ -66,7 +66,7 @@ func TestTodoRenderer_RenderItem(t *testing.T) {
 
 	t.Run("renders in_progress todo with spinner", func(t *testing.T) {
 		todo := state.Todo{
-			Subject:    "Fix bug",
+			Content:    "Fix bug",
 			ActiveForm: "Fixing bug",
 			Status:     "in_progress",
 		}
@@ -80,7 +80,7 @@ func TestTodoRenderer_RenderItem(t *testing.T) {
 
 	t.Run("in_progress uses subject fallback", func(t *testing.T) {
 		todo := state.Todo{
-			Subject:    "Test feature",
+			Content:    "Test feature",
 			ActiveForm: "",
 			Status:     "in_progress",
 		}
@@ -93,7 +93,7 @@ func TestTodoRenderer_RenderItem(t *testing.T) {
 
 	t.Run("renders pending todo with circle", func(t *testing.T) {
 		todo := state.Todo{
-			Subject: "Review code",
+			Content: "Review code",
 			Status:  "pending",
 		}
 		output := r.RenderItem(todo)
@@ -108,7 +108,7 @@ func TestTodoRenderer_RenderItem(t *testing.T) {
 
 	t.Run("pending uses activeForm fallback", func(t *testing.T) {
 		todo := state.Todo{
-			Subject:    "",
+			Content:    "",
 			ActiveForm: "Waiting for review",
 			Status:     "pending",
 		}
@@ -121,7 +121,7 @@ func TestTodoRenderer_RenderItem(t *testing.T) {
 
 	t.Run("unknown status treated as pending", func(t *testing.T) {
 		todo := state.Todo{
-			Subject: "Unknown task",
+			Content: "Unknown task",
 			Status:  "unknown",
 		}
 		output := r.RenderItem(todo)
@@ -149,9 +149,9 @@ func TestTodoRenderer_RenderList(t *testing.T) {
 
 	t.Run("renders todos with header", func(t *testing.T) {
 		todos := []state.Todo{
-			{Subject: "Task 1", Status: "completed"},
-			{Subject: "Task 2", Status: "in_progress"},
-			{Subject: "Task 3", Status: "pending"},
+			{Content: "Task 1", Status: "completed"},
+			{Content: "Task 2", Status: "in_progress"},
+			{Content: "Task 3", Status: "pending"},
 		}
 		output := r.RenderList(todos)
 
@@ -171,7 +171,7 @@ func TestTodoRenderer_RenderList(t *testing.T) {
 
 	t.Run("single todo renders correctly", func(t *testing.T) {
 		todos := []state.Todo{
-			{Subject: "Only task", Status: "pending"},
+			{Content: "Only task", Status: "pending"},
 		}
 		output := r.RenderList(todos)
 
@@ -251,7 +251,7 @@ func TestTodoRenderer_RenderList_WithProgressBar(t *testing.T) {
 
 	t.Run("single todo has no progress bar", func(t *testing.T) {
 		todos := []state.Todo{
-			{Subject: "Only task", Status: "pending"},
+			{Content: "Only task", Status: "pending"},
 		}
 		output := r.RenderList(todos)
 
@@ -262,9 +262,9 @@ func TestTodoRenderer_RenderList_WithProgressBar(t *testing.T) {
 
 	t.Run("two or more todos show progress bar", func(t *testing.T) {
 		todos := []state.Todo{
-			{Subject: "Task 1", Status: "completed"},
-			{Subject: "Task 2", Status: "pending"},
-			{Subject: "Task 3", Status: "pending"},
+			{Content: "Task 1", Status: "completed"},
+			{Content: "Task 2", Status: "pending"},
+			{Content: "Task 3", Status: "pending"},
 		}
 		output := r.RenderList(todos)
 
@@ -281,7 +281,7 @@ func TestTodoRenderer_Truncation(t *testing.T) {
 	r := NewTodoRenderer(20, newTestSpinner()) // narrow width
 
 	todo := state.Todo{
-		Subject: "This is a very long task name that should be truncated",
+		Content: "This is a very long task name that should be truncated",
 		Status:  "pending",
 	}
 	output := r.RenderItem(todo)

@@ -194,7 +194,7 @@ func TestSidebarRenderer_RenderTodo(t *testing.T) {
 
 	t.Run("renders completed todo", func(t *testing.T) {
 		todo := state.Todo{
-			Subject: "Fix bug",
+			Content: "Fix bug",
 			Status:  "completed",
 		}
 		output := r.RenderTodo(todo)
@@ -209,7 +209,7 @@ func TestSidebarRenderer_RenderTodo(t *testing.T) {
 
 	t.Run("renders in_progress todo with active form", func(t *testing.T) {
 		todo := state.Todo{
-			Subject:    "Fix bug",
+			Content:    "Fix bug",
 			ActiveForm: "Fixing bug",
 			Status:     "in_progress",
 		}
@@ -223,7 +223,7 @@ func TestSidebarRenderer_RenderTodo(t *testing.T) {
 
 	t.Run("renders pending todo", func(t *testing.T) {
 		todo := state.Todo{
-			Subject: "Review code",
+			Content: "Review code",
 			Status:  "pending",
 		}
 		output := r.RenderTodo(todo)
@@ -238,7 +238,7 @@ func TestSidebarRenderer_RenderTodo(t *testing.T) {
 
 	t.Run("uses activeForm fallback for completed", func(t *testing.T) {
 		todo := state.Todo{
-			Subject:    "",
+			Content:    "",
 			ActiveForm: "Building project",
 			Status:     "completed",
 		}
@@ -251,7 +251,7 @@ func TestSidebarRenderer_RenderTodo(t *testing.T) {
 
 	t.Run("uses subject fallback for in_progress", func(t *testing.T) {
 		todo := state.Todo{
-			Subject:    "Test feature",
+			Content:    "Test feature",
 			ActiveForm: "",
 			Status:     "in_progress",
 		}
@@ -280,9 +280,9 @@ func TestSidebarRenderer_RenderTodos(t *testing.T) {
 
 	t.Run("renders todos with header", func(t *testing.T) {
 		todos := []state.Todo{
-			{Subject: "Task 1", Status: "completed"},
-			{Subject: "Task 2", Status: "in_progress"},
-			{Subject: "Task 3", Status: "pending"},
+			{Content: "Task 1", Status: "completed"},
+			{Content: "Task 2", Status: "in_progress"},
+			{Content: "Task 3", Status: "pending"},
 		}
 		output := r.RenderTodos(todos)
 
@@ -311,7 +311,7 @@ func TestSidebarRenderer_Render(t *testing.T) {
 		s.TotalCost = 0.1234
 		s.Prompt = "Hello"
 		s.Todos = []state.Todo{
-			{Subject: "Task 1", Status: "completed"},
+			{Content: "Task 1", Status: "completed"},
 		}
 
 		output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
@@ -463,7 +463,7 @@ func TestRenderDetailsModal(t *testing.T) {
 	s.ToolInProgress = true
 	s.CurrentTool = "Read"
 	s.Todos = []state.Todo{
-		{Subject: "Task 1", Status: "completed"},
+		{Content: "Task 1", Status: "completed"},
 	}
 
 	styles := NewHeaderStyles()
