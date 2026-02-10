@@ -32,6 +32,7 @@ type Model struct {
 	headerStyles     HeaderStyles
 	layoutMode       LayoutMode
 	showDetailsModal bool
+	showHelpModal    bool
 	ready            bool
 	processor        *events.EventProcessor
 }
@@ -170,6 +171,11 @@ func (m *Model) updateViewportWithPendingTools() {
 
 // renderLayout composes the main content area and sidebar/header
 func (m Model) renderLayout() string {
+	// Help modal overlays both layout modes
+	if m.showHelpModal {
+		return RenderHelpModal(m.width, m.height, m.headerStyles)
+	}
+
 	switch m.layoutMode {
 	case LayoutHeader:
 		// Header mode: single-line header on top, content below at full width

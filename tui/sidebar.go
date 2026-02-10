@@ -205,13 +205,13 @@ func RenderHeader(s *state.State, width int) string {
 
 	// Fixed parts
 	title := logo.RenderTitle()
-	keyHint := style.MutedText("[d]")
+	keyHint := style.MutedText("[?]")
 
 	// Calculate decoration lengths
-	// Raw lengths (without ANSI): "─── " + "VIEWSCREEN" + " ─── " + info + " ─── " + "[d]" + " ───"
+	// Raw lengths (without ANSI): "─── " + "VIEWSCREEN" + " ─── " + info + " ─── " + "[?]" + " ───"
 	titleLen := 10 // "VIEWSCREEN"
 	infoLen := len(model) + 3 + len(fmt.Sprintf("%d", s.TurnCount)) + 3 + len(fmt.Sprintf("$%.2f", s.TotalCost))
-	keyHintLen := 3 // "[d]"
+	keyHintLen := 3 // "[?]"
 	fixedLen := 4 + titleLen + 5 + infoLen + 5 + keyHintLen + 4 // decorations + spaces
 
 	// Remaining space for decorations
@@ -230,6 +230,63 @@ func RenderHeader(s *state.State, width int) string {
 		style.MutedText(midDeco),
 		keyHint,
 		style.MutedText(rightDeco))
+}
+
+// RenderHelpModal renders the keybindings help modal overlay.
+func RenderHelpModal(width, height int, styles HeaderStyles) string {
+	var sb strings.Builder
+
+	// Title
+	sb.WriteString(style.SidebarValueText("Keybindings"))
+	sb.WriteString("\n\n")
+
+	// Keybinding entries
+	bindings := []struct {
+		key  string
+		desc string
+	}{
+		{"j / ↓", "Scroll down"},
+		{"k / ↑", "Scroll up"},
+		{"PgDn", "Half page down"},
+		{"PgUp", "Half page up"},
+		{"g / Home", "Go to top"},
+		{"G / End", "Go to bottom"},
+		{"d", "Toggle details"},
+		{"?", "Toggle help"},
+		{"q", "Quit"},
+	}
+
+	for _, b := range bindings {
+		key := style.SidebarTodoActiveText(fmt.Sprintf("%-10s", b.key))
+		desc := style.SidebarHeaderText(b.desc)
+		sb.WriteString(key + " " + desc + "\n")
+	}
+
+	// Close hint
+	sb.WriteString("\n")
+	sb.WriteString(style.MutedText("Press ? or Esc to close"))
+
+	modalContent := styles.Modal.Render(sb.String())
+
+	// Center the modal
+	modalHeight := strings.Count(modalContent, "\n") + 1
+	modalWidth := lipgloss.Width(modalContent)
+
+	topPadding := max((height-modalHeight)/2, 0)
+	leftPadding := max((width-modalWidth)/2, 0)
+
+	var result strings.Builder
+	for i := 0; i < topPadding; i++ {
+		result.WriteString("\n")
+	}
+
+	for _, line := range strings.Split(modalContent, "\n") {
+		result.WriteString(strings.Repeat(" ", leftPadding))
+		result.WriteString(line)
+		result.WriteString("\n")
+	}
+
+	return result.String()
 }
 
 // RenderDetailsModal renders the details modal overlay.

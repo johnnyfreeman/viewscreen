@@ -146,6 +146,75 @@ func TestHandleKeyMsg(t *testing.T) {
 			t.Error("expected scroll to be disabled when modal is open")
 		}
 	})
+
+	t.Run("? toggles help modal", func(t *testing.T) {
+		m := newTestModel()
+		m.showHelpModal = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "?"})
+		if !m.showHelpModal {
+			t.Error("expected showHelpModal to be true after pressing ?")
+		}
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "?"})
+		if m.showHelpModal {
+			t.Error("expected showHelpModal to be false after pressing ? again")
+		}
+	})
+
+	t.Run("? works in both layout modes", func(t *testing.T) {
+		m := newTestModel()
+		m.layoutMode = LayoutSidebar
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "?"})
+		if !m.showHelpModal {
+			t.Error("expected help modal to work in sidebar mode")
+		}
+
+		m = newTestModel()
+		m.layoutMode = LayoutHeader
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "?"})
+		if !m.showHelpModal {
+			t.Error("expected help modal to work in header mode")
+		}
+	})
+
+	t.Run("esc closes help modal", func(t *testing.T) {
+		m := newTestModel()
+		m.showHelpModal = true
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEscape})
+		if m.showHelpModal {
+			t.Error("expected showHelpModal to be false after pressing Esc")
+		}
+	})
+
+	t.Run("esc prioritizes help modal over details modal", func(t *testing.T) {
+		m := newTestModel()
+		m.showHelpModal = true
+		m.showDetailsModal = true
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEscape})
+		if m.showHelpModal {
+			t.Error("expected help modal to close first")
+		}
+		if !m.showDetailsModal {
+			t.Error("expected details modal to remain open")
+		}
+	})
+
+	t.Run("scroll keys disabled when help modal open", func(t *testing.T) {
+		m := newTestModel()
+		m.showHelpModal = true
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		initialY := m.viewport.YOffset()
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
+		if m.viewport.YOffset() != initialY {
+			t.Error("expected scroll to be disabled when help modal is open")
+		}
+	})
 }
 
 func TestHandleWindowSizeMsg(t *testing.T) {

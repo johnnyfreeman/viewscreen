@@ -13,38 +13,43 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit // tea.Quit is a func() Msg, which is a Cmd
+	case "?":
+		// Toggle help modal
+		m.showHelpModal = !m.showHelpModal
 	case "d":
 		// Toggle details modal (only in header mode)
 		if m.layoutMode == LayoutHeader {
 			m.showDetailsModal = !m.showDetailsModal
 		}
 	case "esc":
-		// Close details modal
-		if m.showDetailsModal {
+		// Close any open modal
+		if m.showHelpModal {
+			m.showHelpModal = false
+		} else if m.showDetailsModal {
 			m.showDetailsModal = false
 		}
 	case "up", "k":
-		if !m.showDetailsModal {
+		if !m.showDetailsModal && !m.showHelpModal {
 			m.viewport.ScrollUp(1)
 		}
 	case "down", "j":
-		if !m.showDetailsModal {
+		if !m.showDetailsModal && !m.showHelpModal {
 			m.viewport.ScrollDown(1)
 		}
 	case "pgup":
-		if !m.showDetailsModal {
+		if !m.showDetailsModal && !m.showHelpModal {
 			m.viewport.HalfPageUp()
 		}
 	case "pgdown":
-		if !m.showDetailsModal {
+		if !m.showDetailsModal && !m.showHelpModal {
 			m.viewport.HalfPageDown()
 		}
 	case "home", "g":
-		if !m.showDetailsModal {
+		if !m.showDetailsModal && !m.showHelpModal {
 			m.viewport.GotoTop()
 		}
 	case "end", "G":
-		if !m.showDetailsModal {
+		if !m.showDetailsModal && !m.showHelpModal {
 			m.viewport.GotoBottom()
 		}
 	}

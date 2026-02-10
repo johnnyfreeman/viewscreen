@@ -426,8 +426,8 @@ func TestRenderHeader(t *testing.T) {
 		if !strings.Contains(output, "$0.05") {
 			t.Error("expected cost in output")
 		}
-		if !strings.Contains(output, "[d]") {
-			t.Error("expected key hint [d] in output")
+		if !strings.Contains(output, "[?]") {
+			t.Error("expected key hint [?] in output")
 		}
 		if !strings.Contains(output, "─") {
 			t.Error("expected decoration in output")
@@ -488,6 +488,62 @@ func TestRenderDetailsModal(t *testing.T) {
 	}
 	if !strings.Contains(output, "Press d or Esc to close") {
 		t.Error("expected close hint in output")
+	}
+}
+
+func TestRenderHelpModal(t *testing.T) {
+	styles := NewHeaderStyles()
+
+	t.Run("contains keybinding entries", func(t *testing.T) {
+		output := RenderHelpModal(100, 40, styles)
+
+		if !strings.Contains(output, "Keybindings") {
+			t.Error("expected 'Keybindings' title in output")
+		}
+		if !strings.Contains(output, "Scroll down") {
+			t.Error("expected 'Scroll down' binding in output")
+		}
+		if !strings.Contains(output, "Scroll up") {
+			t.Error("expected 'Scroll up' binding in output")
+		}
+		if !strings.Contains(output, "Quit") {
+			t.Error("expected 'Quit' binding in output")
+		}
+		if !strings.Contains(output, "Toggle help") {
+			t.Error("expected 'Toggle help' binding in output")
+		}
+		if !strings.Contains(output, "Toggle details") {
+			t.Error("expected 'Toggle details' binding in output")
+		}
+	})
+
+	t.Run("contains close hint", func(t *testing.T) {
+		output := RenderHelpModal(100, 40, styles)
+
+		if !strings.Contains(output, "Press ? or Esc to close") {
+			t.Error("expected close hint in output")
+		}
+	})
+
+	t.Run("renders non-empty output", func(t *testing.T) {
+		output := RenderHelpModal(80, 30, styles)
+
+		if output == "" {
+			t.Error("expected non-empty output from RenderHelpModal")
+		}
+	})
+}
+
+func TestRenderHeader_HelpHint(t *testing.T) {
+	s := state.NewState()
+	s.Model = "test-model"
+	s.TurnCount = 1
+	s.TotalCost = 0
+
+	output := RenderHeader(s, 100)
+
+	if !strings.Contains(output, "[?]") {
+		t.Error("expected key hint [?] in output")
 	}
 }
 
