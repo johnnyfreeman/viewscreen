@@ -14,9 +14,6 @@ import (
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
-// MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
-type MarkdownRenderer = types.MarkdownRenderer
-
 // Message represents the message object in assistant events
 type Message struct {
 	Model      string               `json:"model"`
@@ -85,20 +82,15 @@ func defaultToolUseRenderer(out *render.Output, block types.ContentBlock) {
 	tools.NewHeaderRenderer().RenderBlockToOutput(out, block)
 }
 
-// NewRenderer creates a new assistant Renderer with default dependencies
-func NewRenderer() *Renderer {
+// NewRenderer creates a new assistant Renderer with the given options
+func NewRenderer(opts ...RendererOption) *Renderer {
 	cfg := config.Get()
-	return &Renderer{
+	r := &Renderer{
 		output:           os.Stdout,
 		markdownRenderer: render.NewMarkdownRenderer(cfg.NoColor(), terminal.Width()),
 		toolUseRenderer:  defaultToolUseRenderer,
 		config:           cfg,
 	}
-}
-
-// NewRendererWithOptions creates a new assistant Renderer with custom options
-func NewRendererWithOptions(opts ...RendererOption) *Renderer {
-	r := NewRenderer()
 	for _, opt := range opts {
 		opt(r)
 	}

@@ -90,37 +90,37 @@ func makeInputJSONDelta(partialJSON string) json.RawMessage {
 }
 
 func TestNewRenderer(t *testing.T) {
-	r := NewRenderer()
+	t.Run("defaults", func(t *testing.T) {
+		r := NewRenderer()
 
-	if r == nil {
-		t.Fatal("NewRenderer returned nil")
-	}
+		if r == nil {
+			t.Fatal("NewRenderer returned nil")
+		}
 
-	if r.block == nil {
-		t.Error("expected block state to be non-nil")
-	}
+		if r.block == nil {
+			t.Error("expected block state to be non-nil")
+		}
 
-	if r.markdownRenderer == nil {
-		t.Error("expected markdownRenderer to be non-nil")
-	}
+		if r.markdownRenderer == nil {
+			t.Error("expected markdownRenderer to be non-nil")
+		}
 
-	if r.indicator == nil {
-		t.Error("expected indicator to be non-nil")
-	}
+		if r.indicator == nil {
+			t.Error("expected indicator to be non-nil")
+		}
 
-	if r.toolHeaderRender == nil {
-		t.Error("expected toolHeaderRender to be non-nil")
-	}
+		if r.toolHeaderRender == nil {
+			t.Error("expected toolHeaderRender to be non-nil")
+		}
 
-	if r.output == nil {
-		t.Error("expected output to be non-nil")
-	}
-}
+		if r.output == nil {
+			t.Error("expected output to be non-nil")
+		}
+	})
 
-func TestNewRendererWithOptions(t *testing.T) {
 	t.Run("with custom output", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		r := NewRendererWithOptions(WithOutput(buf))
+		r := NewRenderer(WithOutput(buf))
 
 		if r.output != buf {
 			t.Error("expected custom output writer")
@@ -129,7 +129,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with custom markdown renderer", func(t *testing.T) {
 		mock := &mockMarkdownRenderer{}
-		r := NewRendererWithOptions(WithMarkdownRenderer(mock))
+		r := NewRenderer(WithMarkdownRenderer(mock))
 
 		if r.markdownRenderer != mock {
 			t.Error("expected custom markdown renderer")
@@ -138,7 +138,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with custom indicator", func(t *testing.T) {
 		mock := &mockIndicator{}
-		r := NewRendererWithOptions(WithIndicator(mock))
+		r := NewRenderer(WithIndicator(mock))
 
 		if r.indicator != mock {
 			t.Error("expected custom indicator")
@@ -151,7 +151,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 			called = true
 			return "rendered", tools.ToolContext{ToolName: toolName}
 		}
-		r := NewRendererWithOptions(WithToolHeaderRenderer(custom))
+		r := NewRenderer(WithToolHeaderRenderer(custom))
 
 		r.toolHeaderRender("Test", nil)
 		if !called {
@@ -161,7 +161,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 }
 
 func TestRenderer_Render_MessageStart(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	event := Event{
 		Event: EventData{
@@ -181,7 +181,7 @@ func TestRenderer_Render_MessageStart(t *testing.T) {
 }
 
 func TestRenderer_Render_ContentBlockStart_Text(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	event := Event{
 		Event: EventData{
@@ -208,7 +208,7 @@ func TestRenderer_Render_ContentBlockStart_Text(t *testing.T) {
 }
 
 func TestRenderer_Render_ContentBlockStart_ToolUse(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	event := Event{
 		Event: EventData{
@@ -232,7 +232,7 @@ func TestRenderer_Render_ContentBlockStart_ToolUse(t *testing.T) {
 }
 
 func TestRenderer_Render_ContentBlockStart_InvalidJSON(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	event := Event{
 		Event: EventData{
@@ -252,7 +252,7 @@ func TestRenderer_Render_ContentBlockStart_InvalidJSON(t *testing.T) {
 
 func TestRenderer_Render_ContentBlockDelta_TextDelta(t *testing.T) {
 	indicator := &mockIndicator{}
-	r := NewRendererWithOptions(WithIndicator(indicator))
+	r := NewRenderer(WithIndicator(indicator))
 
 	// Start a text block via event
 	r.Render(Event{
@@ -293,7 +293,7 @@ func TestRenderer_Render_ContentBlockDelta_TextDelta(t *testing.T) {
 }
 
 func TestRenderer_Render_ContentBlockDelta_InputJSONDelta(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	// Start a tool use block via event
 	r.Render(Event{
@@ -333,7 +333,7 @@ func TestRenderer_Render_ContentBlockStop_TextBlock(t *testing.T) {
 	indicator := &mockIndicator{}
 	markdown := &mockMarkdownRenderer{returnValue: "**rendered**\n"}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithIndicator(indicator),
 		WithMarkdownRenderer(markdown),
@@ -385,7 +385,7 @@ func TestRenderer_Render_ContentBlockStop_TextBlock_Empty(t *testing.T) {
 	output := &bytes.Buffer{}
 	markdown := &mockMarkdownRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 	)
@@ -417,7 +417,7 @@ func TestRenderer_Render_ContentBlockStop_TextBlock_Empty(t *testing.T) {
 func TestRenderer_Render_ContentBlockStop_ToolUseBlock(t *testing.T) {
 	toolRenderer := &mockToolHeaderRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithToolHeaderRenderer(toolRenderer.render),
 	)
 
@@ -463,7 +463,7 @@ func TestRenderer_Render_ContentBlockStop_ToolUseBlock_InvalidJSON(t *testing.T)
 	output := &bytes.Buffer{}
 	toolRenderer := &mockToolHeaderRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithToolHeaderRenderer(toolRenderer.render),
 	)
@@ -507,7 +507,7 @@ func TestRenderer_Render_ContentBlockStop_ToolUseBlock_InvalidJSON(t *testing.T)
 func TestRenderer_Render_ContentBlockStop_WrongIndex(t *testing.T) {
 	markdown := &mockMarkdownRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithMarkdownRenderer(markdown),
 	)
 
@@ -544,7 +544,7 @@ func TestRenderer_Render_ContentBlockStop_WrongIndex(t *testing.T) {
 }
 
 func TestRenderer_Render_MessageDelta(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	event := Event{
 		Event: EventData{
@@ -561,7 +561,7 @@ func TestRenderer_Render_MessageDelta(t *testing.T) {
 }
 
 func TestRenderer_Render_MessageStop(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	// Start a block first
 	r.Render(Event{
@@ -586,7 +586,7 @@ func TestRenderer_Render_MessageStop(t *testing.T) {
 }
 
 func TestRenderer_GetBufferedText(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	if r.GetBufferedText() != "" {
 		t.Error("expected empty buffer initially")
@@ -614,7 +614,7 @@ func TestRenderer_GetBufferedText(t *testing.T) {
 }
 
 func TestRenderer_ResetBlockState(t *testing.T) {
-	r := NewRendererWithOptions()
+	r := NewRenderer()
 
 	// Set up block state via events
 	r.Render(Event{
@@ -644,7 +644,7 @@ func TestRenderer_FullTextBlockFlow(t *testing.T) {
 	indicator := &mockIndicator{}
 	markdown := &mockMarkdownRenderer{returnValue: "rendered text\n"}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithIndicator(indicator),
 		WithMarkdownRenderer(markdown),
@@ -712,7 +712,7 @@ func TestRenderer_FullTextBlockFlow(t *testing.T) {
 func TestRenderer_FullToolUseBlockFlow(t *testing.T) {
 	toolRenderer := &mockToolHeaderRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithToolHeaderRenderer(toolRenderer.render),
 	)
 

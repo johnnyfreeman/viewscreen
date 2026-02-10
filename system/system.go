@@ -56,18 +56,13 @@ func WithConfigProvider(cp config.Provider) RendererOption {
 	}
 }
 
-// NewRenderer creates a new system Renderer with default dependencies
-func NewRenderer() *Renderer {
-	return &Renderer{
+// NewRenderer creates a new system Renderer with the given options
+func NewRenderer(opts ...RendererOption) *Renderer {
+	r := &Renderer{
 		output:       os.Stdout,
 		styleApplier: render.DefaultStyleApplier{},
 		config:       config.Get(),
 	}
-}
-
-// NewRendererWithOptions creates a new system Renderer with custom options
-func NewRendererWithOptions(opts ...RendererOption) *Renderer {
-	r := NewRenderer()
 	for _, opt := range opts {
 		opt(r)
 	}

@@ -44,29 +44,29 @@ func (m *mockToolUseRenderer) render(out *render.Output, block types.ContentBloc
 }
 
 func TestNewRenderer(t *testing.T) {
-	r := NewRenderer()
+	t.Run("defaults", func(t *testing.T) {
+		r := NewRenderer()
 
-	if r == nil {
-		t.Fatal("NewRenderer returned nil")
-	}
+		if r == nil {
+			t.Fatal("NewRenderer returned nil")
+		}
 
-	if r.output == nil {
-		t.Error("expected output to be non-nil")
-	}
+		if r.output == nil {
+			t.Error("expected output to be non-nil")
+		}
 
-	if r.markdownRenderer == nil {
-		t.Error("expected markdownRenderer to be non-nil")
-	}
+		if r.markdownRenderer == nil {
+			t.Error("expected markdownRenderer to be non-nil")
+		}
 
-	if r.toolUseRenderer == nil {
-		t.Error("expected toolUseRenderer to be non-nil")
-	}
-}
+		if r.toolUseRenderer == nil {
+			t.Error("expected toolUseRenderer to be non-nil")
+		}
+	})
 
-func TestNewRendererWithOptions(t *testing.T) {
 	t.Run("with custom output", func(t *testing.T) {
 		buf := &bytes.Buffer{}
-		r := NewRendererWithOptions(WithOutput(buf))
+		r := NewRenderer(WithOutput(buf))
 
 		if r.output != buf {
 			t.Error("expected custom output writer")
@@ -75,7 +75,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 	t.Run("with custom markdown renderer", func(t *testing.T) {
 		mock := &mockMarkdownRenderer{}
-		r := NewRendererWithOptions(WithMarkdownRenderer(mock))
+		r := NewRenderer(WithMarkdownRenderer(mock))
 
 		if r.markdownRenderer != mock {
 			t.Error("expected custom markdown renderer")
@@ -87,7 +87,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 		custom := func(out *render.Output, block types.ContentBlock) {
 			called = true
 		}
-		r := NewRendererWithOptions(WithToolUseRenderer(custom))
+		r := NewRenderer(WithToolUseRenderer(custom))
 
 		r.toolUseRenderer(render.StringOutput(), types.ContentBlock{})
 		if !called {
@@ -99,7 +99,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 		buf := &bytes.Buffer{}
 		mock := &mockMarkdownRenderer{}
 
-		r := NewRendererWithOptions(
+		r := NewRenderer(
 			WithOutput(buf),
 			WithMarkdownRenderer(mock),
 		)
@@ -115,7 +115,7 @@ func TestNewRendererWithOptions(t *testing.T) {
 
 func TestRenderer_Render_Error(t *testing.T) {
 	output := &bytes.Buffer{}
-	r := NewRendererWithOptions(WithOutput(output))
+	r := NewRenderer(WithOutput(output))
 
 	event := Event{
 		Error: "Something went wrong",
@@ -144,7 +144,7 @@ func TestRenderer_Render_TextBlock_NotStreaming(t *testing.T) {
 	output := &bytes.Buffer{}
 	markdown := &mockMarkdownRenderer{returnValue: "rendered markdown\n"}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 	)
@@ -177,7 +177,7 @@ func TestRenderer_Render_TextBlock_AlreadyStreaming(t *testing.T) {
 	output := &bytes.Buffer{}
 	markdown := &mockMarkdownRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 	)
@@ -207,7 +207,7 @@ func TestRenderer_Render_TextBlock_AddsNewline(t *testing.T) {
 	// Return value without trailing newline
 	markdown := &mockMarkdownRenderer{returnValue: "no trailing newline"}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 	)
@@ -233,7 +233,7 @@ func TestRenderer_Render_TextBlock_PreservesNewline(t *testing.T) {
 	// Return value with trailing newline
 	markdown := &mockMarkdownRenderer{returnValue: "has trailing newline\n"}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 	)
@@ -257,7 +257,7 @@ func TestRenderer_Render_TextBlock_PreservesNewline(t *testing.T) {
 func TestRenderer_Render_ToolUseBlock_NotStreaming(t *testing.T) {
 	toolRenderer := &mockToolUseRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithToolUseRenderer(toolRenderer.render),
 	)
 
@@ -294,7 +294,7 @@ func TestRenderer_Render_ToolUseBlock_NotStreaming(t *testing.T) {
 func TestRenderer_Render_ToolUseBlock_AlreadyStreaming(t *testing.T) {
 	toolRenderer := &mockToolUseRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithToolUseRenderer(toolRenderer.render),
 	)
 
@@ -322,7 +322,7 @@ func TestRenderer_Render_MultipleBlocks(t *testing.T) {
 	markdown := &mockMarkdownRenderer{returnValue: "text\n"}
 	toolRenderer := &mockToolUseRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 		WithToolUseRenderer(toolRenderer.render),
@@ -354,7 +354,7 @@ func TestRenderer_Render_UnknownBlockType(t *testing.T) {
 	markdown := &mockMarkdownRenderer{}
 	toolRenderer := &mockToolUseRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 		WithToolUseRenderer(toolRenderer.render),
@@ -383,7 +383,7 @@ func TestRenderer_Render_EmptyContent(t *testing.T) {
 	output := &bytes.Buffer{}
 	markdown := &mockMarkdownRenderer{}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 	)
@@ -406,7 +406,7 @@ func TestRenderer_Render_ErrorWithContent(t *testing.T) {
 	output := &bytes.Buffer{}
 	markdown := &mockMarkdownRenderer{returnValue: "text\n"}
 
-	r := NewRendererWithOptions(
+	r := NewRenderer(
 		WithOutput(output),
 		WithMarkdownRenderer(markdown),
 	)

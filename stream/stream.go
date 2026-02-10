@@ -15,9 +15,6 @@ import (
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
-// MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
-type MarkdownRenderer = types.MarkdownRenderer
-
 // IndicatorInterface abstracts the streaming indicator for testability
 type IndicatorInterface interface {
 	Show()
@@ -65,7 +62,7 @@ type MessageDelta struct {
 // Renderer handles rendering stream events and tracks streaming state
 type Renderer struct {
 	block            *BlockState
-	markdownRenderer MarkdownRenderer
+	markdownRenderer types.MarkdownRenderer
 	indicator        IndicatorInterface
 	toolHeaderRender ToolHeaderRenderer
 	output           io.Writer
@@ -76,22 +73,6 @@ type Renderer struct {
 // defaultToolHeaderRenderer adapts HeaderRenderer to the ToolHeaderRenderer interface
 func defaultToolHeaderRenderer(toolName string, input map[string]any) (string, tools.ToolContext) {
 	return tools.NewHeaderRenderer().RenderToString(toolName, input)
-}
-
-// NewRenderer creates a new stream Renderer
-func NewRenderer() *Renderer {
-	width := terminal.Width()
-	cfg := config.Get()
-
-	return &Renderer{
-		block:            NewBlockState(),
-		markdownRenderer: render.NewMarkdownRenderer(cfg.NoColor(), width),
-		indicator:        indicator.NewStreamingIndicator(cfg.NoColor()),
-		toolHeaderRender: defaultToolHeaderRenderer,
-		output:           os.Stdout,
-		width:            width,
-		config:           cfg,
-	}
 }
 
 // RendererOption is a functional option for configuring a Renderer
@@ -105,7 +86,7 @@ func WithOutput(w io.Writer) RendererOption {
 }
 
 // WithMarkdownRenderer sets a custom markdown renderer
-func WithMarkdownRenderer(mr MarkdownRenderer) RendererOption {
+func WithMarkdownRenderer(mr types.MarkdownRenderer) RendererOption {
 	return func(r *Renderer) {
 		r.markdownRenderer = mr
 	}
@@ -132,9 +113,20 @@ func WithConfigProvider(cp config.Provider) RendererOption {
 	}
 }
 
-// NewRendererWithOptions creates a new stream Renderer with custom options
-func NewRendererWithOptions(opts ...RendererOption) *Renderer {
-	r := NewRenderer()
+// NewRenderer creates a new stream Renderer with the given options
+func NewRenderer(opts ...RendererOption) *Renderer {
+	width := terminal.Width()
+	cfg := config.Get()
+
+	r := &Renderer{
+		block:            NewBlockState(),
+		markdownRenderer: render.NewMarkdownRenderer(cfg.NoColor(), width),
+		indicator:        indicator.NewStreamingIndicator(cfg.NoColor()),
+		toolHeaderRender: defaultToolHeaderRenderer,
+		output:           os.Stdout,
+		width:            width,
+		config:           cfg,
+	}
 	for _, opt := range opts {
 		opt(r)
 	}

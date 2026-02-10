@@ -50,16 +50,13 @@ type Event struct {
 }
 
 
-// MarkdownRenderer is an alias for types.MarkdownRenderer for backward compatibility.
-type MarkdownRenderer = types.MarkdownRenderer
-
 // Renderer handles rendering user events
 type Renderer struct {
 	output           io.Writer
 	config           config.Provider
 	styleApplier     render.StyleApplier
 	highlighter      render.CodeHighlighter
-	markdownRenderer MarkdownRenderer
+	markdownRenderer types.MarkdownRenderer
 	toolContext      *tools.ToolContext
 	contentCleaner   *textutil.ContentCleaner
 	// Registry for result-specific renderers
@@ -105,7 +102,7 @@ func WithToolContext(tc *tools.ToolContext) RendererOption {
 }
 
 // WithMarkdownRenderer sets a custom markdown renderer
-func WithMarkdownRenderer(mr MarkdownRenderer) RendererOption {
+func WithMarkdownRenderer(mr types.MarkdownRenderer) RendererOption {
 	return func(r *Renderer) {
 		r.markdownRenderer = mr
 	}
@@ -118,19 +115,13 @@ func WithContentCleaner(cc *textutil.ContentCleaner) RendererOption {
 	}
 }
 
-// NewRenderer creates a new user Renderer with default dependencies
-func NewRenderer() *Renderer {
+// NewRenderer creates a new user Renderer with the given options
+func NewRenderer(opts ...RendererOption) *Renderer {
 	cfg := config.Get()
 	sa := render.DefaultStyleApplier{}
 	ch := render.NewCodeRenderer(cfg.NoColor())
 
-	// Build the result registry with renderers in priority order
-	registry := NewResultRegistry()
-	registry.Register(NewEditRenderer(sa, ch))
-	registry.Register(NewWriteRenderer(sa))
-	registry.Register(NewTodoRenderer(sa))
-
-	return &Renderer{
+	r := &Renderer{
 		output:           os.Stdout,
 		config:           cfg,
 		styleApplier:     sa,
@@ -138,17 +129,11 @@ func NewRenderer() *Renderer {
 		markdownRenderer: render.NewMarkdownRenderer(cfg.NoColor(), terminal.Width()),
 		toolContext:      &tools.ToolContext{},
 		contentCleaner:   textutil.DefaultContentCleaner(),
-		resultRegistry:   registry,
 	}
-}
-
-// NewRendererWithOptions creates a new user Renderer with custom options
-func NewRendererWithOptions(opts ...RendererOption) *Renderer {
-	r := NewRenderer()
 	for _, opt := range opts {
 		opt(r)
 	}
-	// Rebuild result registry with potentially updated dependencies
+	// Build result registry with final dependencies (after options applied)
 	r.resultRegistry = NewResultRegistry()
 	r.resultRegistry.Register(NewEditRenderer(r.styleApplier, r.highlighter))
 	r.resultRegistry.Register(NewWriteRenderer(r.styleApplier))

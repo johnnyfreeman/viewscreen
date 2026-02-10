@@ -228,7 +228,7 @@ func TestParser_Run_EventHandlerCalled(t *testing.T) {
 
 			// Use a custom output buffer for stream renderer to suppress output
 			outputBuf := &bytes.Buffer{}
-			sr := stream.NewRendererWithOptions(stream.WithOutput(outputBuf))
+			sr := stream.NewRenderer(stream.WithOutput(outputBuf))
 
 			p := NewParserWithOptions(
 				WithInput(strings.NewReader(string(eventJSON))),
@@ -380,7 +380,7 @@ func TestParser_Run_ParseErrorsForEachEventType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			errOut := &bytes.Buffer{}
 			outputBuf := &bytes.Buffer{}
-			sr := stream.NewRendererWithOptions(stream.WithOutput(outputBuf))
+			sr := stream.NewRenderer(stream.WithOutput(outputBuf))
 
 			p := NewParserWithOptions(
 				WithInput(strings.NewReader(tt.invalidJSON)),
@@ -423,7 +423,7 @@ func TestParser_Run_StreamRendererIntegration(t *testing.T) {
 	input := strings.Join(lines, "\n")
 
 	outputBuf := &bytes.Buffer{}
-	sr := stream.NewRendererWithOptions(stream.WithOutput(outputBuf))
+	sr := stream.NewRenderer(stream.WithOutput(outputBuf))
 	rs := rendererSetWithStream(sr)
 
 	p := NewParserWithOptions(
@@ -445,7 +445,7 @@ func TestParser_Run_StreamRendererIntegration(t *testing.T) {
 
 func TestParser_Run_AssistantResetsBlockState(t *testing.T) {
 	outputBuf := &bytes.Buffer{}
-	sr := stream.NewRendererWithOptions(stream.WithOutput(outputBuf))
+	sr := stream.NewRenderer(stream.WithOutput(outputBuf))
 	rs := rendererSetWithStream(sr)
 
 	// First send a stream event to start a text block
