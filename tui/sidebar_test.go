@@ -567,6 +567,67 @@ func TestLayoutBreakpoint(t *testing.T) {
 	}
 }
 
+func TestSidebarRenderer_RenderCacheUsage(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("zero cache returns empty string", func(t *testing.T) {
+		output := r.RenderCacheUsage(0, 0)
+		if output != "" {
+			t.Errorf("expected empty string for zero cache, got %q", output)
+		}
+	})
+
+	t.Run("renders cache counts", func(t *testing.T) {
+		output := r.RenderCacheUsage(5000, 2000)
+
+		if !strings.Contains(output, "Cache") {
+			t.Error("expected 'Cache' label in output")
+		}
+		if !strings.Contains(output, "5.0k") {
+			t.Errorf("expected '5.0k' for cache read, got %q", output)
+		}
+		if !strings.Contains(output, "2.0k") {
+			t.Errorf("expected '2.0k' for cache created, got %q", output)
+		}
+	})
+
+	t.Run("renders with symbols", func(t *testing.T) {
+		output := r.RenderCacheUsage(100, 50)
+
+		if !strings.Contains(output, "⟳") {
+			t.Error("expected ⟳ symbol for cache read")
+		}
+		if !strings.Contains(output, "✦") {
+			t.Error("expected ✦ symbol for cache created")
+		}
+	})
+
+	t.Run("shows when only cache read present", func(t *testing.T) {
+		output := r.RenderCacheUsage(100, 0)
+		if output == "" {
+			t.Error("expected non-empty output when cache read > 0")
+		}
+	})
+
+	t.Run("shows when only cache created present", func(t *testing.T) {
+		output := r.RenderCacheUsage(0, 100)
+		if output == "" {
+			t.Error("expected non-empty output when cache created > 0")
+		}
+	})
+
+	t.Run("renders large cache counts", func(t *testing.T) {
+		output := r.RenderCacheUsage(1_500_000, 500_000)
+
+		if !strings.Contains(output, "1.5M") {
+			t.Errorf("expected '1.5M' for cache read, got %q", output)
+		}
+		if !strings.Contains(output, "500.0k") {
+			t.Errorf("expected '500.0k' for cache created, got %q", output)
+		}
+	})
+}
+
 func TestSidebarRenderer_RenderTokenUsage(t *testing.T) {
 	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
 
@@ -666,6 +727,65 @@ func TestSidebarRenderer_Render_WithTokens(t *testing.T) {
 	}
 	if !strings.Contains(output, "3.0k") {
 		t.Error("expected formatted output tokens in sidebar")
+	}
+}
+
+func TestSidebarRenderer_Render_WithCache(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("renders cache section when data present", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "claude-3-opus"
+		s.TurnCount = 5
+		s.TotalCost = 0.1234
+		s.CacheRead = 8000
+		s.CacheCreated = 3000
+
+		output := r.Render(s, 40, true)
+
+		if !strings.Contains(output, "Cache") {
+			t.Error("expected Cache section in sidebar with cache data")
+		}
+		if !strings.Contains(output, "8.0k") {
+			t.Error("expected formatted cache read in sidebar")
+		}
+		if !strings.Contains(output, "3.0k") {
+			t.Error("expected formatted cache created in sidebar")
+		}
+	})
+
+	t.Run("omits cache section when no data", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "claude-3-opus"
+		s.TurnCount = 1
+		s.TotalCost = 0
+
+		output := r.Render(s, 40, true)
+
+		if strings.Contains(output, "Cache") {
+			t.Error("expected no Cache section when cache data is zero")
+		}
+	})
+}
+
+func TestDetailsModal_WithCache(t *testing.T) {
+	s := state.NewState()
+	s.Model = "claude-opus"
+	s.TurnCount = 5
+	s.TotalCost = 0.1234
+	s.CacheRead = 12000
+	s.CacheCreated = 4000
+
+	styles := NewHeaderStyles()
+	sp := newTestSpinner()
+
+	output := RenderDetailsModal(s, sp, 100, 40, styles, true)
+
+	if !strings.Contains(output, "Cache") {
+		t.Error("expected Cache section in details modal")
+	}
+	if !strings.Contains(output, "12.0k") {
+		t.Error("expected formatted cache read in details modal")
 	}
 }
 

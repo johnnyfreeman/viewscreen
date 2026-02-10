@@ -121,6 +121,16 @@ func (r *SidebarRenderer) RenderTokenUsage(input, output int) string {
 	return sb.String()
 }
 
+// RenderCacheUsage renders the cache read/created token section.
+func (r *SidebarRenderer) RenderCacheUsage(cacheRead, cacheCreated int) string {
+	if cacheRead == 0 && cacheCreated == 0 {
+		return ""
+	}
+
+	value := fmt.Sprintf("⟳%s ✦%s", formatTokenCount(cacheRead), formatTokenCount(cacheCreated))
+	return r.RenderLabelValue("Cache", value)
+}
+
 // formatTokenCount formats a token count compactly (e.g., 1234 -> "1.2k", 1234567 -> "1.2M").
 func formatTokenCount(n int) string {
 	switch {
@@ -208,6 +218,7 @@ func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool) st
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
+	sb.WriteString(r.RenderCacheUsage(s.CacheRead, s.CacheCreated))
 
 	if s.ToolInProgress {
 		sb.WriteString(r.RenderCurrentTool(s.CurrentTool, s.CurrentToolInput))
@@ -399,6 +410,7 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
+	sb.WriteString(r.RenderCacheUsage(s.CacheRead, s.CacheCreated))
 
 	// Current tool
 	if s.ToolInProgress {
