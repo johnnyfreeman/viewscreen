@@ -235,8 +235,8 @@ func (m Model) renderLayout() string {
 	}
 }
 
-// Run starts the TUI
-func Run() error {
+// Run starts the TUI and returns the final rendered content for optional dumping.
+func Run() (string, error) {
 	// Initialize styles (needed for renderers)
 	cfg := config.DefaultProvider{}
 	render.NewMarkdownRenderer(cfg.NoColor(), 80)
@@ -257,8 +257,16 @@ func Run() error {
 
 	p := tea.NewProgram(NewModel(), opts...)
 
-	_, err := p.Run()
-	return err
+	finalModel, err := p.Run()
+	if err != nil {
+		return "", err
+	}
+
+	// Extract final content from the model
+	if m, ok := finalModel.(Model); ok {
+		return m.content.String(), nil
+	}
+	return "", nil
 }
 
 // isatty returns true if the file descriptor is a terminal.

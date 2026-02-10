@@ -586,6 +586,100 @@ func TestParse_AutoExitFlag(t *testing.T) {
 	}
 }
 
+func TestParse_DumpFlag(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected bool
+	}{
+		{
+			name:     "not set",
+			args:     []string{},
+			expected: false,
+		},
+		{
+			name:     "flag set",
+			args:     []string{"-dump"},
+			expected: true,
+		},
+		{
+			name:     "explicit true",
+			args:     []string{"-dump=true"},
+			expected: true,
+		},
+		{
+			name:     "explicit false",
+			args:     []string{"-dump=false"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &MockStyleInitializer{}
+			cfg, err := Parse(
+				WithArgs(tt.args),
+				WithStyleInitializer(mock),
+			)
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if cfg.Dump != tt.expected {
+				t.Errorf("Dump: got %v, want %v", cfg.Dump, tt.expected)
+			}
+		})
+	}
+}
+
+func TestParse_AutoExitImpliesDump(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		wantDump bool
+	}{
+		{
+			name:     "auto-exit alone enables dump",
+			args:     []string{"-auto-exit"},
+			wantDump: true,
+		},
+		{
+			name:     "auto-exit with explicit dump=false",
+			args:     []string{"-auto-exit", "-dump=false"},
+			wantDump: false,
+		},
+		{
+			name:     "auto-exit with explicit dump=true",
+			args:     []string{"-auto-exit", "-dump=true"},
+			wantDump: true,
+		},
+		{
+			name:     "no auto-exit no dump",
+			args:     []string{},
+			wantDump: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := &MockStyleInitializer{}
+			cfg, err := Parse(
+				WithArgs(tt.args),
+				WithStyleInitializer(mock),
+			)
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if cfg.Dump != tt.wantDump {
+				t.Errorf("Dump: got %v, want %v", cfg.Dump, tt.wantDump)
+			}
+		})
+	}
+}
+
 func TestParse_FlagOrderIndependent(t *testing.T) {
 	tests := []struct {
 		name string

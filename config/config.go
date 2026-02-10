@@ -13,6 +13,7 @@ var (
 	ShowUsage bool
 	NoTUI     bool
 	AutoExit  bool
+	Dump      bool
 )
 
 // Provider abstracts config access for testability.
@@ -51,6 +52,7 @@ type Config struct {
 	ShowUsage bool
 	NoTUI     bool
 	AutoExit  bool
+	Dump      bool
 }
 
 // Option is a functional option for configuring the parser
@@ -119,14 +121,31 @@ func Parse(opts ...Option) (*Config, error) {
 	p.flagSet.BoolVar(&cfg.ShowUsage, "usage", true, "Show token usage in result")
 	p.flagSet.BoolVar(&cfg.NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
 	p.flagSet.BoolVar(&cfg.AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
+	p.flagSet.BoolVar(&cfg.Dump, "dump", false, "Print content to stdout on TUI exit (preserves output in scrollback)")
 
 	if err := p.flagSet.Parse(p.args); err != nil {
 		return nil, err
 	}
 
+	// Auto-enable dump when auto-exit is set (loop-friendly default)
+	if cfg.AutoExit && !isFlagSet(p.flagSet, "dump") {
+		cfg.Dump = true
+	}
+
 	p.styleInitializer.Init(cfg.NoColor)
 
 	return cfg, nil
+}
+
+// isFlagSet checks if a flag was explicitly set on the command line.
+func isFlagSet(fs *flag.FlagSet, name string) bool {
+	found := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
 }
 
 // ParseFlags parses command line flags and configures the application
@@ -137,7 +156,13 @@ func ParseFlags() {
 	flag.BoolVar(&ShowUsage, "usage", true, "Show token usage in result")
 	flag.BoolVar(&NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
 	flag.BoolVar(&AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
+	flag.BoolVar(&Dump, "dump", false, "Print content to stdout on TUI exit (preserves output in scrollback)")
 	flag.Parse()
+
+	// Auto-enable dump when auto-exit is set (loop-friendly default)
+	if AutoExit && !isFlagSet(flag.CommandLine, "dump") {
+		Dump = true
+	}
 
 	style.Init(NoColor)
 }

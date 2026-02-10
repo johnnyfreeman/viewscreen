@@ -75,9 +75,13 @@ func (r *Runner) Run() {
 	useTUI := !config.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
 
 	if useTUI {
-		if err := tui.Run(); err != nil {
+		content, err := tui.Run()
+		if err != nil {
 			fmt.Fprintf(r.errOutput, "TUI error: %v\n", err)
 			r.exitFunc(1)
+		}
+		if config.Dump && content != "" {
+			fmt.Print(content)
 		}
 		return
 	}
