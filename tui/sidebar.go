@@ -108,6 +108,30 @@ func (r *SidebarRenderer) RenderSessionInfo(model string, turns int, cost float6
 	return sb.String()
 }
 
+// RenderTokenUsage renders the token usage section.
+func (r *SidebarRenderer) RenderTokenUsage(input, output int) string {
+	if input == 0 && output == 0 {
+		return ""
+	}
+
+	var sb strings.Builder
+	sb.WriteString(r.RenderLabelValue("Tokens",
+		fmt.Sprintf("↑%s ↓%s", formatTokenCount(input), formatTokenCount(output))))
+	return sb.String()
+}
+
+// formatTokenCount formats a token count compactly (e.g., 1234 -> "1.2k", 1234567 -> "1.2M").
+func formatTokenCount(n int) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
+	case n >= 1_000:
+		return fmt.Sprintf("%.1fk", float64(n)/1_000)
+	default:
+		return fmt.Sprintf("%d", n)
+	}
+}
+
 // RenderCurrentTool renders the currently running tool with spinner.
 func (r *SidebarRenderer) RenderCurrentTool(toolName, toolInput string) string {
 	if toolName == "" {
@@ -149,6 +173,7 @@ func (r *SidebarRenderer) Render(s *state.State, height int) string {
 	sb.WriteString("\n")
 	sb.WriteString(r.RenderPrompt(s.Prompt))
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
 
 	if s.ToolInProgress {
 		sb.WriteString(r.RenderCurrentTool(s.CurrentTool, s.CurrentToolInput))
@@ -308,6 +333,7 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 
 	// Session info
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
 
 	// Current tool
 	if s.ToolInProgress {

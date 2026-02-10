@@ -104,6 +104,12 @@ func (p *EventProcessor) processSystem(event system.Event) ProcessResult {
 
 func (p *EventProcessor) processAssistant(event assistant.Event) ProcessResult {
 	p.state.IncrementTurnCount()
+
+	// Accumulate per-turn token usage for real-time tracking
+	if u := event.Message.Usage; u != nil {
+		p.state.AccumulateUsage(u.InputTokens, u.OutputTokens, u.CacheCreationInputTokens, u.CacheReadInputTokens)
+	}
+
 	r := p.renderers
 
 	// Buffer tool_use blocks using the tracker's method

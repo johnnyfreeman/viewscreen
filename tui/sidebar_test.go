@@ -565,3 +565,126 @@ func TestLayoutBreakpoint(t *testing.T) {
 		t.Errorf("headerHeight = %d, want 1", headerHeight)
 	}
 }
+
+func TestSidebarRenderer_RenderTokenUsage(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("zero tokens returns empty string", func(t *testing.T) {
+		output := r.RenderTokenUsage(0, 0)
+		if output != "" {
+			t.Errorf("expected empty string for zero tokens, got %q", output)
+		}
+	})
+
+	t.Run("renders token counts", func(t *testing.T) {
+		output := r.RenderTokenUsage(1500, 300)
+
+		if !strings.Contains(output, "Tokens") {
+			t.Error("expected 'Tokens' label in output")
+		}
+		if !strings.Contains(output, "1.5k") {
+			t.Errorf("expected '1.5k' for input tokens, got %q", output)
+		}
+		if !strings.Contains(output, "300") {
+			t.Errorf("expected '300' for output tokens, got %q", output)
+		}
+	})
+
+	t.Run("renders large token counts", func(t *testing.T) {
+		output := r.RenderTokenUsage(1_500_000, 50_000)
+
+		if !strings.Contains(output, "1.5M") {
+			t.Errorf("expected '1.5M' for input tokens, got %q", output)
+		}
+		if !strings.Contains(output, "50.0k") {
+			t.Errorf("expected '50.0k' for output tokens, got %q", output)
+		}
+	})
+
+	t.Run("renders with arrows", func(t *testing.T) {
+		output := r.RenderTokenUsage(100, 50)
+
+		if !strings.Contains(output, "↑") {
+			t.Error("expected up arrow for input tokens")
+		}
+		if !strings.Contains(output, "↓") {
+			t.Error("expected down arrow for output tokens")
+		}
+	})
+
+	t.Run("shows when only input tokens present", func(t *testing.T) {
+		output := r.RenderTokenUsage(100, 0)
+		if output == "" {
+			t.Error("expected non-empty output when input tokens > 0")
+		}
+	})
+}
+
+func TestFormatTokenCount(t *testing.T) {
+	tests := []struct {
+		input int
+		want  string
+	}{
+		{0, "0"},
+		{1, "1"},
+		{999, "999"},
+		{1000, "1.0k"},
+		{1500, "1.5k"},
+		{10000, "10.0k"},
+		{999999, "1000.0k"},
+		{1000000, "1.0M"},
+		{1500000, "1.5M"},
+		{10000000, "10.0M"},
+	}
+
+	for _, tt := range tests {
+		got := formatTokenCount(tt.input)
+		if got != tt.want {
+			t.Errorf("formatTokenCount(%d) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestSidebarRenderer_Render_WithTokens(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	s := state.NewState()
+	s.Model = "claude-3-opus"
+	s.TurnCount = 5
+	s.TotalCost = 0.1234
+	s.InputTokens = 15000
+	s.OutputTokens = 3000
+
+	output := r.Render(s, 40)
+
+	if !strings.Contains(output, "Tokens") {
+		t.Error("expected Tokens section in sidebar with token data")
+	}
+	if !strings.Contains(output, "15.0k") {
+		t.Error("expected formatted input tokens in sidebar")
+	}
+	if !strings.Contains(output, "3.0k") {
+		t.Error("expected formatted output tokens in sidebar")
+	}
+}
+
+func TestDetailsModal_WithTokens(t *testing.T) {
+	s := state.NewState()
+	s.Model = "claude-opus"
+	s.TurnCount = 5
+	s.TotalCost = 0.1234
+	s.InputTokens = 25000
+	s.OutputTokens = 5000
+
+	styles := NewHeaderStyles()
+	sp := newTestSpinner()
+
+	output := RenderDetailsModal(s, sp, 100, 40, styles)
+
+	if !strings.Contains(output, "Tokens") {
+		t.Error("expected Tokens section in details modal")
+	}
+	if !strings.Contains(output, "25.0k") {
+		t.Error("expected formatted input tokens in details modal")
+	}
+}

@@ -357,3 +357,78 @@ func TestEventProcessor_MultipleTurns(t *testing.T) {
 		t.Errorf("TurnCount should be 3 after 3 assistant events, got %d", s.TurnCount)
 	}
 }
+
+func TestEventProcessor_AccumulatesTokenUsage(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+
+	// First turn with usage
+	event1 := AssistantEvent{
+		Data: assistant.Event{
+			Message: assistant.Message{
+				Content: []types.ContentBlock{
+					{Type: "text", Text: "Hello"},
+				},
+				Usage: &types.Usage{
+					InputTokens:              100,
+					OutputTokens:             50,
+					CacheCreationInputTokens: 200,
+					CacheReadInputTokens:     300,
+				},
+			},
+		},
+	}
+	p.Process(event1)
+
+	if s.InputTokens != 100 {
+		t.Errorf("InputTokens = %d, want 100", s.InputTokens)
+	}
+	if s.OutputTokens != 50 {
+		t.Errorf("OutputTokens = %d, want 50", s.OutputTokens)
+	}
+
+	// Second turn with more usage
+	event2 := AssistantEvent{
+		Data: assistant.Event{
+			Message: assistant.Message{
+				Content: []types.ContentBlock{
+					{Type: "text", Text: "World"},
+				},
+				Usage: &types.Usage{
+					InputTokens:  150,
+					OutputTokens: 75,
+				},
+			},
+		},
+	}
+	p.Process(event2)
+
+	if s.InputTokens != 250 {
+		t.Errorf("InputTokens = %d, want 250 (accumulated)", s.InputTokens)
+	}
+	if s.OutputTokens != 125 {
+		t.Errorf("OutputTokens = %d, want 125 (accumulated)", s.OutputTokens)
+	}
+}
+
+func TestEventProcessor_NilUsageDoesNotPanic(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+
+	// Assistant event without usage (nil)
+	event := AssistantEvent{
+		Data: assistant.Event{
+			Message: assistant.Message{
+				Content: []types.ContentBlock{
+					{Type: "text", Text: "No usage"},
+				},
+				// Usage is nil
+			},
+		},
+	}
+	p.Process(event)
+
+	if s.InputTokens != 0 {
+		t.Errorf("InputTokens = %d, want 0 (no usage provided)", s.InputTokens)
+	}
+}

@@ -76,6 +76,15 @@ func (s *State) IncrementTurnCount() {
 	s.TurnCount++
 }
 
+// AccumulateUsage adds per-turn token usage to the running totals.
+// This is called for each assistant message to provide real-time tracking.
+func (s *State) AccumulateUsage(input, output, cacheCreated, cacheRead int) {
+	s.InputTokens += input
+	s.OutputTokens += output
+	s.CacheCreated += cacheCreated
+	s.CacheRead += cacheRead
+}
+
 // SetCurrentTool sets the current tool being executed
 func (s *State) SetCurrentTool(name, input string) {
 	s.CurrentTool = name
