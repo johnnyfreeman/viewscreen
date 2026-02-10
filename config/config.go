@@ -8,32 +8,12 @@ import (
 	"github.com/johnnyfreeman/viewscreen/style"
 )
 
-var (
-	Verbose    bool
-	NoColor    bool
-	ShowUsage  bool
-	NoTUI      bool
-	AutoExit   bool
-	Dump       bool
-	PromptMode bool
-	Prompt     string
-)
-
 // Provider abstracts config access for testability.
-// This interface unifies the scattered config access patterns across packages.
 type Provider interface {
 	IsVerbose() bool
 	NoColor() bool
 	ShowUsage() bool
 }
-
-// DefaultProvider reads from the global config variables.
-// Use this in production code.
-type DefaultProvider struct{}
-
-func (DefaultProvider) IsVerbose() bool { return Verbose }
-func (DefaultProvider) NoColor() bool   { return NoColor }
-func (DefaultProvider) ShowUsage() bool { return ShowUsage }
 
 // StyleInitializer is an interface for initializing styles
 type StyleInitializer interface {
@@ -48,17 +28,35 @@ func (DefaultStyleInitializer) Init(disableColor bool) {
 	style.Init(disableColor)
 }
 
-// Config holds the parsed configuration
+// Config holds the parsed configuration.
+// It implements the Provider interface directly, so it can be passed
+// anywhere a Provider is needed without an adapter.
 type Config struct {
-	Verbose    bool
-	NoColor    bool
-	ShowUsage  bool
-	NoTUI      bool
-	AutoExit   bool
-	Dump       bool
-	PromptMode bool
-	Prompt     string
+	Verbose      bool
+	DisableColor bool
+	DisplayUsage bool
+	NoTUI        bool
+	AutoExit     bool
+	Dump         bool
+	PromptMode   bool
+	Prompt       string
 }
+
+// IsVerbose implements Provider.
+func (c *Config) IsVerbose() bool { return c.Verbose }
+
+// NoColor implements Provider.
+func (c *Config) NoColor() bool { return c.DisableColor }
+
+// ShowUsage implements Provider.
+func (c *Config) ShowUsage() bool { return c.DisplayUsage }
+
+// cfg is the package-level config set by Parse().
+// Accessed via Get(). This replaces the old scattered global variables.
+var cfg = &Config{DisplayUsage: true}
+
+// Get returns the current global config. Never nil.
+func Get() *Config { return cfg }
 
 // Option is a functional option for configuring the parser
 type Option func(*configParser)
@@ -98,7 +96,8 @@ func WithErrOutput(w io.Writer) Option {
 	}
 }
 
-// Parse parses the provided arguments and returns a Config
+// Parse parses the provided arguments and returns a Config.
+// It also sets the package-level config accessible via Get().
 func Parse(opts ...Option) (*Config, error) {
 	p := &configParser{
 		styleInitializer: DefaultStyleInitializer{},
@@ -117,17 +116,17 @@ func Parse(opts ...Option) (*Config, error) {
 		p.flagSet.SetOutput(p.errOutput)
 	}
 
-	cfg := &Config{
-		ShowUsage: true, // Default value
+	c := &Config{
+		DisplayUsage: true, // Default value
 	}
 
-	p.flagSet.BoolVar(&cfg.Verbose, "v", false, "Verbose output (show more details)")
-	p.flagSet.BoolVar(&cfg.NoColor, "no-color", false, "Disable colored output")
-	p.flagSet.BoolVar(&cfg.ShowUsage, "usage", true, "Show token usage in result")
-	p.flagSet.BoolVar(&cfg.NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
-	p.flagSet.BoolVar(&cfg.AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
-	p.flagSet.BoolVar(&cfg.Dump, "dump", false, "Print content to stdout on TUI exit (preserves output in scrollback)")
-	p.flagSet.BoolVar(&cfg.PromptMode, "p", false, "Treat stdin as a prompt (not a JSON stream)")
+	p.flagSet.BoolVar(&c.Verbose, "v", false, "Verbose output (show more details)")
+	p.flagSet.BoolVar(&c.DisableColor, "no-color", false, "Disable colored output")
+	p.flagSet.BoolVar(&c.DisplayUsage, "usage", true, "Show token usage in result")
+	p.flagSet.BoolVar(&c.NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
+	p.flagSet.BoolVar(&c.AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
+	p.flagSet.BoolVar(&c.Dump, "dump", false, "Print content to stdout on TUI exit (preserves output in scrollback)")
+	p.flagSet.BoolVar(&c.PromptMode, "p", false, "Treat stdin as a prompt (not a JSON stream)")
 
 	if err := p.flagSet.Parse(p.args); err != nil {
 		return nil, err
@@ -135,17 +134,20 @@ func Parse(opts ...Option) (*Config, error) {
 
 	// Capture positional args as prompt text
 	if args := p.flagSet.Args(); len(args) > 0 {
-		cfg.Prompt = strings.Join(args, " ")
+		c.Prompt = strings.Join(args, " ")
 	}
 
 	// Auto-enable dump when auto-exit is set (loop-friendly default)
-	if cfg.AutoExit && !isFlagSet(p.flagSet, "dump") {
-		cfg.Dump = true
+	if c.AutoExit && !isFlagSet(p.flagSet, "dump") {
+		c.Dump = true
 	}
 
-	p.styleInitializer.Init(cfg.NoColor)
+	p.styleInitializer.Init(c.DisableColor)
 
-	return cfg, nil
+	// Set the package-level config
+	cfg = c
+
+	return c, nil
 }
 
 // isFlagSet checks if a flag was explicitly set on the command line.
@@ -157,29 +159,4 @@ func isFlagSet(fs *flag.FlagSet, name string) bool {
 		}
 	})
 	return found
-}
-
-// ParseFlags parses command line flags and configures the application
-// This is the legacy function that uses global variables
-func ParseFlags() {
-	flag.BoolVar(&Verbose, "v", false, "Verbose output (show more details)")
-	flag.BoolVar(&NoColor, "no-color", false, "Disable colored output")
-	flag.BoolVar(&ShowUsage, "usage", true, "Show token usage in result")
-	flag.BoolVar(&NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
-	flag.BoolVar(&AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
-	flag.BoolVar(&Dump, "dump", false, "Print content to stdout on TUI exit (preserves output in scrollback)")
-	flag.BoolVar(&PromptMode, "p", false, "Treat stdin as a prompt (not a JSON stream)")
-	flag.Parse()
-
-	// Capture positional args as prompt text
-	if args := flag.Args(); len(args) > 0 {
-		Prompt = strings.Join(args, " ")
-	}
-
-	// Auto-enable dump when auto-exit is set (loop-friendly default)
-	if AutoExit && !isFlagSet(flag.CommandLine, "dump") {
-		Dump = true
-	}
-
-	style.Init(NoColor)
 }

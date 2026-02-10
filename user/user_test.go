@@ -1291,13 +1291,13 @@ func TestRendererSetToolContextMultiple(t *testing.T) {
 	}
 }
 
-func TestDefaultConfigProvider(t *testing.T) {
-	cp := config.DefaultProvider{}
+func TestConfigProvider(t *testing.T) {
+	cfg := config.Get()
 
 	// These just verify the methods exist and return bools
-	_ = cp.IsVerbose()
-	_ = cp.NoColor()
-	_ = cp.ShowUsage()
+	_ = cfg.IsVerbose()
+	_ = cfg.NoColor()
+	_ = cfg.ShowUsage()
 }
 
 func TestDefaultStyleApplier(t *testing.T) {

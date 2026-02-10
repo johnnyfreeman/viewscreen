@@ -89,7 +89,7 @@ func WithStyleApplier(sa render.StyleApplier) RendererOption {
 func NewRenderer(opts ...RendererOption) *Renderer {
 	r := &Renderer{
 		output:       os.Stdout,
-		config:       config.DefaultProvider{},
+		config:       config.Get(),
 		styleApplier: render.DefaultStyleApplier{},
 	}
 	for _, opt := range opts {

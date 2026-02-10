@@ -3,12 +3,18 @@ package main
 import (
 	"bytes"
 	"errors"
-	"flag"
 	"strings"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/parser"
 )
+
+// noopStyleInit prevents style.Init from affecting other tests
+var testConfigOpts = []config.Option{
+	config.WithArgs([]string{}),
+	config.WithStyleInitializer(&config.DefaultStyleInitializer{}),
+}
 
 func TestNewRunner_Defaults(t *testing.T) {
 	r := NewRunner()
@@ -21,9 +27,6 @@ func TestNewRunner_Defaults(t *testing.T) {
 	}
 	if r.exitFunc == nil {
 		t.Error("expected exitFunc to be set")
-	}
-	if r.parseFlags == nil {
-		t.Error("expected parseFlags to be set")
 	}
 }
 
@@ -48,7 +51,7 @@ func TestNewRunner_WithOptions(t *testing.T) {
 
 		r := NewRunner(
 			WithParserFactory(factory),
-			WithParseFlags(func() {}),
+			WithConfigOpts(testConfigOpts...),
 		)
 
 		r.Run()
@@ -78,7 +81,7 @@ func TestNewRunner_WithOptions(t *testing.T) {
 			WithErrOutput(errBuf),
 			WithParserFactory(factory),
 			WithExitFunc(exitFunc),
-			WithParseFlags(func() {}),
+			WithConfigOpts(testConfigOpts...),
 		)
 
 		r.Run()
@@ -88,28 +91,6 @@ func TestNewRunner_WithOptions(t *testing.T) {
 		}
 		if exitCode != 1 {
 			t.Errorf("expected exit code 1, got %d", exitCode)
-		}
-	})
-
-	t.Run("WithParseFlags", func(t *testing.T) {
-		flagsCalled := false
-		parseFlags := func() {
-			flagsCalled = true
-		}
-
-		r := NewRunner(
-			WithParserFactory(func() *parser.Parser {
-				return parser.NewParserWithOptions(
-					parser.WithInput(strings.NewReader("")),
-				)
-			}),
-			WithParseFlags(parseFlags),
-		)
-
-		r.Run()
-
-		if !flagsCalled {
-			t.Error("expected parseFlags to be called")
 		}
 	})
 }
@@ -122,13 +103,10 @@ func (e *errorReader) Read(p []byte) (n int, err error) {
 }
 
 func TestRunner_Run_Success(t *testing.T) {
-	flagsCalled := false
 	factoryCalled := false
 
 	r := NewRunner(
-		WithParseFlags(func() {
-			flagsCalled = true
-		}),
+		WithConfigOpts(testConfigOpts...),
 		WithParserFactory(func() *parser.Parser {
 			factoryCalled = true
 			return parser.NewParserWithOptions(
@@ -139,9 +117,6 @@ func TestRunner_Run_Success(t *testing.T) {
 
 	r.Run()
 
-	if !flagsCalled {
-		t.Error("expected parseFlags to be called")
-	}
 	if !factoryCalled {
 		t.Error("expected parserFactory to be called")
 	}
@@ -154,7 +129,7 @@ func TestRunner_Run_Error(t *testing.T) {
 
 	r := NewRunner(
 		WithErrOutput(errBuf),
-		WithParseFlags(func() {}),
+		WithConfigOpts(testConfigOpts...),
 		WithParserFactory(func() *parser.Parser {
 			return parser.NewParserWithOptions(
 				parser.WithInput(&errorReader{}),
@@ -184,7 +159,7 @@ func TestRunner_Run_ValidEvents(t *testing.T) {
 	input := `{"type":"system","subtype":"init","cwd":"/test","model":"test-model","claude_code_version":"1.0.0","tools":[]}`
 
 	r := NewRunner(
-		WithParseFlags(func() {}),
+		WithConfigOpts(testConfigOpts...),
 		WithParserFactory(func() *parser.Parser {
 			return parser.NewParserWithOptions(
 				parser.WithInput(strings.NewReader(input)),
@@ -205,7 +180,7 @@ func TestRunner_Run_MultipleEvents(t *testing.T) {
 	input := strings.Join(events, "\n")
 
 	r := NewRunner(
-		WithParseFlags(func() {}),
+		WithConfigOpts(testConfigOpts...),
 		WithParserFactory(func() *parser.Parser {
 			return parser.NewParserWithOptions(
 				parser.WithInput(strings.NewReader(input)),
@@ -217,7 +192,7 @@ func TestRunner_Run_MultipleEvents(t *testing.T) {
 	r.Run()
 }
 
-func TestWithErrOutput(t *testing.T) {
+func TestWithErrOutput_Option(t *testing.T) {
 	buf := &bytes.Buffer{}
 	opt := WithErrOutput(buf)
 
@@ -229,7 +204,7 @@ func TestWithErrOutput(t *testing.T) {
 	}
 }
 
-func TestWithParserFactory(t *testing.T) {
+func TestWithParserFactory_Option(t *testing.T) {
 	called := false
 	factory := func() *parser.Parser {
 		called = true
@@ -250,7 +225,7 @@ func TestWithParserFactory(t *testing.T) {
 	}
 }
 
-func TestWithExitFunc(t *testing.T) {
+func TestWithExitFunc_Option(t *testing.T) {
 	called := false
 	capturedCode := -1
 	exitFn := func(code int) {
@@ -275,55 +250,14 @@ func TestWithExitFunc(t *testing.T) {
 	}
 }
 
-func TestWithParseFlags(t *testing.T) {
-	called := false
-	parseFn := func() {
-		called = true
-	}
-	opt := WithParseFlags(parseFn)
+func TestWithConfigOpts_Option(t *testing.T) {
+	opts := []config.Option{config.WithArgs([]string{"-v"})}
+	opt := WithConfigOpts(opts...)
 
 	r := &Runner{}
 	opt(r)
 
-	if r.parseFlags == nil {
-		t.Error("expected parseFlags to be set by option")
+	if len(r.configOpts) != 1 {
+		t.Errorf("expected 1 config option, got %d", len(r.configOpts))
 	}
-
-	r.parseFlags()
-	if !called {
-		t.Error("expected parseFlags to be callable")
-	}
-}
-
-func TestIsFlagExplicitlySet(t *testing.T) {
-	t.Run("returns false for unset flag", func(t *testing.T) {
-		// Reset flag.CommandLine to avoid pollution between tests
-		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
-		flag.Bool("dump", false, "test flag")
-		flag.CommandLine.Parse([]string{})
-
-		if isFlagExplicitlySet("dump") {
-			t.Error("expected dump to not be explicitly set")
-		}
-	})
-
-	t.Run("returns true for explicitly set flag", func(t *testing.T) {
-		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
-		flag.Bool("dump", false, "test flag")
-		flag.CommandLine.Parse([]string{"-dump"})
-
-		if !isFlagExplicitlySet("dump") {
-			t.Error("expected dump to be explicitly set")
-		}
-	})
-
-	t.Run("returns false for unknown flag", func(t *testing.T) {
-		flag.CommandLine = flag.NewFlagSet("test", flag.ContinueOnError)
-		flag.Bool("dump", false, "test flag")
-		flag.CommandLine.Parse([]string{"-dump"})
-
-		if isFlagExplicitlySet("nonexistent") {
-			t.Error("expected nonexistent flag to not be set")
-		}
-	})
 }

@@ -337,8 +337,7 @@ func (m Model) handleAutoExitTick() (Model, tea.Cmd) {
 
 // handleParseError processes event parsing errors.
 func (m Model) handleParseError(msg events.ParseError) Model {
-	cfg := config.DefaultProvider{}
-	if cfg.IsVerbose() {
+	if config.Get().IsVerbose() {
 		m.content.WriteString("Parse error: " + msg.Line + "\n")
 		m.viewport.SetContent(m.content.String())
 		if m.followMode {

@@ -87,7 +87,7 @@ func defaultToolUseRenderer(out *render.Output, block types.ContentBlock) {
 
 // NewRenderer creates a new assistant Renderer with default dependencies
 func NewRenderer() *Renderer {
-	cfg := config.DefaultProvider{}
+	cfg := config.Get()
 	return &Renderer{
 		output:           os.Stdout,
 		markdownRenderer: render.NewMarkdownRenderer(cfg.NoColor(), terminal.Width()),

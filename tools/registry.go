@@ -95,7 +95,7 @@ func GetDefinition(name string) (ToolDefinition, bool) {
 // GetToolArg returns the display argument for a tool using the registry.
 // Falls back to JSON preview for unknown tools in verbose mode.
 func GetToolArg(toolName string, input map[string]interface{}) string {
-	return GetToolArgWithConfig(toolName, input, config.DefaultProvider{})
+	return GetToolArgWithConfig(toolName, input, config.Get())
 }
 
 // GetToolArgWithConfig returns the display argument for a tool using the provided config.

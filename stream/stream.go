@@ -81,7 +81,7 @@ func defaultToolHeaderRenderer(toolName string, input map[string]any) (string, t
 // NewRenderer creates a new stream Renderer
 func NewRenderer() *Renderer {
 	width := terminal.Width()
-	cfg := config.DefaultProvider{}
+	cfg := config.Get()
 
 	return &Renderer{
 		block:            NewBlockState(),

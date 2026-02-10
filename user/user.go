@@ -155,7 +155,7 @@ func WithContentCleaner(cc *textutil.ContentCleaner) RendererOption {
 
 // NewRenderer creates a new user Renderer with default dependencies
 func NewRenderer() *Renderer {
-	cfg := config.DefaultProvider{}
+	cfg := config.Get()
 	sa := render.DefaultStyleApplier{}
 	ch := NewDefaultCodeHighlighter(cfg.NoColor())
 

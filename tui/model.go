@@ -95,7 +95,7 @@ func NewModel(opts ...ModelOption) Model {
 		search:        NewSearch(),
 		promptEditor:  NewPromptEditor(),
 		followMode:    true, // auto-scroll to bottom by default
-		autoExit:      config.AutoExit,
+		autoExit:      config.Get().AutoExit,
 	}
 
 	for _, opt := range opts {
@@ -302,8 +302,7 @@ func (m Model) Prompt() string {
 // Run starts the TUI and returns the final rendered content for optional dumping.
 func Run() (string, error) {
 	// Initialize styles (needed for renderers)
-	cfg := config.DefaultProvider{}
-	render.NewMarkdownRenderer(cfg.NoColor(), 80)
+	render.NewMarkdownRenderer(config.Get().NoColor(), 80)
 
 	// AltScreen and MouseMode are now set declaratively in View()
 	var opts []tea.ProgramOption
@@ -336,8 +335,7 @@ func Run() (string, error) {
 // RunWithPrompt spawns claude with the given prompt and runs the TUI on its output.
 func RunWithPrompt(prompt string) (string, error) {
 	// Initialize styles (needed for renderers)
-	cfg := config.DefaultProvider{}
-	render.NewMarkdownRenderer(cfg.NoColor(), 80)
+	render.NewMarkdownRenderer(config.Get().NoColor(), 80)
 
 	proc, err := claudepkg.Start(prompt, nil)
 	if err != nil {

@@ -61,7 +61,7 @@ func NewRenderer() *Renderer {
 	return &Renderer{
 		output:       os.Stdout,
 		styleApplier: render.DefaultStyleApplier{},
-		config:       config.DefaultProvider{},
+		config:       config.Get(),
 	}
 }
 

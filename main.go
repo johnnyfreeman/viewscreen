@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -21,7 +20,7 @@ type Runner struct {
 	errOutput     io.Writer
 	parserFactory func() *parser.Parser
 	exitFunc      func(int)
-	parseFlags    func()
+	configOpts    []config.Option
 }
 
 // RunnerOption is a functional option for configuring a Runner
@@ -48,10 +47,10 @@ func WithExitFunc(f func(int)) RunnerOption {
 	}
 }
 
-// WithParseFlags sets a custom flag parsing function
-func WithParseFlags(f func()) RunnerOption {
+// WithConfigOpts sets custom config parse options (for testing)
+func WithConfigOpts(opts ...config.Option) RunnerOption {
 	return func(r *Runner) {
-		r.parseFlags = f
+		r.configOpts = opts
 	}
 }
 
@@ -61,7 +60,6 @@ func NewRunner(opts ...RunnerOption) *Runner {
 		errOutput:     os.Stderr,
 		parserFactory: parser.NewParser,
 		exitFunc:      os.Exit,
-		parseFlags:    config.ParseFlags,
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -71,11 +69,16 @@ func NewRunner(opts ...RunnerOption) *Runner {
 
 // Run executes the application
 func (r *Runner) Run() {
-	r.parseFlags()
+	cfg, err := config.Parse(r.configOpts...)
+	if err != nil {
+		fmt.Fprintf(r.errOutput, "%v\n", err)
+		r.exitFunc(1)
+		return
+	}
 
 	// Resolve prompt: positional args take priority, then -p reads stdin
-	prompt := config.Prompt
-	if prompt == "" && config.PromptMode {
+	prompt := cfg.Prompt
+	if prompt == "" && cfg.PromptMode {
 		data, err := io.ReadAll(stdinReader)
 		if err == nil {
 			prompt = string(data)
@@ -86,7 +89,7 @@ func (r *Runner) Run() {
 	// TUI mode is used when:
 	// 1. --no-tui flag is NOT set, AND
 	// 2. stdout is a TTY (interactive terminal)
-	useTUI := !config.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
+	useTUI := !cfg.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
 
 	if useTUI {
 		// If we have a prompt, spawn claude and stream into the TUI
@@ -96,7 +99,7 @@ func (r *Runner) Run() {
 				fmt.Fprintf(r.errOutput, "TUI error: %v\n", err)
 				r.exitFunc(1)
 			}
-			if config.Dump && content != "" {
+			if cfg.Dump && content != "" {
 				fmt.Print(content)
 			}
 			return
@@ -106,11 +109,11 @@ func (r *Runner) Run() {
 		// When stdin is a pipe, the user is running something like:
 		//   while :; do cat ... | claude ... | viewscreen; done
 		// In this case, auto-exit prevents the TUI from blocking after each iteration.
-		if !term.IsTerminal(int(os.Stdin.Fd())) && !config.AutoExit {
-			config.AutoExit = true
+		if !term.IsTerminal(int(os.Stdin.Fd())) && !cfg.AutoExit {
+			cfg.AutoExit = true
 			// Auto-enable dump too (same logic as the flag)
-			if !isFlagExplicitlySet("dump") {
-				config.Dump = true
+			if !cfg.Dump {
+				cfg.Dump = true
 			}
 		}
 
@@ -119,7 +122,7 @@ func (r *Runner) Run() {
 			fmt.Fprintf(r.errOutput, "TUI error: %v\n", err)
 			r.exitFunc(1)
 		}
-		if config.Dump && content != "" {
+		if cfg.Dump && content != "" {
 			fmt.Print(content)
 		}
 		return
@@ -131,17 +134,6 @@ func (r *Runner) Run() {
 		fmt.Fprintf(r.errOutput, "%v\n", err)
 		r.exitFunc(1)
 	}
-}
-
-// isFlagExplicitlySet checks if a flag was explicitly set on the command line.
-func isFlagExplicitlySet(name string) bool {
-	found := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == name {
-			found = true
-		}
-	})
-	return found
 }
 
 func main() {

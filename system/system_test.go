@@ -470,14 +470,13 @@ func TestDefaultStyleApplier(t *testing.T) {
 	}
 }
 
-func TestDefaultConfigProvider(t *testing.T) {
-	dp := config.DefaultProvider{}
+func TestConfigProvider(t *testing.T) {
+	cfg := config.Get()
 
 	// Test that the methods don't panic
-	// The actual values depend on config globals which we can't easily control here
-	_ = dp.IsVerbose()
-	_ = dp.NoColor()
-	_ = dp.ShowUsage()
+	_ = cfg.IsVerbose()
+	_ = cfg.NoColor()
+	_ = cfg.ShowUsage()
 }
 
 func TestRenderer_Render_MutedTextStyleCalls(t *testing.T) {

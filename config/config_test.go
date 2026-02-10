@@ -33,12 +33,12 @@ func TestParse_DefaultValues(t *testing.T) {
 		t.Error("expected Verbose to be false by default")
 	}
 
-	if cfg.NoColor {
-		t.Error("expected NoColor to be false by default")
+	if cfg.DisableColor {
+		t.Error("expected DisableColor to be false by default")
 	}
 
-	if !cfg.ShowUsage {
-		t.Error("expected ShowUsage to be true by default")
+	if !cfg.DisplayUsage {
+		t.Error("expected DisplayUsage to be true by default")
 	}
 
 	if !mock.InitCalled {
@@ -142,8 +142,8 @@ func TestParse_NoColorFlag(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if cfg.NoColor != tt.expectedNoColor {
-				t.Errorf("NoColor: got %v, want %v", cfg.NoColor, tt.expectedNoColor)
+			if cfg.DisableColor != tt.expectedNoColor {
+				t.Errorf("DisableColor: got %v, want %v", cfg.DisableColor, tt.expectedNoColor)
 			}
 
 			if mock.DisableColor != tt.expectedInitColor {
@@ -188,8 +188,8 @@ func TestParse_ShowUsageFlag(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if cfg.ShowUsage != tt.expected {
-				t.Errorf("ShowUsage: got %v, want %v", cfg.ShowUsage, tt.expected)
+			if cfg.DisplayUsage != tt.expected {
+				t.Errorf("DisplayUsage: got %v, want %v", cfg.DisplayUsage, tt.expected)
 			}
 		})
 	}
@@ -249,12 +249,12 @@ func TestParse_MultipleFlagsCombined(t *testing.T) {
 				t.Errorf("Verbose: got %v, want %v", cfg.Verbose, tt.wantVerbose)
 			}
 
-			if cfg.NoColor != tt.wantNoColor {
-				t.Errorf("NoColor: got %v, want %v", cfg.NoColor, tt.wantNoColor)
+			if cfg.DisableColor != tt.wantNoColor {
+				t.Errorf("DisableColor: got %v, want %v", cfg.DisableColor, tt.wantNoColor)
 			}
 
-			if cfg.ShowUsage != tt.wantShowUsage {
-				t.Errorf("ShowUsage: got %v, want %v", cfg.ShowUsage, tt.wantShowUsage)
+			if cfg.DisplayUsage != tt.wantShowUsage {
+				t.Errorf("DisplayUsage: got %v, want %v", cfg.DisplayUsage, tt.wantShowUsage)
 			}
 		})
 	}
@@ -393,8 +393,8 @@ func TestParse_DefaultStyleInitializer(t *testing.T) {
 		t.Error("expected Verbose to be true")
 	}
 
-	if !cfg.NoColor {
-		t.Error("expected NoColor to be true")
+	if !cfg.DisableColor {
+		t.Error("expected DisableColor to be true")
 	}
 }
 
@@ -465,21 +465,21 @@ func TestWithErrOutput(t *testing.T) {
 func TestConfig_StructFields(t *testing.T) {
 	// Test that Config struct has expected fields with correct types
 	cfg := Config{
-		Verbose:   true,
-		NoColor:   true,
-		ShowUsage: false,
+		Verbose:      true,
+		DisableColor: true,
+		DisplayUsage: false,
 	}
 
 	if !cfg.Verbose {
 		t.Error("expected Verbose to be true")
 	}
 
-	if !cfg.NoColor {
-		t.Error("expected NoColor to be true")
+	if !cfg.DisableColor {
+		t.Error("expected DisableColor to be true")
 	}
 
-	if cfg.ShowUsage {
-		t.Error("expected ShowUsage to be false")
+	if cfg.DisplayUsage {
+		t.Error("expected DisplayUsage to be false")
 	}
 }
 
@@ -499,12 +499,12 @@ func TestParse_EmptyArgs(t *testing.T) {
 		t.Error("expected Verbose to default to false")
 	}
 
-	if cfg.NoColor != false {
-		t.Error("expected NoColor to default to false")
+	if cfg.DisableColor != false {
+		t.Error("expected DisableColor to default to false")
 	}
 
-	if cfg.ShowUsage != true {
-		t.Error("expected ShowUsage to default to true")
+	if cfg.DisplayUsage != true {
+		t.Error("expected DisplayUsage to default to true")
 	}
 }
 
@@ -715,9 +715,56 @@ func TestParse_FlagOrderIndependent(t *testing.T) {
 				t.Error("expected Verbose to be true")
 			}
 
-			if !cfg.NoColor {
-				t.Error("expected NoColor to be true")
+			if !cfg.DisableColor {
+				t.Error("expected DisableColor to be true")
 			}
 		})
+	}
+}
+
+func TestConfig_ImplementsProvider(t *testing.T) {
+	cfg := &Config{
+		Verbose:      true,
+		DisableColor: true,
+		DisplayUsage: false,
+	}
+
+	// Verify Config implements Provider interface
+	var p Provider = cfg
+	if !p.IsVerbose() {
+		t.Error("expected IsVerbose() to be true")
+	}
+	if !p.NoColor() {
+		t.Error("expected NoColor() to be true")
+	}
+	if p.ShowUsage() {
+		t.Error("expected ShowUsage() to be false")
+	}
+}
+
+func TestGet_ReturnsNonNil(t *testing.T) {
+	cfg := Get()
+	if cfg == nil {
+		t.Fatal("expected Get() to return non-nil config")
+	}
+}
+
+func TestParse_SetsGlobalConfig(t *testing.T) {
+	mock := &MockStyleInitializer{}
+	cfg, err := Parse(
+		WithArgs([]string{"-v"}),
+		WithStyleInitializer(mock),
+	)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := Get()
+	if got != cfg {
+		t.Error("expected Get() to return the config set by Parse()")
+	}
+	if !got.Verbose {
+		t.Error("expected global config to have Verbose=true")
 	}
 }
