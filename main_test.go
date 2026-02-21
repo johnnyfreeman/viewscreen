@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/parser"
 )
 
@@ -21,8 +22,8 @@ func TestNewRunner_Defaults(t *testing.T) {
 	if r.exitFunc == nil {
 		t.Error("expected exitFunc to be set")
 	}
-	if r.parseFlags == nil {
-		t.Error("expected parseFlags to be set")
+	if r.parseConfig == nil {
+		t.Error("expected parseConfig to be set")
 	}
 }
 
@@ -284,12 +285,44 @@ func TestWithParseFlags(t *testing.T) {
 	r := &Runner{}
 	opt(r)
 
-	if r.parseFlags == nil {
-		t.Error("expected parseFlags to be set by option")
+	if r.parseConfig == nil {
+		t.Error("expected parseConfig to be set by option")
 	}
 
-	r.parseFlags()
+	cfg, err := r.parseConfig()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if cfg == nil {
+		t.Error("expected non-nil config")
+	}
 	if !called {
 		t.Error("expected parseFlags to be callable")
+	}
+}
+
+func TestWithParseConfig(t *testing.T) {
+	called := false
+	opt := WithParseConfig(func() (*config.Config, error) {
+		called = true
+		return &config.Config{Verbose: true}, nil
+	})
+
+	r := &Runner{}
+	opt(r)
+
+	if r.parseConfig == nil {
+		t.Error("expected parseConfig to be set by option")
+	}
+
+	cfg, err := r.parseConfig()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("expected parseConfig to be callable")
+	}
+	if !cfg.Verbose {
+		t.Error("expected Verbose to be true")
 	}
 }

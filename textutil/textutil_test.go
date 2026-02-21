@@ -68,16 +68,22 @@ func TestTruncate(t *testing.T) {
 			expected: "a",
 		},
 		{
-			name:     "unicode characters - byte counting",
+			name:     "unicode characters - rune counting",
 			input:    "hello 世界",
-			maxLen:   12, // "hello " is 6 bytes, each Chinese char is 3 bytes = 12 total
+			maxLen:   8, // "hello " is 6 runes + 2 CJK runes = 8 total
 			expected: "hello 世界",
 		},
 		{
-			name:     "unicode truncated with ellipsis",
+			name:     "unicode truncated with ellipsis preserves whole runes",
 			input:    "hello 世界 test",
-			maxLen:   9, // "hello " (6) + "..." (3)
+			maxLen:   9, // 13 runes total > 9, so truncates: 6 runes + "..."
 			expected: "hello ...",
+		},
+		{
+			name:     "unicode preserves full characters",
+			input:    "日本語テスト",
+			maxLen:   5, // 6 runes > 5, so truncates: 2 runes + "..."
+			expected: "日本...",
 		},
 	}
 

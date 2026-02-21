@@ -184,10 +184,19 @@ func NewHeaderStyles() HeaderStyles {
 	}
 }
 
+// cachedTitle caches the styled VIEWSCREEN title since it never changes after init.
+var cachedTitle string
+
+func getCachedTitle() string {
+	if cachedTitle == "" {
+		cachedTitle = NewLogoRenderer().RenderTitle()
+	}
+	return cachedTitle
+}
+
 // RenderHeader renders a single-line header for narrow terminals.
 // Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 ─── [d] ───
 func RenderHeader(s *state.State, width int) string {
-	logo := NewLogoRenderer()
 
 	// Build the info section: model │ turns │ cost
 	model := s.Model
@@ -204,7 +213,7 @@ func RenderHeader(s *state.State, width int) string {
 		s.TotalCost)
 
 	// Fixed parts
-	title := logo.RenderTitle()
+	title := getCachedTitle()
 	keyHint := style.MutedText("[d]")
 
 	// Calculate decoration lengths

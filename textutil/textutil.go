@@ -9,17 +9,19 @@ import (
 	"strings"
 )
 
-// Truncate shortens a string to maxLen characters, adding "..." if truncated.
+// Truncate shortens a string to maxLen runes, adding "..." if truncated.
 // If maxLen is too small to fit the ellipsis (<=3), truncates without ellipsis.
+// Uses rune-based counting to avoid splitting multi-byte UTF-8 characters.
 func Truncate(s string, maxLen int) string {
 	s = strings.TrimSpace(s)
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
 	if maxLen <= 3 {
-		return s[:maxLen]
+		return string(runes[:maxLen])
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
 
 // systemReminderRegex matches <system-reminder>...</system-reminder> blocks
@@ -51,12 +53,14 @@ func WrapText(s string, maxWidth int) string {
 	var result strings.Builder
 	words := strings.Fields(s)
 	lineLen := 0
+	newlineCount := 0
 
 	for i, word := range words {
 		wordLen := len(word)
 
 		if lineLen+wordLen+1 > maxWidth && lineLen > 0 {
 			result.WriteString("\n")
+			newlineCount++
 			lineLen = 0
 		}
 
@@ -75,7 +79,7 @@ func WrapText(s string, maxWidth int) string {
 		lineLen += wordLen
 
 		// Limit to 3 lines
-		if i > 0 && strings.Count(result.String(), "\n") >= 2 && lineLen > 0 {
+		if i > 0 && newlineCount >= 2 && lineLen > 0 {
 			if len(s) > result.Len() {
 				result.WriteString("...")
 			}

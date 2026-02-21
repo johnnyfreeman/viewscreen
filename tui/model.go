@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"strings"
 
@@ -26,6 +27,7 @@ type Model struct {
 	spinner          spinner.Model
 	state            *state.State
 	content          *strings.Builder // pointer to avoid copy issues
+	contentSnapshot  string           // cached content string to avoid repeated String() calls
 	stdinDone        bool
 	scanner          *bufio.Scanner
 	sidebarStyles    SidebarStyles
@@ -34,10 +36,25 @@ type Model struct {
 	showDetailsModal bool
 	ready            bool
 	processor        *events.EventProcessor
+	sidebarRenderer  *SidebarRenderer
+}
+
+// ModelOption is a functional option for configuring a Model
+type ModelOption func(*Model)
+
+// WithStdinReader sets a custom reader for stdin input instead of os.Stdin.
+func WithStdinReader(r io.Reader) ModelOption {
+	return func(m *Model) {
+		scanner := bufio.NewScanner(r)
+		const maxCapacity = 10 * 1024 * 1024 // 10MB
+		buf := make([]byte, maxCapacity)
+		scanner.Buffer(buf, maxCapacity)
+		m.scanner = scanner
+	}
 }
 
 // NewModel creates a new TUI model
-func NewModel() Model {
+func NewModel(opts ...ModelOption) Model {
 	// Initialize spinner with Dot spinner and lipgloss styling.
 	// We use lipgloss here (not Ultraviolet) because the spinner output
 	// goes through bubbletea/lipgloss rendering pipeline.
@@ -52,17 +69,23 @@ func NewModel() Model {
 	buf := make([]byte, maxCapacity)
 	scanner.Buffer(buf, maxCapacity)
 
+	sidebarStyles := NewSidebarStyles()
 	st := state.NewState()
-	return Model{
-		spinner:       s,
-		state:         st,
-		content:       &strings.Builder{},
-		scanner:       scanner,
-		sidebarStyles: NewSidebarStyles(),
-		headerStyles:  NewHeaderStyles(),
-		layoutMode:    LayoutSidebar, // default to sidebar mode
-		processor:     events.NewEventProcessor(st),
+	m := Model{
+		spinner:         s,
+		state:           st,
+		content:         &strings.Builder{},
+		scanner:         scanner,
+		sidebarStyles:   sidebarStyles,
+		headerStyles:    NewHeaderStyles(),
+		layoutMode:      LayoutSidebar, // default to sidebar mode
+		processor:       events.NewEventProcessor(st),
+		sidebarRenderer: NewSidebarRenderer(sidebarStyles, s),
 	}
+	for _, opt := range opts {
+		opt(&m)
+	}
+	return m
 }
 
 // Init initializes the model
@@ -127,16 +150,17 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 	// Process the event through the EventProcessor
 	result := m.processor.Process(event)
 
-	// Append rendered content
+	// Append rendered content and update the cached snapshot
 	if result.Rendered != "" {
 		m.content.WriteString(result.Rendered)
 	}
+	m.contentSnapshot = m.content.String()
 
 	// Update viewport based on whether there are pending tools
 	if result.HasPendingTools {
 		m.updateViewportWithPendingTools()
 	} else {
-		m.viewport.SetContent(m.content.String())
+		m.viewport.SetContent(m.contentSnapshot)
 	}
 	m.viewport.GotoBottom()
 
@@ -157,15 +181,17 @@ func (m Model) View() tea.View {
 	return v
 }
 
-// updateViewportWithPendingTools updates the viewport content, rendering pending tools with spinner
+// updateViewportWithPendingTools updates the viewport content, rendering pending tools with spinner.
+// Uses the cached contentSnapshot to avoid repeated String() calls on every spinner tick.
 func (m *Model) updateViewportWithPendingTools() {
-	content := m.content.String()
+	var sb strings.Builder
+	sb.WriteString(m.contentSnapshot)
 	// Render pending tools with spinner instead of bullet.
 	// Apply Ultraviolet styling to the spinner for proper style/content separation.
 	m.processor.ForEachPendingTool(func(id string, pending tools.PendingTool) {
-		content += m.processor.RenderPendingTool(pending, m.spinner.View())
+		sb.WriteString(m.processor.RenderPendingTool(pending, m.spinner.View()))
 	})
-	m.viewport.SetContent(content)
+	m.viewport.SetContent(sb.String())
 }
 
 // renderLayout composes the main content area and sidebar/header
@@ -184,7 +210,7 @@ func (m Model) renderLayout() string {
 		return layout
 	default:
 		// Sidebar mode: content left, sidebar right
-		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles)
+		sidebar := m.sidebarRenderer.Render(m.state, m.height)
 		mainContent := m.viewport.View()
 		return lipgloss.JoinHorizontal(lipgloss.Top, mainContent, sidebar)
 	}

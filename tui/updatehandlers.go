@@ -94,7 +94,8 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 	m.processor.SetWidth(contentWidth)
 
 	// Update viewport content
-	m.viewport.SetContent(m.content.String())
+	m.contentSnapshot = m.content.String()
+	m.viewport.SetContent(m.contentSnapshot)
 
 	return m
 }
@@ -103,6 +104,10 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 func (m Model) handleSpinnerTick(msg spinner.TickMsg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.spinner, cmd = m.spinner.Update(msg)
+
+	// Update the cached sidebar renderer's spinner (and its todo sub-renderer)
+	m.sidebarRenderer.spinner = m.spinner
+	m.sidebarRenderer.todo.spinner = m.spinner
 
 	// Refresh viewport to animate spinner for pending tools
 	if m.processor.HasPendingTools() {
@@ -146,7 +151,8 @@ func (m Model) handleParseError(msg events.ParseError) Model {
 	cfg := config.DefaultProvider{}
 	if cfg.IsVerbose() {
 		m.content.WriteString("Parse error: " + msg.Line + "\n")
-		m.viewport.SetContent(m.content.String())
+		m.contentSnapshot = m.content.String()
+		m.viewport.SetContent(m.contentSnapshot)
 		m.viewport.GotoBottom()
 	}
 	return m

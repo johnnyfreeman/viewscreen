@@ -16,7 +16,7 @@ type Runner struct {
 	errOutput     io.Writer
 	parserFactory func() *parser.Parser
 	exitFunc      func(int)
-	parseFlags    func()
+	parseConfig   func() (*config.Config, error)
 }
 
 // RunnerOption is a functional option for configuring a Runner
@@ -43,10 +43,27 @@ func WithExitFunc(f func(int)) RunnerOption {
 	}
 }
 
-// WithParseFlags sets a custom flag parsing function
+// WithParseFlags sets a custom flag parsing function.
+// Wraps the function to return a Config populated from globals for backward compatibility.
 func WithParseFlags(f func()) RunnerOption {
 	return func(r *Runner) {
-		r.parseFlags = f
+		r.parseConfig = func() (*config.Config, error) {
+			f()
+			// Read back from globals (the legacy parseFlags may have set them)
+			return &config.Config{
+				Verbose:   config.Verbose,
+				NoColor:   config.NoColor,
+				ShowUsage: config.ShowUsage,
+				NoTUI:     config.NoTUI,
+			}, nil
+		}
+	}
+}
+
+// WithParseConfig sets a custom config parsing function
+func WithParseConfig(f func() (*config.Config, error)) RunnerOption {
+	return func(r *Runner) {
+		r.parseConfig = f
 	}
 }
 
@@ -56,7 +73,9 @@ func NewRunner(opts ...RunnerOption) *Runner {
 		errOutput:     os.Stderr,
 		parserFactory: parser.NewParser,
 		exitFunc:      os.Exit,
-		parseFlags:    config.ParseFlags,
+		parseConfig: func() (*config.Config, error) {
+			return config.Parse(config.WithArgs(os.Args[1:]))
+		},
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -66,13 +85,25 @@ func NewRunner(opts ...RunnerOption) *Runner {
 
 // Run executes the application
 func (r *Runner) Run() {
-	r.parseFlags()
+	cfg, err := r.parseConfig()
+	if err != nil {
+		fmt.Fprintf(r.errOutput, "%v\n", err)
+		r.exitFunc(1)
+		return
+	}
+
+	// Bridge: sync parsed config to globals so existing code that reads
+	// config.DefaultProvider{} continues to work during migration.
+	config.Verbose = cfg.Verbose
+	config.NoColor = cfg.NoColor
+	config.ShowUsage = cfg.ShowUsage
+	config.NoTUI = cfg.NoTUI
 
 	// Determine if we should use TUI mode
 	// TUI mode is used when:
 	// 1. --no-tui flag is NOT set, AND
 	// 2. stdout is a TTY (interactive terminal)
-	useTUI := !config.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
+	useTUI := !cfg.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
 
 	if useTUI {
 		if err := tui.Run(); err != nil {
