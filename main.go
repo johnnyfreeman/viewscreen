@@ -60,6 +60,7 @@ func NewRunner(opts ...RunnerOption) *Runner {
 		errOutput:     os.Stderr,
 		parserFactory: parser.NewParser,
 		exitFunc:      os.Exit,
+		configOpts:    []config.Option{config.WithArgs(os.Args[1:])},
 	}
 	for _, opt := range opts {
 		opt(r)
