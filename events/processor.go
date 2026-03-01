@@ -99,7 +99,21 @@ func (p *EventProcessor) ForEachPendingTool(fn func(id string, pending tools.Pen
 }
 
 func (p *EventProcessor) processSystem(event system.Event) ProcessResult {
+	// Claude transcript logs include many non-init system metadata events
+	// (e.g. turn_duration, local_command). Ignore these to avoid rendering
+	// repeated empty "Session Started" blocks.
+	if event.Subtype != "" && event.Subtype != "init" {
+		return ProcessResult{}
+	}
+
 	p.state.UpdateFromSystemEvent(event)
+
+	// Skip rendering for system events with no meaningful data.
+	// These are typically subagent events that lack parent_tool_use_id.
+	if event.Model == "" && event.CWD == "" && len(event.Tools) == 0 {
+		return ProcessResult{}
+	}
+
 	rendered := p.renderers.System.RenderToString(event)
 	return ProcessResult{Rendered: rendered}
 }
@@ -257,4 +271,3 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 
 	return ProcessResult{Rendered: content.String()}
 }
-

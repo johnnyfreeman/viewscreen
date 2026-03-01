@@ -109,6 +109,70 @@ func TestEventProcessor_ProcessSubAgentSystemEvent(t *testing.T) {
 	}
 }
 
+func TestEventProcessor_ProcessSystemEvent_EmptyFieldsSkipsRendering(t *testing.T) {
+	s := state.NewState()
+	// Pre-populate state to verify it's not overwritten
+	s.Model = "parent-model"
+	s.CWD = "/parent/path"
+	s.ToolsCount = 42
+
+	p := NewEventProcessor(s)
+
+	// System event with no meaningful data (no parent_tool_use_id but empty fields)
+	event := SystemEvent{
+		Data: system.Event{},
+	}
+
+	result := p.Process(event)
+
+	// Should produce no rendered output
+	if result.Rendered != "" {
+		t.Errorf("Empty system event should produce no rendered output, got %q", result.Rendered)
+	}
+
+	// Parent state should not be overwritten
+	if s.Model != "parent-model" {
+		t.Errorf("State model should still be 'parent-model', got %q", s.Model)
+	}
+	if s.CWD != "/parent/path" {
+		t.Errorf("State CWD should still be '/parent/path', got %q", s.CWD)
+	}
+	if s.ToolsCount != 42 {
+		t.Errorf("State ToolsCount should still be 42, got %d", s.ToolsCount)
+	}
+}
+
+func TestEventProcessor_ProcessSystemEvent_NonInitSubtypeSkipsRendering(t *testing.T) {
+	s := state.NewState()
+	// Pre-populate state to ensure metadata system events don't clobber it.
+	s.Model = "parent-model"
+	s.CWD = "/parent/path"
+
+	p := NewEventProcessor(s)
+
+	// Claude transcript logs emit system metadata events like turn_duration.
+	// These should not render or update session state.
+	event := SystemEvent{
+		Data: system.Event{
+			Subtype: "turn_duration",
+			CWD:     "/home/john/projects/pathfinder",
+		},
+	}
+
+	result := p.Process(event)
+
+	if result.Rendered != "" {
+		t.Errorf("Non-init system event should produce no rendered output, got %q", result.Rendered)
+	}
+
+	if s.Model != "parent-model" {
+		t.Errorf("State model should still be 'parent-model', got %q", s.Model)
+	}
+	if s.CWD != "/parent/path" {
+		t.Errorf("State CWD should still be '/parent/path', got %q", s.CWD)
+	}
+}
+
 func TestEventProcessor_ProcessAssistantEvent_TextOnly(t *testing.T) {
 	s := state.NewState()
 	p := NewEventProcessor(s)
