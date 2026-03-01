@@ -85,14 +85,28 @@ func (s *State) CostRate() float64 {
 	return s.TotalCost / elapsed.Minutes()
 }
 
-// UpdateFromSystemEvent extracts state from a system event
+// UpdateFromSystemEvent extracts state from a system event.
+// Only overwrites fields that have non-empty values, so subagent system events
+// (which carry empty fields) cannot clobber the parent session state.
 func (s *State) UpdateFromSystemEvent(event system.Event) {
-	s.Model = event.Model
-	s.Version = event.ClaudeCodeVersion
-	s.CWD = event.CWD
-	s.ToolsCount = len(event.Tools)
-	s.Agents = event.Agents
-	s.PermissionMode = event.PermissionMode
+	if event.Model != "" {
+		s.Model = event.Model
+	}
+	if event.ClaudeCodeVersion != "" {
+		s.Version = event.ClaudeCodeVersion
+	}
+	if event.CWD != "" {
+		s.CWD = event.CWD
+	}
+	if len(event.Tools) > 0 {
+		s.ToolsCount = len(event.Tools)
+	}
+	if len(event.Agents) > 0 {
+		s.Agents = event.Agents
+	}
+	if event.PermissionMode != "" {
+		s.PermissionMode = event.PermissionMode
+	}
 }
 
 // IncrementTurnCount increments the turn counter

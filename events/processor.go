@@ -62,6 +62,8 @@ func (p *EventProcessor) Process(event Event) ProcessResult {
 	switch e := event.(type) {
 	case SystemEvent:
 		return p.processSystem(e.Data)
+	case SubAgentSystemEvent:
+		return ProcessResult{}
 	case AssistantEvent:
 		return p.processAssistant(e.Data)
 	case UserEvent:

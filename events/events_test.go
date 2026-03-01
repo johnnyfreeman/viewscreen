@@ -140,6 +140,46 @@ func TestParse_ResultEvent(t *testing.T) {
 	}
 }
 
+func TestParse_SubAgentSystemEvent(t *testing.T) {
+	parentID := "tool-use-123"
+	event := map[string]any{
+		"type":               "system",
+		"subtype":            "init",
+		"parent_tool_use_id": parentID,
+		"cwd":                "",
+		"model":              "",
+		"tools":              []string{},
+	}
+	eventJSON, _ := json.Marshal(event)
+
+	result := Parse(string(eventJSON))
+	subEvent, ok := result.(SubAgentSystemEvent)
+	if !ok {
+		t.Fatalf("Parse should return SubAgentSystemEvent when parent_tool_use_id is set, got %T", result)
+	}
+	if subEvent.Data.ParentToolUseID == nil || *subEvent.Data.ParentToolUseID != parentID {
+		t.Errorf("SubAgentSystemEvent ParentToolUseID should be %q", parentID)
+	}
+}
+
+func TestParse_SystemEvent_WithoutParentToolUseID(t *testing.T) {
+	event := map[string]any{
+		"type":                "system",
+		"subtype":             "init",
+		"cwd":                 "/test",
+		"model":               "test-model",
+		"claude_code_version": "1.0.0",
+		"tools":               []string{},
+	}
+	eventJSON, _ := json.Marshal(event)
+
+	result := Parse(string(eventJSON))
+	_, ok := result.(SystemEvent)
+	if !ok {
+		t.Fatalf("Parse should return SystemEvent when parent_tool_use_id is absent, got %T", result)
+	}
+}
+
 func TestParse_InvalidSystemEvent(t *testing.T) {
 	// Invalid because subtype should be a string, not a number
 	result := Parse(`{"type":"system","subtype":123}`)

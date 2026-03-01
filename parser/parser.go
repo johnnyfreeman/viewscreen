@@ -147,6 +147,8 @@ func eventTypeName(event events.Event) string {
 	switch event.(type) {
 	case events.SystemEvent:
 		return "system"
+	case events.SubAgentSystemEvent:
+		return "system"
 	case events.AssistantEvent:
 		return "assistant"
 	case events.UserEvent:

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/johnnyfreeman/viewscreen/result"
+	"github.com/johnnyfreeman/viewscreen/system"
 )
 
 func TestNewState(t *testing.T) {
@@ -76,6 +77,72 @@ func TestAccumulateUsage_ThenResultOverrides(t *testing.T) {
 	}
 	if s.OutputTokens != 200 {
 		t.Errorf("OutputTokens = %d, want 200 (should be overridden by result)", s.OutputTokens)
+	}
+}
+
+func TestUpdateFromSystemEvent_EmptyFieldsDoNotOverwrite(t *testing.T) {
+	s := NewState()
+	// Set initial state
+	s.Model = "parent-model"
+	s.Version = "2.0.0"
+	s.CWD = "/parent/cwd"
+	s.ToolsCount = 10
+	s.Agents = []string{"agent1"}
+	s.PermissionMode = "auto"
+
+	// Update with empty event (like a subagent system event)
+	s.UpdateFromSystemEvent(system.Event{})
+
+	if s.Model != "parent-model" {
+		t.Errorf("Model should not be overwritten by empty value, got %q", s.Model)
+	}
+	if s.Version != "2.0.0" {
+		t.Errorf("Version should not be overwritten by empty value, got %q", s.Version)
+	}
+	if s.CWD != "/parent/cwd" {
+		t.Errorf("CWD should not be overwritten by empty value, got %q", s.CWD)
+	}
+	if s.ToolsCount != 10 {
+		t.Errorf("ToolsCount should not be overwritten by empty tools, got %d", s.ToolsCount)
+	}
+	if len(s.Agents) != 1 || s.Agents[0] != "agent1" {
+		t.Errorf("Agents should not be overwritten by empty value, got %v", s.Agents)
+	}
+	if s.PermissionMode != "auto" {
+		t.Errorf("PermissionMode should not be overwritten by empty value, got %q", s.PermissionMode)
+	}
+}
+
+func TestUpdateFromSystemEvent_NonEmptyFieldsDoOverwrite(t *testing.T) {
+	s := NewState()
+	s.Model = "old-model"
+	s.Version = "1.0.0"
+	s.CWD = "/old/path"
+	s.ToolsCount = 5
+
+	s.UpdateFromSystemEvent(system.Event{
+		Model:             "new-model",
+		ClaudeCodeVersion: "3.0.0",
+		CWD:               "/new/path",
+		Tools:             []string{"tool1", "tool2"},
+		Agents:            []string{"agent-new"},
+		PermissionMode:    "manual",
+	})
+
+	if s.Model != "new-model" {
+		t.Errorf("Model should be updated to 'new-model', got %q", s.Model)
+	}
+	if s.Version != "3.0.0" {
+		t.Errorf("Version should be updated to '3.0.0', got %q", s.Version)
+	}
+	if s.CWD != "/new/path" {
+		t.Errorf("CWD should be updated to '/new/path', got %q", s.CWD)
+	}
+	if s.ToolsCount != 2 {
+		t.Errorf("ToolsCount should be 2, got %d", s.ToolsCount)
+	}
+	if s.PermissionMode != "manual" {
+		t.Errorf("PermissionMode should be 'manual', got %q", s.PermissionMode)
 	}
 }
 

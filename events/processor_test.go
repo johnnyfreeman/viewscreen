@@ -63,6 +63,52 @@ func TestEventProcessor_ProcessSystemEvent(t *testing.T) {
 	}
 }
 
+func TestEventProcessor_ProcessSubAgentSystemEvent(t *testing.T) {
+	s := state.NewState()
+	// Pre-populate state to verify it's not overwritten
+	s.Model = "parent-model"
+	s.Version = "1.0.0"
+	s.CWD = "/parent/path"
+	s.ToolsCount = 42
+
+	p := NewEventProcessor(s)
+
+	parentID := "tool-use-456"
+	event := SubAgentSystemEvent{
+		Data: system.Event{
+			BaseEvent: types.BaseEvent{
+				Type:            "system",
+				ParentToolUseID: &parentID,
+			},
+			Subtype: "init",
+		},
+	}
+
+	result := p.Process(event)
+
+	// Should produce no rendered output
+	if result.Rendered != "" {
+		t.Errorf("SubAgentSystemEvent should produce empty rendered output, got %q", result.Rendered)
+	}
+	if result.HasPendingTools {
+		t.Error("SubAgentSystemEvent should not have pending tools")
+	}
+
+	// Parent state should not be overwritten
+	if s.Model != "parent-model" {
+		t.Errorf("State model should still be 'parent-model', got %q", s.Model)
+	}
+	if s.Version != "1.0.0" {
+		t.Errorf("State version should still be '1.0.0', got %q", s.Version)
+	}
+	if s.CWD != "/parent/path" {
+		t.Errorf("State CWD should still be '/parent/path', got %q", s.CWD)
+	}
+	if s.ToolsCount != 42 {
+		t.Errorf("State ToolsCount should still be 42, got %d", s.ToolsCount)
+	}
+}
+
 func TestEventProcessor_ProcessAssistantEvent_TextOnly(t *testing.T) {
 	s := state.NewState()
 	p := NewEventProcessor(s)

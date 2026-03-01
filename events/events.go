@@ -31,6 +31,12 @@ type SystemEvent struct{ Data system.Event }
 
 func (SystemEvent) eventMarker() {}
 
+// SubAgentSystemEvent wraps a system event emitted by a subagent.
+// These have ParentToolUseID set and typically carry empty session fields.
+type SubAgentSystemEvent struct{ Data system.Event }
+
+func (SubAgentSystemEvent) eventMarker() {}
+
 // AssistantEvent wraps a parsed assistant event.
 type AssistantEvent struct{ Data assistant.Event }
 
@@ -76,6 +82,9 @@ func Parse(line string) Event {
 		var event system.Event
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			return ParseError{Err: err, Line: line}
+		}
+		if event.ParentToolUseID != nil {
+			return SubAgentSystemEvent{Data: event}
 		}
 		return SystemEvent{Data: event}
 
