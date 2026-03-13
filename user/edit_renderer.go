@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/textutil"
 )
@@ -29,13 +30,15 @@ type EditResult struct {
 type EditRenderer struct {
 	styleApplier render.StyleApplier
 	highlighter  render.CodeHighlighter
+	config       config.Provider
 }
 
 // NewEditRenderer creates a new EditRenderer with the given dependencies.
-func NewEditRenderer(styleApplier render.StyleApplier, highlighter render.CodeHighlighter) *EditRenderer {
+func NewEditRenderer(styleApplier render.StyleApplier, highlighter render.CodeHighlighter, cfg config.Provider) *EditRenderer {
 	return &EditRenderer{
 		styleApplier: styleApplier,
 		highlighter:  highlighter,
+		config:       cfg,
 	}
 }
 
@@ -84,8 +87,12 @@ func (er *EditRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMess
 				continue
 			}
 
-			// Check truncation limit
-			if lineCount >= textutil.DefaultMaxLines {
+			// Write tools: -v = 10 lines, -vv = no limit
+			maxLines := 10
+			if er.config.GetVerboseLevel() >= 2 {
+				maxLines = -1
+			}
+			if maxLines >= 0 && lineCount >= maxLines {
 				// Count remaining lines
 				remaining := 0
 				for _, h := range editResult.StructuredPatch {

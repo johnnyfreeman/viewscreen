@@ -135,8 +135,8 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 	}
 	// Build result registry with final dependencies (after options applied)
 	r.resultRegistry = NewResultRegistry()
-	r.resultRegistry.Register(NewEditRenderer(r.styleApplier, r.highlighter))
-	r.resultRegistry.Register(NewWriteRenderer(r.styleApplier))
+	r.resultRegistry.Register(NewEditRenderer(r.styleApplier, r.highlighter, r.config))
+	r.resultRegistry.Register(NewWriteRenderer(r.styleApplier, r.highlighter, r.config))
 	r.resultRegistry.Register(NewTodoRenderer(r.styleApplier))
 	return r
 }
