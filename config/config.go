@@ -11,6 +11,8 @@ import (
 // Provider abstracts config access for testability.
 type Provider interface {
 	IsVerbose() bool
+	IsVeryVerbose() bool
+	GetVerboseLevel() int
 	NoColor() bool
 	ShowUsage() bool
 }
@@ -32,7 +34,7 @@ func (DefaultStyleInitializer) Init(disableColor bool) {
 // It implements the Provider interface directly, so it can be passed
 // anywhere a Provider is needed without an adapter.
 type Config struct {
-	Verbose      bool
+	VerboseLevel int
 	DisableColor bool
 	DisplayUsage bool
 	NoTUI        bool
@@ -42,8 +44,14 @@ type Config struct {
 	Prompt       string
 }
 
-// IsVerbose implements Provider.
-func (c *Config) IsVerbose() bool { return c.Verbose }
+// IsVerbose implements Provider. True at -v or higher.
+func (c *Config) IsVerbose() bool { return c.VerboseLevel >= 1 }
+
+// IsVeryVerbose implements Provider. True at -vv or higher.
+func (c *Config) IsVeryVerbose() bool { return c.VerboseLevel >= 2 }
+
+// GetVerboseLevel implements Provider.
+func (c *Config) GetVerboseLevel() int { return c.VerboseLevel }
 
 // NoColor implements Provider.
 func (c *Config) NoColor() bool { return c.DisableColor }
@@ -120,7 +128,10 @@ func Parse(opts ...Option) (*Config, error) {
 		DisplayUsage: true, // Default value
 	}
 
-	p.flagSet.BoolVar(&c.Verbose, "v", false, "Verbose output (show more details)")
+	var verbose, veryVerbose, maxVerbose bool
+	p.flagSet.BoolVar(&verbose, "v", false, "Verbose output (expand writes, truncated)")
+	p.flagSet.BoolVar(&veryVerbose, "vv", false, "Very verbose (expand reads truncated, writes untruncated)")
+	p.flagSet.BoolVar(&maxVerbose, "vvv", false, "Max verbose (expand reads with more lines)")
 	p.flagSet.BoolVar(&c.DisableColor, "no-color", false, "Disable colored output")
 	p.flagSet.BoolVar(&c.DisplayUsage, "usage", true, "Show token usage in result")
 	p.flagSet.BoolVar(&c.NoTUI, "no-tui", false, "Disable TUI mode (use legacy streaming output)")
@@ -130,6 +141,15 @@ func Parse(opts ...Option) (*Config, error) {
 
 	if err := p.flagSet.Parse(p.args); err != nil {
 		return nil, err
+	}
+
+	// Compute verbose level from flags (highest wins)
+	if maxVerbose {
+		c.VerboseLevel = 3
+	} else if veryVerbose {
+		c.VerboseLevel = 2
+	} else if verbose {
+		c.VerboseLevel = 1
 	}
 
 	// Capture positional args as prompt text

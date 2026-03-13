@@ -52,7 +52,7 @@ func TestNewRenderer(t *testing.T) {
 	})
 
 	t.Run("with custom config provider", func(t *testing.T) {
-		mock := testutil.MockConfigProvider{VerboseVal: true}
+		mock := testutil.MockConfigProvider{VerboseLevelVal: 1}
 		r := NewRenderer(WithConfigProvider(mock))
 
 		if r.config != mock {
@@ -87,7 +87,7 @@ func TestRenderer_Render_BasicEvent(t *testing.T) {
 	style.Init(false) // Enable color
 	output := &bytes.Buffer{}
 	styleMock := testutil.MockStyleApplier{NoColorVal: false}
-	configMock := testutil.MockConfigProvider{VerboseVal: false}
+	configMock := testutil.MockConfigProvider{}
 
 	r := NewRenderer(
 		WithOutput(output),
@@ -139,7 +139,7 @@ func TestRenderer_Render_NoColorMode(t *testing.T) {
 
 	output := &bytes.Buffer{}
 	styleMock := testutil.MockStyleApplier{NoColorVal: true}
-	configMock := testutil.MockConfigProvider{VerboseVal: false}
+	configMock := testutil.MockConfigProvider{}
 
 	r := NewRenderer(
 		WithOutput(output),
@@ -175,7 +175,7 @@ func TestRenderer_Render_VerboseWithAgents(t *testing.T) {
 
 	output := &bytes.Buffer{}
 	styleMock := testutil.MockStyleApplier{NoColorVal: true}
-	configMock := testutil.MockConfigProvider{VerboseVal: true}
+	configMock := testutil.MockConfigProvider{VerboseLevelVal: 1}
 
 	r := NewRenderer(
 		WithOutput(output),
@@ -204,7 +204,7 @@ func TestRenderer_Render_VerboseWithAgents(t *testing.T) {
 func TestRenderer_Render_VerboseWithoutAgents(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := testutil.MockStyleApplier{NoColorVal: true}
-	configMock := testutil.MockConfigProvider{VerboseVal: true}
+	configMock := testutil.MockConfigProvider{VerboseLevelVal: 1}
 
 	r := NewRenderer(
 		WithOutput(output),
@@ -233,7 +233,7 @@ func TestRenderer_Render_VerboseWithoutAgents(t *testing.T) {
 func TestRenderer_Render_NonVerboseWithAgents(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := testutil.MockStyleApplier{NoColorVal: true}
-	configMock := testutil.MockConfigProvider{VerboseVal: false}
+	configMock := testutil.MockConfigProvider{}
 
 	r := NewRenderer(
 		WithOutput(output),
@@ -262,7 +262,7 @@ func TestRenderer_Render_NonVerboseWithAgents(t *testing.T) {
 func TestRenderer_Render_EmptyTools(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := testutil.MockStyleApplier{NoColorVal: true}
-	configMock := testutil.MockConfigProvider{VerboseVal: false}
+	configMock := testutil.MockConfigProvider{}
 
 	r := NewRenderer(
 		WithOutput(output),
@@ -290,7 +290,7 @@ func TestRenderer_Render_EmptyTools(t *testing.T) {
 func TestRenderer_Render_OutputFormat(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := testutil.MockStyleApplier{NoColorVal: true}
-	configMock := testutil.MockConfigProvider{VerboseVal: false}
+	configMock := testutil.MockConfigProvider{}
 
 	r := NewRenderer(
 		WithOutput(output),
@@ -482,7 +482,7 @@ func TestConfigProvider(t *testing.T) {
 func TestRenderer_Render_MutedTextStyleCalls(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := &testutil.TrackingStyleApplier{MockStyleApplier: testutil.MockStyleApplier{NoColorVal: true}}
-	configMock := testutil.MockConfigProvider{VerboseVal: true}
+	configMock := testutil.MockConfigProvider{VerboseLevelVal: 1}
 
 	r := NewRenderer(
 		WithOutput(output),
@@ -516,7 +516,7 @@ func TestRenderer_Render_MutedTextStyleCalls(t *testing.T) {
 func TestRenderer_Render_SpecialCharacters(t *testing.T) {
 	output := &bytes.Buffer{}
 	styleMock := testutil.MockStyleApplier{NoColorVal: true}
-	configMock := testutil.MockConfigProvider{VerboseVal: false}
+	configMock := testutil.MockConfigProvider{}
 
 	r := NewRenderer(
 		WithOutput(output),

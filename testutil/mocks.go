@@ -77,14 +77,16 @@ func (m *TrackingStyleApplier) ApplyErrorGradient(text string) string {
 
 // MockConfigProvider is a test double for config.Provider.
 type MockConfigProvider struct {
-	VerboseVal   bool
-	NoColorVal   bool
-	ShowUsageVal bool
+	VerboseLevelVal int
+	NoColorVal      bool
+	ShowUsageVal    bool
 }
 
-func (m MockConfigProvider) IsVerbose() bool { return m.VerboseVal }
-func (m MockConfigProvider) NoColor() bool   { return m.NoColorVal }
-func (m MockConfigProvider) ShowUsage() bool { return m.ShowUsageVal }
+func (m MockConfigProvider) IsVerbose() bool      { return m.VerboseLevelVal >= 1 }
+func (m MockConfigProvider) IsVeryVerbose() bool   { return m.VerboseLevelVal >= 2 }
+func (m MockConfigProvider) GetVerboseLevel() int  { return m.VerboseLevelVal }
+func (m MockConfigProvider) NoColor() bool         { return m.NoColorVal }
+func (m MockConfigProvider) ShowUsage() bool       { return m.ShowUsageVal }
 
 // StripANSI removes ANSI escape sequences from a string.
 // Useful for testing output that may contain color codes.

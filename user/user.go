@@ -193,26 +193,58 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 			lines := strings.Split(cleaned, "\n")
 			lineCount := len(lines)
 
-			if r.config.IsVerbose() {
-				// Apply syntax highlighting first
-				highlighted := r.highlightContent(cleaned)
+			// Verbosity levels for tool output:
+			// Writes (Edit, Write, NotebookEdit):
+			//   -v:   truncated to 10 lines
+			//   -vv:  not truncated
+			// Reads (everything else):
+			//   -v:   no content shown (summary only)
+			//   -vv:  truncated to 5 lines
+			//   -vvv: truncated to 10 lines
+			isWriteTool := r.toolContext != nil && (r.toolContext.ToolName == "Edit" || r.toolContext.ToolName == "Write" || r.toolContext.ToolName == "NotebookEdit")
+			level := r.config.GetVerboseLevel()
 
-				// Truncate to max lines
-				truncated, remaining := textutil.TruncateLines(highlighted, textutil.DefaultMaxLines)
-				resultLines := strings.Split(truncated, "\n")
-
-				pw := textutil.NewPrefixedWriter(out, outputPrefix, outputContinue)
-				for _, line := range resultLines {
-					pw.WriteLine(line)
-				}
-
-				// Show truncation indicator if content was truncated
-				if remaining > 0 {
-					pw.WriteLinef("%s", r.styleApplier.MutedText(textutil.TruncationIndicator(remaining)))
+			var maxLines int // 0 = don't expand, -1 = no limit
+			if isWriteTool {
+				switch {
+				case level >= 2:
+					maxLines = -1
+				case level >= 1:
+					maxLines = 10
 				}
 			} else {
-				// Show summary in non-verbose mode
-				summary := fmt.Sprintf("Read %d lines", lineCount)
+				switch {
+				case level >= 3:
+					maxLines = 10
+				case level >= 2:
+					maxLines = 5
+				}
+			}
+
+			if maxLines != 0 {
+				highlighted := r.highlightContent(cleaned)
+
+				if maxLines < 0 {
+					// No truncation
+					pw := textutil.NewPrefixedWriter(out, outputPrefix, outputContinue)
+					for _, line := range strings.Split(highlighted, "\n") {
+						pw.WriteLine(line)
+					}
+				} else {
+					truncated, remaining := textutil.TruncateLines(highlighted, maxLines)
+					resultLines := strings.Split(truncated, "\n")
+
+					pw := textutil.NewPrefixedWriter(out, outputPrefix, outputContinue)
+					for _, line := range resultLines {
+						pw.WriteLine(line)
+					}
+
+					if remaining > 0 {
+						pw.WriteLinef("%s", r.styleApplier.MutedText(textutil.TruncationIndicator(remaining)))
+					}
+				}
+			} else {
+				summary := fmt.Sprintf("%d lines", lineCount)
 				fmt.Fprintf(out, "%s%s\n", outputPrefix, r.styleApplier.MutedText(summary))
 			}
 		}

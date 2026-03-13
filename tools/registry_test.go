@@ -265,32 +265,30 @@ func TestToolRenderers(t *testing.T) {
 
 func TestGetToolArg(t *testing.T) {
 	tests := []struct {
-		name     string
-		toolName string
-		input    map[string]interface{}
-		verbose  bool
-		expected string
+		name         string
+		toolName     string
+		input        map[string]interface{}
+		verboseLevel int
+		expected     string
 	}{
 		{
 			name:     "known tool returns header",
 			toolName: "Bash",
 			input:    map[string]interface{}{"command": "echo hello"},
-			verbose:  false,
 			expected: "echo hello",
 		},
 		{
 			name:     "unknown tool non-verbose returns empty",
 			toolName: "CustomTool",
 			input:    map[string]interface{}{"key": "value"},
-			verbose:  false,
 			expected: "",
 		},
 		{
-			name:     "unknown tool verbose returns JSON",
-			toolName: "CustomTool",
-			input:    map[string]interface{}{"key": "value"},
-			verbose:  true,
-			expected: `{"key":"value"}`,
+			name:         "unknown tool verbose returns JSON",
+			toolName:     "CustomTool",
+			input:        map[string]interface{}{"key": "value"},
+			verboseLevel: 1,
+			expected:     `{"key":"value"}`,
 		},
 		{
 			name:     "unknown tool verbose truncates long JSON",
@@ -298,21 +296,20 @@ func TestGetToolArg(t *testing.T) {
 			input: map[string]interface{}{
 				"very_long_key_name": "this is a very long value that will make the JSON exceed one hundred characters when serialized",
 			},
-			verbose:  true,
-			expected: `{"very_long_key_name":"this is a very long value that will make the JSON exceed one hundred characte...`,
+			verboseLevel: 1,
+			expected:     `{"very_long_key_name":"this is a very long value that will make the JSON exceed one hundred characte...`,
 		},
 		{
 			name:     "nil input non-verbose",
 			toolName: "UnknownTool",
 			input:    nil,
-			verbose:  false,
 			expected: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := testutil.MockConfigProvider{VerboseVal: tt.verbose}
+			cfg := testutil.MockConfigProvider{VerboseLevelVal: tt.verboseLevel}
 			result := GetToolArgWithConfig(tt.toolName, tt.input, cfg)
 			if result != tt.expected {
 				t.Errorf("GetToolArgWithConfig(%q, %v) = %q, expected %q", tt.toolName, tt.input, result, tt.expected)

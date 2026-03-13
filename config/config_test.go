@@ -29,7 +29,7 @@ func TestParse_DefaultValues(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if cfg.Verbose {
+	if cfg.IsVerbose() {
 		t.Error("expected Verbose to be false by default")
 	}
 
@@ -52,29 +52,48 @@ func TestParse_DefaultValues(t *testing.T) {
 
 func TestParse_VerboseFlag(t *testing.T) {
 	tests := []struct {
-		name     string
-		args     []string
-		expected bool
+		name          string
+		args          []string
+		wantLevel     int
+		wantVerbose   bool
+		wantVeryVerbose bool
 	}{
 		{
-			name:     "not set",
-			args:     []string{},
-			expected: false,
+			name:      "not set",
+			args:      []string{},
+			wantLevel: 0,
 		},
 		{
-			name:     "short flag",
-			args:     []string{"-v"},
-			expected: true,
+			name:        "short flag -v",
+			args:        []string{"-v"},
+			wantLevel:   1,
+			wantVerbose: true,
 		},
 		{
-			name:     "explicit true",
-			args:     []string{"-v=true"},
-			expected: true,
+			name:            "double verbose -vv",
+			args:            []string{"-vv"},
+			wantLevel:       2,
+			wantVerbose:     true,
+			wantVeryVerbose: true,
 		},
 		{
-			name:     "explicit false",
-			args:     []string{"-v=false"},
-			expected: false,
+			name:            "both -v and -vv",
+			args:            []string{"-v", "-vv"},
+			wantLevel:       2,
+			wantVerbose:     true,
+			wantVeryVerbose: true,
+		},
+		{
+			name:            "triple verbose -vvv",
+			args:            []string{"-vvv"},
+			wantLevel:       3,
+			wantVerbose:     true,
+			wantVeryVerbose: true,
+		},
+		{
+			name:      "explicit false",
+			args:      []string{"-v=false"},
+			wantLevel: 0,
 		},
 	}
 
@@ -90,8 +109,14 @@ func TestParse_VerboseFlag(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if cfg.Verbose != tt.expected {
-				t.Errorf("Verbose: got %v, want %v", cfg.Verbose, tt.expected)
+			if cfg.VerboseLevel != tt.wantLevel {
+				t.Errorf("VerboseLevel: got %v, want %v", cfg.VerboseLevel, tt.wantLevel)
+			}
+			if cfg.IsVerbose() != tt.wantVerbose {
+				t.Errorf("IsVerbose(): got %v, want %v", cfg.IsVerbose(), tt.wantVerbose)
+			}
+			if cfg.IsVeryVerbose() != tt.wantVeryVerbose {
+				t.Errorf("IsVeryVerbose(): got %v, want %v", cfg.IsVeryVerbose(), tt.wantVeryVerbose)
 			}
 		})
 	}
@@ -199,35 +224,35 @@ func TestParse_MultipleFlagsCombined(t *testing.T) {
 	tests := []struct {
 		name          string
 		args          []string
-		wantVerbose   bool
+		wantLevel     int
 		wantNoColor   bool
 		wantShowUsage bool
 	}{
 		{
 			name:          "all flags set",
 			args:          []string{"-v", "-no-color", "-usage=false"},
-			wantVerbose:   true,
+			wantLevel:     1,
 			wantNoColor:   true,
 			wantShowUsage: false,
 		},
 		{
 			name:          "verbose and no-color",
 			args:          []string{"-v", "-no-color"},
-			wantVerbose:   true,
+			wantLevel:     1,
 			wantNoColor:   true,
 			wantShowUsage: true,
 		},
 		{
-			name:          "verbose and usage disabled",
-			args:          []string{"-v", "-usage=false"},
-			wantVerbose:   true,
+			name:          "vv and usage disabled",
+			args:          []string{"-vv", "-usage=false"},
+			wantLevel:     2,
 			wantNoColor:   false,
 			wantShowUsage: false,
 		},
 		{
 			name:          "no-color and usage disabled",
 			args:          []string{"-no-color", "-usage=false"},
-			wantVerbose:   false,
+			wantLevel:     0,
 			wantNoColor:   true,
 			wantShowUsage: false,
 		},
@@ -245,8 +270,8 @@ func TestParse_MultipleFlagsCombined(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if cfg.Verbose != tt.wantVerbose {
-				t.Errorf("Verbose: got %v, want %v", cfg.Verbose, tt.wantVerbose)
+			if cfg.VerboseLevel != tt.wantLevel {
+				t.Errorf("VerboseLevel: got %v, want %v", cfg.VerboseLevel, tt.wantLevel)
 			}
 
 			if cfg.DisableColor != tt.wantNoColor {
@@ -311,7 +336,7 @@ func TestParse_WithCustomFlagSet(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !cfg.Verbose {
+	if !cfg.IsVerbose() {
 		t.Error("expected Verbose to be true")
 	}
 }
@@ -389,7 +414,7 @@ func TestParse_DefaultStyleInitializer(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !cfg.Verbose {
+	if !cfg.IsVerbose() {
 		t.Error("expected Verbose to be true")
 	}
 
@@ -465,13 +490,17 @@ func TestWithErrOutput(t *testing.T) {
 func TestConfig_StructFields(t *testing.T) {
 	// Test that Config struct has expected fields with correct types
 	cfg := Config{
-		Verbose:      true,
+		VerboseLevel: 2,
 		DisableColor: true,
 		DisplayUsage: false,
 	}
 
-	if !cfg.Verbose {
-		t.Error("expected Verbose to be true")
+	if !cfg.IsVerbose() {
+		t.Error("expected IsVerbose to be true")
+	}
+
+	if !cfg.IsVeryVerbose() {
+		t.Error("expected IsVeryVerbose to be true")
 	}
 
 	if !cfg.DisableColor {
@@ -495,7 +524,7 @@ func TestParse_EmptyArgs(t *testing.T) {
 	}
 
 	// All flags should have their default values
-	if cfg.Verbose != false {
+	if cfg.IsVerbose() != false {
 		t.Error("expected Verbose to default to false")
 	}
 
@@ -711,7 +740,7 @@ func TestParse_FlagOrderIndependent(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if !cfg.Verbose {
+			if !cfg.IsVerbose() {
 				t.Error("expected Verbose to be true")
 			}
 
@@ -724,7 +753,7 @@ func TestParse_FlagOrderIndependent(t *testing.T) {
 
 func TestConfig_ImplementsProvider(t *testing.T) {
 	cfg := &Config{
-		Verbose:      true,
+		VerboseLevel: 1,
 		DisableColor: true,
 		DisplayUsage: false,
 	}
@@ -733,6 +762,9 @@ func TestConfig_ImplementsProvider(t *testing.T) {
 	var p Provider = cfg
 	if !p.IsVerbose() {
 		t.Error("expected IsVerbose() to be true")
+	}
+	if p.IsVeryVerbose() {
+		t.Error("expected IsVeryVerbose() to be false at level 1")
 	}
 	if !p.NoColor() {
 		t.Error("expected NoColor() to be true")
@@ -764,7 +796,7 @@ func TestParse_SetsGlobalConfig(t *testing.T) {
 	if got != cfg {
 		t.Error("expected Get() to return the config set by Parse()")
 	}
-	if !got.Verbose {
-		t.Error("expected global config to have Verbose=true")
+	if !got.IsVerbose() {
+		t.Error("expected global config to have IsVerbose()=true")
 	}
 }
