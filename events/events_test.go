@@ -220,3 +220,103 @@ func TestParse_InvalidResultEvent(t *testing.T) {
 		t.Fatal("Parse should return ParseError for invalid result event")
 	}
 }
+
+func TestParse_RateLimitEvent(t *testing.T) {
+	result := Parse(`{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","resetsAt":1773421200,"rateLimitType":"five_hour"},"uuid":"test-uuid","session_id":"test-session"}`)
+	ignored, ok := result.(IgnoredEvent)
+	if !ok {
+		t.Fatalf("Parse should return IgnoredEvent for rate_limit_event, got %T", result)
+	}
+	if ignored.Type != "rate_limit_event" {
+		t.Errorf("IgnoredEvent Type should be 'rate_limit_event', got %q", ignored.Type)
+	}
+}
+
+func TestParse_SystemEvent_NewFields(t *testing.T) {
+	event := map[string]any{
+		"type":                "system",
+		"subtype":             "init",
+		"cwd":                 "/test",
+		"model":               "claude-opus-4-6",
+		"claude_code_version": "2.1.74",
+		"tools":               []string{"Bash", "Read"},
+		"agents":              []string{"general-purpose", "Explore"},
+		"mcp_servers": []map[string]string{
+			{"name": "test-server", "status": "connected"},
+		},
+		"slash_commands":  []string{"simplify", "loop"},
+		"skills":          []string{"simplify"},
+		"plugins":         []map[string]string{{"name": "gopls-lsp", "path": "/test/path"}},
+		"fast_mode_state": "off",
+		"apiKeySource":    "none",
+		"output_style":    "default",
+	}
+	eventJSON, _ := json.Marshal(event)
+
+	result := Parse(string(eventJSON))
+	sysEvent, ok := result.(SystemEvent)
+	if !ok {
+		t.Fatalf("Parse should return SystemEvent, got %T", result)
+	}
+	if len(sysEvent.Data.MCPServers) != 1 || sysEvent.Data.MCPServers[0].Name != "test-server" {
+		t.Errorf("MCPServers not parsed correctly: %+v", sysEvent.Data.MCPServers)
+	}
+	if len(sysEvent.Data.Plugins) != 1 || sysEvent.Data.Plugins[0].Name != "gopls-lsp" {
+		t.Errorf("Plugins not parsed correctly: %+v", sysEvent.Data.Plugins)
+	}
+	if sysEvent.Data.FastModeState != "off" {
+		t.Errorf("FastModeState should be 'off', got %q", sysEvent.Data.FastModeState)
+	}
+	if len(sysEvent.Data.Skills) != 1 || sysEvent.Data.Skills[0] != "simplify" {
+		t.Errorf("Skills not parsed correctly: %+v", sysEvent.Data.Skills)
+	}
+	if len(sysEvent.Data.SlashCommands) != 2 {
+		t.Errorf("SlashCommands not parsed correctly: %+v", sysEvent.Data.SlashCommands)
+	}
+}
+
+func TestParse_ResultEvent_NewFields(t *testing.T) {
+	event := map[string]any{
+		"type":            "result",
+		"subtype":         "success",
+		"is_error":        false,
+		"duration_ms":     5000,
+		"duration_api_ms": 4800,
+		"num_turns":       2,
+		"result":          "done",
+		"stop_reason":     "end_turn",
+		"total_cost_usd":  0.05,
+		"fast_mode_state": "off",
+		"usage": map[string]any{
+			"input_tokens":                100,
+			"output_tokens":               50,
+			"cache_creation_input_tokens": 10,
+			"cache_read_input_tokens":     20,
+			"service_tier":                "standard",
+			"speed":                       "standard",
+			"server_tool_use": map[string]any{
+				"web_search_requests": 0,
+				"web_fetch_requests":  0,
+			},
+		},
+	}
+	eventJSON, _ := json.Marshal(event)
+
+	result := Parse(string(eventJSON))
+	resultEvent, ok := result.(ResultEvent)
+	if !ok {
+		t.Fatalf("Parse should return ResultEvent, got %T", result)
+	}
+	if resultEvent.Data.StopReason != "end_turn" {
+		t.Errorf("StopReason should be 'end_turn', got %q", resultEvent.Data.StopReason)
+	}
+	if resultEvent.Data.FastModeState != "off" {
+		t.Errorf("FastModeState should be 'off', got %q", resultEvent.Data.FastModeState)
+	}
+	if resultEvent.Data.Usage.Speed != "standard" {
+		t.Errorf("Usage.Speed should be 'standard', got %q", resultEvent.Data.Usage.Speed)
+	}
+	if resultEvent.Data.Usage.ServiceTier != "standard" {
+		t.Errorf("Usage.ServiceTier should be 'standard', got %q", resultEvent.Data.Usage.ServiceTier)
+	}
+}

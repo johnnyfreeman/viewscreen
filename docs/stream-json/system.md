@@ -12,7 +12,7 @@ Initialization event emitted at the start of a session.
 | `session_id` | `string` | UUID for the session |
 | `tools` | `string[]` | Available tool names |
 | `mcp_servers` | `array` | MCP server configurations |
-| `model` | `string` | Model identifier (e.g., `"claude-opus-4-5-20251101"`) |
+| `model` | `string` | Model identifier (e.g., `"claude-opus-4-6"`) |
 | `permissionMode` | `string` | Permission mode (e.g., `"default"`) |
 | `slash_commands` | `string[]` | Available slash commands |
 | `apiKeySource` | `string` | Source of API key (e.g., `"none"`) |
@@ -44,7 +44,7 @@ Initialization event emitted at the start of a session.
   "session_id": "960d3f4f-0bcb-41a8-a9b3-198e6594f9ac",
   "tools": ["Task", "Bash", "Glob", "Grep", "Read", "Edit", "Write", ...],
   "mcp_servers": [],
-  "model": "claude-opus-4-5-20251101",
+  "model": "claude-opus-4-6",
   "permissionMode": "default",
   "slash_commands": ["compact", "context", "cost", "init", ...],
   "apiKeySource": "none",

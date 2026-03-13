@@ -54,7 +54,7 @@ Final result event emitted at the end of a session.
 
 ## modelUsage Object
 
-Keyed by model ID (e.g., `"claude-opus-4-5-20251101"`):
+Keyed by model ID (e.g., `"claude-opus-4-6"`):
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -96,7 +96,7 @@ Keyed by model ID (e.g., `"claude-opus-4-5-20251101"`):
     "server_tool_use": {"web_search_requests": 0, "web_fetch_requests": 0}
   },
   "modelUsage": {
-    "claude-opus-4-5-20251101": {
+    "claude-opus-4-6": {
       "inputTokens": 2,
       "outputTokens": 5,
       "costUSD": 0.030087749999999996,

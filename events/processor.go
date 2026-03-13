@@ -72,6 +72,8 @@ func (p *EventProcessor) Process(event Event) ProcessResult {
 		return p.processStream(e.Data)
 	case ResultEvent:
 		return p.processResult(e.Data)
+	case IgnoredEvent:
+		return ProcessResult{}
 	default:
 		return ProcessResult{}
 	}

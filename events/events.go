@@ -57,6 +57,12 @@ type ResultEvent struct{ Data result.Event }
 
 func (ResultEvent) eventMarker() {}
 
+// IgnoredEvent wraps an event type that is recognized but intentionally not processed.
+// Examples: rate_limit_event.
+type IgnoredEvent struct{ Type string }
+
+func (IgnoredEvent) eventMarker() {}
+
 // ParseError represents an error parsing an event.
 type ParseError struct {
 	Err  error
@@ -115,6 +121,9 @@ func Parse(line string) Event {
 			return ParseError{Err: err, Line: line}
 		}
 		return ResultEvent{Data: event}
+
+	case "rate_limit_event":
+		return IgnoredEvent{Type: base.Type}
 
 	default:
 		return ParseError{Err: nil, Line: "Unknown event type: " + base.Type}

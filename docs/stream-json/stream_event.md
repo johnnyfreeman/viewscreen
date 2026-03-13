@@ -37,7 +37,7 @@ Signals the start of a new assistant message.
   "event": {
     "type": "message_start",
     "message": {
-      "model": "claude-opus-4-5-20251101",
+      "model": "claude-opus-4-6",
       "id": "msg_01QC57b2ATRj1HDdR55GGHxK",
       "type": "message",
       "role": "assistant",

@@ -12,12 +12,21 @@ import (
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
+// ServerToolUse represents server-side tool use counts
+type ServerToolUse struct {
+	WebSearchRequests int `json:"web_search_requests"`
+	WebFetchRequests  int `json:"web_fetch_requests"`
+}
+
 // Usage represents usage in result events
 type Usage struct {
-	InputTokens              int `json:"input_tokens"`
-	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-	OutputTokens             int `json:"output_tokens"`
+	InputTokens              int           `json:"input_tokens"`
+	CacheCreationInputTokens int           `json:"cache_creation_input_tokens"`
+	CacheReadInputTokens     int           `json:"cache_read_input_tokens"`
+	OutputTokens             int           `json:"output_tokens"`
+	ServerToolUse            ServerToolUse `json:"server_tool_use"`
+	ServiceTier              string        `json:"service_tier"`
+	Speed                    string        `json:"speed"`
 }
 
 // ModelUsage represents per-model usage
@@ -47,11 +56,13 @@ type Event struct {
 	DurationAPIMS     int                   `json:"duration_api_ms"`
 	NumTurns          int                   `json:"num_turns"`
 	Result            string                `json:"result"`
+	StopReason        string                `json:"stop_reason"`
 	TotalCostUSD      float64               `json:"total_cost_usd"`
 	Usage             Usage                 `json:"usage"`
 	ModelUsage        map[string]ModelUsage `json:"modelUsage"`
 	PermissionDenials []PermissionDenial    `json:"permission_denials"`
 	Errors            []string              `json:"errors"`
+	FastModeState     string                `json:"fast_mode_state"`
 }
 
 // Renderer handles rendering of result events with configurable output and options

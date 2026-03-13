@@ -69,7 +69,7 @@ Message event from the assistant (Claude).
 {
   "type": "assistant",
   "message": {
-    "model": "claude-opus-4-5-20251101",
+    "model": "claude-opus-4-6",
     "id": "msg_01F89mJEggpRxDzDL9AHMDsF",
     "type": "message",
     "role": "assistant",
