@@ -1130,13 +1130,24 @@ func TestRenderer_Render_WriteResult_Create(t *testing.T) {
 	r.Render(event)
 	output := buf.String()
 
-	// Write results should show "Created (N lines)" instead of "Read N lines"
+	// Write results should show "Created (N lines)" summary
 	if !strings.Contains(output, "Created (3 lines)") {
 		t.Errorf("Expected 'Created (3 lines)' in output, got: %q", output)
 	}
-	// Should not show the misleading "Read" message
-	if strings.Contains(output, "Read") {
-		t.Errorf("Should not show 'Read' for write results, got: %q", output)
+	// Should render in diff format with + indicators
+	if !strings.Contains(output, "[SUCCESS:+]") {
+		t.Errorf("Expected diff-style + indicator in output, got: %q", output)
+	}
+	// Should show line numbers
+	if !strings.Contains(output, "[LN:1]") {
+		t.Errorf("Expected line number 1 in output, got: %q", output)
+	}
+	// Should show content
+	if !strings.Contains(output, "line 1") {
+		t.Errorf("Expected 'line 1' in output, got: %q", output)
+	}
+	if !strings.Contains(output, "line 3") {
+		t.Errorf("Expected 'line 3' in output, got: %q", output)
 	}
 }
 
@@ -1170,6 +1181,13 @@ func TestRenderer_Render_WriteResult_SingleLine(t *testing.T) {
 	// Single line file should show "Created (1 lines)"
 	if !strings.Contains(output, "Created (1 lines)") {
 		t.Errorf("Expected 'Created (1 lines)' in output, got: %q", output)
+	}
+	// Should render in diff format with + indicator and content
+	if !strings.Contains(output, "[SUCCESS:+]") {
+		t.Errorf("Expected diff-style + indicator in output, got: %q", output)
+	}
+	if !strings.Contains(output, "single line content") {
+		t.Errorf("Expected content in diff output, got: %q", output)
 	}
 }
 

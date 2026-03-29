@@ -34,7 +34,7 @@ func NewWriteRenderer(styleApplier render.StyleApplier, highlighter render.CodeH
 }
 
 // TryRender implements ResultRenderer interface.
-// Attempts to render a write/create result with a concise summary.
+// Renders a write/create result as a diff with all lines shown as additions.
 // Returns true if it was a write/create result and was rendered, false otherwise.
 func (wr *WriteRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMessage) bool {
 	if len(toolUseResult) == 0 {
@@ -51,16 +51,13 @@ func (wr *WriteRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMes
 		return false
 	}
 
-	// Count lines in the created file
-	lineCount := 1
-	if writeResult.Content != "" {
-		lineCount = len(strings.Split(writeResult.Content, "\n"))
-	}
+	lines := strings.Split(writeResult.Content, "\n")
+	lineCount := len(lines)
 
 	level := wr.config.GetVerboseLevel()
 
 	// Write tools: -v = 10 lines, -vv = no limit
-	var maxLines int
+	maxLines := 10
 	switch {
 	case level >= 2:
 		maxLines = -1
@@ -72,25 +69,31 @@ func (wr *WriteRenderer) TryRender(ctx *RenderContext, toolUseResult json.RawMes
 	summary := fmt.Sprintf("Created (%d lines)", lineCount)
 	fmt.Fprintf(ctx.Output, "%s%s\n", ctx.OutputPrefix, wr.styleApplier.MutedText(summary))
 
-	// Show content at -v or higher
-	if maxLines != 0 && writeResult.Content != "" {
-		highlighted := wr.highlighter.HighlightFile(writeResult.Content, writeResult.FilePath)
+	if writeResult.Content == "" {
+		return true
+	}
 
-		if maxLines < 0 {
-			pw := textutil.NewPrefixedWriter(ctx.Output, ctx.OutputPrefix, ctx.OutputContinue)
-			for _, line := range strings.Split(highlighted, "\n") {
-				pw.WriteLine(line)
-			}
-		} else {
-			truncated, remaining := textutil.TruncateLines(highlighted, maxLines)
-			pw := textutil.NewPrefixedWriter(ctx.Output, ctx.OutputPrefix, ctx.OutputContinue)
-			for _, line := range strings.Split(truncated, "\n") {
-				pw.WriteLine(line)
-			}
+	// Calculate line number column width
+	numWidth := len(fmt.Sprintf("%d", lineCount))
+	sep := wr.styleApplier.LineNumberSepRender("│")
+	op := wr.styleApplier.SuccessText("+")
+
+	pw := textutil.NewPrefixedWriter(ctx.Output, ctx.OutputPrefix, ctx.OutputContinue)
+
+	for i, line := range lines {
+		if maxLines >= 0 && i >= maxLines {
+			remaining := lineCount - i
 			if remaining > 0 {
 				pw.WriteLinef("%s", wr.styleApplier.MutedText(textutil.TruncationIndicator(remaining)))
 			}
+			break
 		}
+
+		lineNum := fmt.Sprintf("%*d", numWidth, i+1)
+		lineNums := wr.styleApplier.LineNumberRender(lineNum)
+		styled := wr.highlighter.HighlightFileWithBg(line, writeResult.FilePath, wr.styleApplier.DiffAddBg())
+
+		pw.WriteLinef("%s %s %s %s", lineNums, sep, op, styled)
 	}
 
 	return true
