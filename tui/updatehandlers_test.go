@@ -607,7 +607,7 @@ func TestFollowMode(t *testing.T) {
 		}
 	})
 
-	t.Run("scroll down does not change follow mode", func(t *testing.T) {
+	t.Run("scroll down away from bottom keeps follow mode off", func(t *testing.T) {
 		m := newTestModel()
 		m.viewport.SetContent(strings.Repeat("line\n", 100))
 		m.followMode = false
@@ -615,6 +615,44 @@ func TestFollowMode(t *testing.T) {
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
 		if m.followMode {
 			t.Error("expected follow mode to remain off after scrolling down")
+		}
+	})
+
+	t.Run("scroll down to bottom re-enables follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.viewport.ScrollUp(1)
+		m.followMode = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
+		if !m.followMode {
+			t.Error("expected follow mode to turn on after scrolling down to bottom")
+		}
+	})
+
+	t.Run("page down to bottom re-enables follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.viewport.ScrollUp(1)
+		m.followMode = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyPgDown})
+		if !m.followMode {
+			t.Error("expected follow mode to turn on after paging down to bottom")
+		}
+	})
+
+	t.Run("scroll down while already at bottom keeps intentional pause", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.followMode = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
+		if m.followMode {
+			t.Error("expected follow mode to stay off when already paused at bottom")
 		}
 	})
 

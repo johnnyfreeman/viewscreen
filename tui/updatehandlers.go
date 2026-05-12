@@ -97,12 +97,16 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.followMode = false
 		m.viewport.ScrollUp(1)
 	case "down", "j":
+		wasAtBottom := m.viewport.AtBottom()
 		m.viewport.ScrollDown(1)
+		m.resumeFollowModeAtBottom(wasAtBottom)
 	case "pgup":
 		m.followMode = false
 		m.viewport.HalfPageUp()
 	case "pgdown":
+		wasAtBottom := m.viewport.AtBottom()
 		m.viewport.HalfPageDown()
+		m.resumeFollowModeAtBottom(wasAtBottom)
 	case "home", "g":
 		m.followMode = false
 		m.viewport.GotoTop()
@@ -111,6 +115,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 	}
 	return m, nil
+}
+
+// resumeFollowModeAtBottom keeps manual browsing from getting stuck in a
+// confusing "paused at bottom" state after downward navigation reaches bottom.
+func (m *Model) resumeFollowModeAtBottom(wasAtBottom bool) {
+	if !wasAtBottom && m.viewport.AtBottom() {
+		m.followMode = true
+	}
 }
 
 // canEditPrompt reports whether the prompt editor can perform its advertised
