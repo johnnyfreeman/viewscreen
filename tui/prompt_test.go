@@ -6,7 +6,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
-	claudepkg "github.com/johnnyfreeman/viewscreen/claude"
 )
 
 func TestPromptEditor(t *testing.T) {
@@ -269,7 +268,10 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 	t.Run("e opens editor when stdin done in subprocess mode", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
-		m.claudeProcess = &claudepkg.Process{}
+		m.claudeProcess = &fakeClaudeProcess{}
+		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+			return &fakeClaudeProcess{}, nil
+		}
 		m.state.Prompt = "test prompt"
 
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})
@@ -295,7 +297,10 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 	t.Run("e does nothing when stdin not done", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = false
-		m.claudeProcess = &claudepkg.Process{}
+		m.claudeProcess = &fakeClaudeProcess{}
+		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+			return &fakeClaudeProcess{}, nil
+		}
 
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})
 		if m.promptEditor.Active {
@@ -306,7 +311,10 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 	t.Run("e does nothing when help modal open", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
-		m.claudeProcess = &claudepkg.Process{}
+		m.claudeProcess = &fakeClaudeProcess{}
+		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+			return &fakeClaudeProcess{}, nil
+		}
 		m.showHelpModal = true
 
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})
@@ -318,7 +326,10 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 	t.Run("e does nothing when details modal open", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
-		m.claudeProcess = &claudepkg.Process{}
+		m.claudeProcess = &fakeClaudeProcess{}
+		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+			return &fakeClaudeProcess{}, nil
+		}
 		m.showDetailsModal = true
 
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})
@@ -486,7 +497,10 @@ func TestPromptViewportHeight(t *testing.T) {
 		m := NewModel()
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
 		m.stdinDone = true
-		m.claudeProcess = &claudepkg.Process{}
+		m.claudeProcess = &fakeClaudeProcess{}
+		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+			return &fakeClaudeProcess{}, nil
+		}
 		heightWithout := m.viewport.Height()
 
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})

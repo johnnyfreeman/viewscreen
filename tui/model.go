@@ -10,14 +10,10 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	claudepkg "github.com/johnnyfreeman/viewscreen/claude"
-	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
-	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/tools"
-	"golang.org/x/term"
 )
 
 // Model is the main Bubbletea model for the TUI
@@ -42,8 +38,10 @@ type Model struct {
 	autoExit          bool                 // --auto-exit flag enabled
 	autoExitRemaining int                  // seconds left in countdown, 0 = inactive
 	autoExitCanceled  bool                 // user interacted before auto-exit could start
+	showParseErrors   bool                 // show malformed stream-json lines in content
 	streamErr         error                // non-nil when stdin ended because of a scanner/read error
 	claudeProcess     managedClaudeProcess // non-nil when we spawned claude
+	claudeStarter     claudeProcessStarter // starts replacement claude runs for prompt edits
 	prompt            string               // the prompt used to spawn claude
 	inputReader       io.Reader            // where to read stream-json lines (defaults to os.Stdin)
 }
@@ -54,9 +52,12 @@ type managedClaudeProcess interface {
 	Kill() error
 }
 
+type claudeProcessStarter func(prompt string) (managedClaudeProcess, error)
+
 const (
 	defaultInitialWidth  = 80
 	defaultInitialHeight = 24
+	maxScannerCapacity   = 10 * 1024 * 1024
 )
 
 // ModelOption is a functional option for configuring the Model.
@@ -70,9 +71,30 @@ func WithInputReader(r io.Reader) ModelOption {
 }
 
 // WithClaudeProcess attaches a spawned claude subprocess to the model.
-func WithClaudeProcess(p *claudepkg.Process) ModelOption {
+func WithClaudeProcess(p managedClaudeProcess) ModelOption {
 	return func(m *Model) {
 		m.claudeProcess = p
+	}
+}
+
+// WithClaudeStarter sets the factory used for prompt-editor re-runs.
+func WithClaudeStarter(starter claudeProcessStarter) ModelOption {
+	return func(m *Model) {
+		m.claudeStarter = starter
+	}
+}
+
+// WithAutoExit sets whether the model should auto-exit after stream completion.
+func WithAutoExit(enabled bool) ModelOption {
+	return func(m *Model) {
+		m.autoExit = enabled
+	}
+}
+
+// WithVerboseParseErrors controls whether malformed input appears in the TUI.
+func WithVerboseParseErrors(enabled bool) ModelOption {
+	return func(m *Model) {
+		m.showParseErrors = enabled
 	}
 }
 
@@ -125,7 +147,6 @@ func NewModel(opts ...ModelOption) Model {
 		search:        NewSearch(),
 		promptEditor:  NewPromptEditor(),
 		followMode:    true, // auto-scroll to bottom by default
-		autoExit:      config.Get().AutoExit,
 	}
 
 	for _, opt := range opts {
@@ -146,13 +167,16 @@ func NewModel(opts ...ModelOption) Model {
 
 	m.updateViewportDimensions()
 
-	// Create scanner with large buffer
-	m.scanner = bufio.NewScanner(m.inputReader)
-	const maxCapacity = 10 * 1024 * 1024 // 10MB
-	buf := make([]byte, maxCapacity)
-	m.scanner.Buffer(buf, maxCapacity)
+	m.scanner = newStreamScanner(m.inputReader)
 
 	return m
+}
+
+func newStreamScanner(r io.Reader) *bufio.Scanner {
+	scanner := bufio.NewScanner(r)
+	buf := make([]byte, maxScannerCapacity)
+	scanner.Buffer(buf, maxScannerCapacity)
+	return scanner
 }
 
 // Init initializes the model
@@ -372,95 +396,4 @@ func (m Model) Prompt() string {
 		return m.promptEditor.Value
 	}
 	return m.state.Prompt
-}
-
-// Run starts the TUI and returns the final rendered content for optional dumping.
-func Run() (string, error) {
-	// Initialize styles (needed for renderers)
-	render.NewMarkdownRenderer(config.Get().NoColor(), 80)
-	resetTerminalModes(os.Stdout)
-
-	// AltScreen is set declaratively in View()
-	var opts []tea.ProgramOption
-	width, height := detectTerminalSize(os.Stdout)
-
-	// When stdin is not a TTY (e.g., piped input), we need to read keyboard
-	// input from /dev/tty instead. Otherwise bubbletea tries to read keyboard
-	// events from the pipe, which causes terminal escape sequence issues.
-	if !isatty(os.Stdin.Fd()) {
-		tty, err := os.Open("/dev/tty")
-		if err == nil {
-			opts = append(opts, tea.WithInput(tty))
-			defer tty.Close()
-		}
-	}
-
-	p := tea.NewProgram(NewModel(WithInitialSize(width, height)), opts...)
-
-	finalModel, err := p.Run()
-	if err != nil {
-		return "", err
-	}
-
-	// Extract final content from the model
-	if m, ok := finalModel.(Model); ok {
-		return m.content.String(), nil
-	}
-	return "", nil
-}
-
-// RunWithPrompt spawns claude with the given prompt and runs the TUI on its output.
-func RunWithPrompt(prompt string) (string, error) {
-	// Initialize styles (needed for renderers)
-	render.NewMarkdownRenderer(config.Get().NoColor(), 80)
-	resetTerminalModes(os.Stdout)
-
-	proc, err := claudepkg.Start(prompt, nil)
-	if err != nil {
-		return "", err
-	}
-
-	// Keyboard input comes from /dev/tty since stdin is not available
-	var teaOpts []tea.ProgramOption
-	width, height := detectTerminalSize(os.Stdout)
-	tty, err := os.Open("/dev/tty")
-	if err == nil {
-		teaOpts = append(teaOpts, tea.WithInput(tty))
-		defer tty.Close()
-	}
-
-	model := NewModel(
-		WithInputReader(proc.Stdout()),
-		WithClaudeProcess(proc),
-		WithPrompt(prompt),
-		WithInitialSize(width, height),
-	)
-
-	p := tea.NewProgram(model, teaOpts...)
-
-	finalModel, err := p.Run()
-	if err != nil {
-		_ = proc.Kill()
-		_ = proc.Wait()
-		return "", err
-	}
-
-	if m, ok := finalModel.(Model); ok {
-		// If the user quit before Claude closed stdout, terminate it so the TUI
-		// exits immediately instead of waiting for the generation to finish.
-		m.stopClaudeProcessIfRunning()
-		if m.claudeProcess != nil {
-			_ = m.claudeProcess.Wait()
-		} else {
-			_ = proc.Wait()
-		}
-		return m.content.String(), nil
-	}
-	_ = proc.Wait()
-	return "", nil
-}
-
-// isatty returns true if the file descriptor is a terminal.
-func isatty(fd uintptr) bool {
-	return term.IsTerminal(int(fd))
 }

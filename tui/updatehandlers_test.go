@@ -9,7 +9,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/johnnyfreeman/viewscreen/assistant"
-	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
@@ -17,9 +16,10 @@ import (
 type fakeClaudeProcess struct {
 	killCount int
 	waitCount int
+	stdout    io.ReadCloser
 }
 
-func (p *fakeClaudeProcess) Stdout() io.ReadCloser { return nil }
+func (p *fakeClaudeProcess) Stdout() io.ReadCloser { return p.stdout }
 func (p *fakeClaudeProcess) Wait() error {
 	p.waitCount++
 	return nil
@@ -28,10 +28,6 @@ func (p *fakeClaudeProcess) Kill() error {
 	p.killCount++
 	return nil
 }
-
-type noopStyleInitializer struct{}
-
-func (noopStyleInitializer) Init(bool) {}
 
 func newTestModel() Model {
 	m := NewModel()
@@ -599,6 +595,102 @@ func TestHandleStdinClosed(t *testing.T) {
 	})
 }
 
+func TestHandleRerun(t *testing.T) {
+	t.Run("uses injected starter and resets stream state", func(t *testing.T) {
+		oldProc := &fakeClaudeProcess{}
+		newProc := &fakeClaudeProcess{stdout: io.NopCloser(strings.NewReader(""))}
+		var gotPrompt string
+
+		m := newTestModel()
+		m.claudeProcess = oldProc
+		m.claudeStarter = func(prompt string) (managedClaudeProcess, error) {
+			gotPrompt = prompt
+			return newProc, nil
+		}
+		m.stdinDone = true
+		m.streamErr = errors.New("old error")
+		m.content.WriteString("old content")
+		m.search.Query = "old"
+		m.search.UpdateMatches(m.content.String())
+
+		m, cmd := m.handleRerun(RerunMsg{Prompt: "new prompt"})
+
+		if oldProc.killCount != 1 {
+			t.Errorf("old Kill called %d times, want 1", oldProc.killCount)
+		}
+		if oldProc.waitCount != 1 {
+			t.Errorf("old Wait called %d times, want 1", oldProc.waitCount)
+		}
+		if gotPrompt != "new prompt" {
+			t.Errorf("starter prompt = %q, want new prompt", gotPrompt)
+		}
+		if m.claudeProcess != newProc {
+			t.Error("expected model to use new process")
+		}
+		if m.stdinDone {
+			t.Error("expected stdinDone to reset for new stream")
+		}
+		if m.streamErr != nil {
+			t.Errorf("streamErr = %v, want nil", m.streamErr)
+		}
+		if m.content.String() != "" {
+			t.Errorf("content = %q, want empty after rerun", m.content.String())
+		}
+		if m.search.HasQuery() {
+			t.Error("expected search to clear on rerun")
+		}
+		if m.state.Prompt != "new prompt" {
+			t.Errorf("state.Prompt = %q, want new prompt", m.state.Prompt)
+		}
+		if cmd == nil {
+			t.Error("expected read command for new process stdout")
+		}
+	})
+
+	t.Run("reports missing starter instead of spawning from model code", func(t *testing.T) {
+		oldProc := &fakeClaudeProcess{}
+		m := newTestModel()
+		m.claudeProcess = oldProc
+
+		m, cmd := m.handleRerun(RerunMsg{Prompt: "new prompt"})
+
+		if cmd != nil {
+			t.Error("expected no read command when starter is missing")
+		}
+		if oldProc.killCount != 1 {
+			t.Errorf("old Kill called %d times, want 1", oldProc.killCount)
+		}
+		if m.claudeProcess != nil {
+			t.Error("expected stale process to clear after failed rerun")
+		}
+		if !m.stdinDone {
+			t.Error("expected stdinDone after failed rerun")
+		}
+		if got := m.content.String(); !strings.Contains(got, "claude starter unavailable") {
+			t.Fatalf("content = %q, want starter error", got)
+		}
+	})
+
+	t.Run("reports missing stdout from started process", func(t *testing.T) {
+		m := newTestModel()
+		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+			return &fakeClaudeProcess{}, nil
+		}
+
+		m, cmd := m.handleRerun(RerunMsg{Prompt: "new prompt"})
+
+		if cmd != nil {
+			t.Error("expected no read command when stdout is missing")
+		}
+		if !m.stdinDone {
+			t.Error("expected stdinDone after failed rerun")
+		}
+		if got := m.content.String(); !strings.Contains(got, "claude stdout unavailable") {
+			t.Fatalf("content = %q, want stdout error", got)
+		}
+	})
+}
+
 func TestHandleAutoExitTick(t *testing.T) {
 	t.Run("decrements remaining and continues", func(t *testing.T) {
 		m := newTestModel()
@@ -853,20 +945,7 @@ func TestHandleParseError(t *testing.T) {
 }
 
 func TestHandleRawLineShowsParseErrorsInVerboseMode(t *testing.T) {
-	if _, err := config.Parse(
-		config.WithArgs([]string{"-v"}),
-		config.WithStyleInitializer(noopStyleInitializer{}),
-	); err != nil {
-		t.Fatalf("failed to enable verbose config: %v", err)
-	}
-	defer func() {
-		_, _ = config.Parse(
-			config.WithArgs(nil),
-			config.WithStyleInitializer(noopStyleInitializer{}),
-		)
-	}()
-
-	m := newTestModel()
+	m := NewModel(WithVerboseParseErrors(true))
 	m, _ = m.handleRawLine(RawLineMsg{Line: "not json"})
 
 	if got := m.content.String(); !strings.Contains(got, "Parse error: not json") {

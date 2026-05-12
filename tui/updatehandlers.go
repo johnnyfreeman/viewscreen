@@ -1,18 +1,18 @@
 package tui
 
 import (
-	"bufio"
+	"errors"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
-	claudepkg "github.com/johnnyfreeman/viewscreen/claude"
-	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/state"
 )
+
+var errClaudeStarterUnavailable = errors.New("claude starter unavailable")
 
 // handleKeyMsg processes keyboard input and returns the model and any command.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
@@ -253,7 +253,7 @@ func (m Model) shouldStartAutoExitCountdown() bool {
 // action. Prompt edits only have an effect when this TUI spawned Claude and can
 // re-run it after the current stream finishes.
 func (m Model) canEditPrompt() bool {
-	return m.stdinDone && m.claudeProcess != nil
+	return m.stdinDone && m.claudeProcess != nil && m.claudeStarter != nil
 }
 
 // handlePromptEditorKeyMsg processes keyboard input while prompt editing is active.
@@ -265,7 +265,7 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.prompt = m.promptEditor.Value
 		m.promptEditor.Exit()
 		m.updateViewportDimensions()
-		if m.claudeProcess != nil {
+		if m.claudeProcess != nil && m.claudeStarter != nil {
 			return m, func() tea.Msg { return RerunMsg{Prompt: m.state.Prompt} }
 		}
 	case msg.String() == "backspace":
@@ -458,31 +458,40 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	m.processor = events.NewEventProcessor(st)
 	m.prompt = msg.Prompt
 	m.followMode = true
+	m.claudeProcess = nil
 	m.search.Clear()
 	m.updateViewportDimensions()
 
 	// Spawn new claude process
-	proc, err := claudepkg.Start(msg.Prompt, nil)
+	if m.claudeStarter == nil {
+		m.failRerunStart(errClaudeStarterUnavailable)
+		return m, nil
+	}
+	proc, err := m.claudeStarter(msg.Prompt)
 	if err != nil {
-		m.content.WriteString("Error starting claude: " + err.Error() + "\n")
-		m.viewport.SetContent(m.content.String())
-		m.stdinDone = true
+		m.failRerunStart(err)
+		return m, nil
+	}
+	stdout := proc.Stdout()
+	if stdout == nil {
+		m.failRerunStart(errors.New("claude stdout unavailable"))
 		return m, nil
 	}
 
 	m.claudeProcess = proc
-	m.inputReader = proc.Stdout()
-
-	// Create new scanner
-	m.scanner = bufio.NewScanner(m.inputReader)
-	const maxCapacity = 10 * 1024 * 1024
-	buf := make([]byte, maxCapacity)
-	m.scanner.Buffer(buf, maxCapacity)
+	m.inputReader = stdout
+	m.scanner = newStreamScanner(m.inputReader)
 
 	// Clear viewport
 	m.viewport.SetContent("")
 
 	return m, ReadStdinLine(m.scanner)
+}
+
+func (m *Model) failRerunStart(err error) {
+	m.content.WriteString("Error starting claude: " + err.Error() + "\n")
+	m.viewport.SetContent(m.content.String())
+	m.stdinDone = true
 }
 
 // handleAutoExitTick processes a countdown tick for auto-exit.
@@ -499,7 +508,7 @@ func (m Model) handleAutoExitTick() (Model, tea.Cmd) {
 
 // handleParseError processes event parsing errors.
 func (m Model) handleParseError(msg events.ParseError) Model {
-	if config.Get().IsVerbose() {
+	if m.showParseErrors {
 		m.content.WriteString("Parse error: " + msg.Line + "\n")
 		m.updateSearchMatches()
 		m.viewport.SetContent(m.content.String())
