@@ -243,6 +243,16 @@ func TestHandleKeyMsg(t *testing.T) {
 		}
 	})
 
+	t.Run("shifted ? toggles help modal", func(t *testing.T) {
+		m := newTestModel()
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "?", Mod: tea.ModShift})
+
+		if !m.showHelpModal {
+			t.Error("expected showHelpModal to be true after shifted ?")
+		}
+	})
+
 	t.Run("? works in both layout modes", func(t *testing.T) {
 		m := newTestModel()
 		m.layoutMode = LayoutSidebar
@@ -298,7 +308,37 @@ func TestHandleKeyMsg(t *testing.T) {
 	})
 }
 
+func TestViewTerminalModes(t *testing.T) {
+	m := newTestModel()
+
+	view := m.View()
+
+	if !view.AltScreen {
+		t.Error("expected TUI view to use alt screen")
+	}
+	if view.MouseMode != tea.MouseModeNone {
+		t.Errorf("expected mouse mode to be disabled, got %v", view.MouseMode)
+	}
+}
+
 func TestHandleWindowSizeMsg(t *testing.T) {
+	t.Run("starts with usable fallback dimensions", func(t *testing.T) {
+		m := NewModel()
+
+		if m.width != defaultInitialWidth {
+			t.Errorf("width = %d, want %d", m.width, defaultInitialWidth)
+		}
+		if m.height != defaultInitialHeight {
+			t.Errorf("height = %d, want %d", m.height, defaultInitialHeight)
+		}
+		if m.viewport.Width() <= 0 {
+			t.Errorf("viewport width = %d, want positive", m.viewport.Width())
+		}
+		if m.viewport.Height() <= 0 {
+			t.Errorf("viewport height = %d, want positive", m.viewport.Height())
+		}
+	})
+
 	t.Run("sets dimensions on size message", func(t *testing.T) {
 		m := NewModel()
 

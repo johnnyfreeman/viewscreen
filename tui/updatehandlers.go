@@ -3,6 +3,8 @@ package tui
 import (
 	"bufio"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -14,15 +16,17 @@ import (
 
 // handleKeyMsg processes keyboard input and returns the model and any command.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if isCtrlCKey(msg) || (!m.promptEditor.Active && isPlainTextKey(msg, "q")) {
+		return m.quitCommand()
+	}
+
 	// During auto-exit countdown:
 	// - q/ctrl+c: quit immediately
 	// - space/enter: skip countdown and exit (continue the loop)
 	// - any other key: cancel countdown and browse
 	if m.autoExitRemaining > 0 {
-		switch msg.String() {
-		case "q", "ctrl+c":
-			return m.quitCommand()
-		case "space", "enter":
+		switch {
+		case isEnterKey(msg), isSpaceKey(msg):
 			return m.quitCommand()
 		default:
 			m.cancelAutoExit()
@@ -42,18 +46,16 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 
 	// Keys that work regardless of modal state
-	switch msg.String() {
-	case "q", "ctrl+c":
-		return m.quitCommand()
-	case "?":
+	switch {
+	case isPlainTextKey(msg, "?"):
 		m.showHelpModal = !m.showHelpModal
 		return m, nil
-	case "d":
+	case isPlainTextKey(msg, "d"):
 		if m.layoutMode == LayoutHeader && !m.showHelpModal {
 			m.showDetailsModal = !m.showDetailsModal
 		}
 		return m, nil
-	case "esc":
+	case isEscKey(msg):
 		if m.showHelpModal {
 			m.showHelpModal = false
 		} else if m.showDetailsModal {
@@ -70,52 +72,105 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 
-	switch msg.String() {
-	case "f":
+	switch {
+	case isPlainTextKey(msg, "f"):
 		m.followMode = !m.followMode
 		if m.followMode {
 			m.viewport.GotoBottom()
 		}
-	case "/":
+	case isPlainTextKey(msg, "/"):
 		m.search.Enter()
 		m.updateViewportDimensions()
-	case "n":
+	case isPlainTextKey(msg, "n"):
 		if m.search.HasQuery() {
 			m.search.NextMatch()
 			m.scrollToSearchMatch()
 		}
-	case "N":
+	case isPlainTextKey(msg, "N"):
 		if m.search.HasQuery() {
 			m.search.PrevMatch()
 			m.scrollToSearchMatch()
 		}
-	case "e":
+	case isPlainTextKey(msg, "e"):
 		if m.canEditPrompt() {
 			m.promptEditor.Enter(m.state.Prompt)
 			m.updateViewportDimensions()
 		}
-	case "up", "k":
+	case msg.String() == "up", isPlainTextKey(msg, "k"):
 		m.followMode = false
 		m.viewport.ScrollUp(1)
-	case "down", "j":
+	case msg.String() == "down", isPlainTextKey(msg, "j"):
 		wasAtBottom := m.viewport.AtBottom()
 		m.viewport.ScrollDown(1)
 		m.resumeFollowModeAtBottom(wasAtBottom)
-	case "pgup":
+	case msg.String() == "pgup":
 		m.followMode = false
 		m.viewport.HalfPageUp()
-	case "pgdown":
+	case msg.String() == "pgdown":
 		wasAtBottom := m.viewport.AtBottom()
 		m.viewport.HalfPageDown()
 		m.resumeFollowModeAtBottom(wasAtBottom)
-	case "home", "g":
+	case msg.String() == "home", isPlainTextKey(msg, "g"):
 		m.followMode = false
 		m.viewport.GotoTop()
-	case "end", "G":
+	case msg.String() == "end", isPlainTextKey(msg, "G"):
 		m.followMode = true
 		m.viewport.GotoBottom()
 	}
 	return m, nil
+}
+
+func isCtrlCKey(msg tea.KeyMsg) bool {
+	key := msg.Key()
+	return msg.String() == "ctrl+c" ||
+		key.Code == 0x03 ||
+		(key.Mod.Contains(tea.ModCtrl) && (key.Code == 'c' || key.Code == 'C'))
+}
+
+func isEscKey(msg tea.KeyMsg) bool {
+	return msg.String() == "esc" || msg.String() == "escape" || msg.Key().Code == tea.KeyEscape
+}
+
+func isEnterKey(msg tea.KeyMsg) bool {
+	return msg.String() == "enter" || msg.Key().Code == tea.KeyEnter
+}
+
+func isSpaceKey(msg tea.KeyMsg) bool {
+	return msg.String() == "space" || isPlainTextKey(msg, " ")
+}
+
+func isPlainTextKey(msg tea.KeyMsg, text string) bool {
+	key := msg.Key()
+	return hasOnlyTextModifiers(key.Mod) && key.Text == text
+}
+
+func keyInputText(msg tea.KeyMsg) string {
+	key := msg.Key()
+	if !hasOnlyTextModifiers(key.Mod) {
+		return ""
+	}
+	return key.Text
+}
+
+func hasOnlyTextModifiers(mod tea.KeyMod) bool {
+	return mod&^(tea.ModShift|tea.ModCapsLock|tea.ModNumLock|tea.ModScrollLock) == 0
+}
+
+func isPrintableInputText(text string) bool {
+	if text == "" {
+		return false
+	}
+	for len(text) > 0 {
+		r, size := utf8.DecodeRuneInString(text)
+		if r == utf8.RuneError && size == 1 {
+			return false
+		}
+		if unicode.IsControl(r) && r != '\r' && r != '\n' {
+			return false
+		}
+		text = text[size:]
+	}
+	return true
 }
 
 // handleMouseWheelMsg keeps mouse scrolling aligned with keyboard navigation.
@@ -186,12 +241,12 @@ func (m Model) canEditPrompt() bool {
 
 // handlePromptEditorKeyMsg processes keyboard input while prompt editing is active.
 func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	switch {
+	case isEscKey(msg):
 		// Cancel editing, restore original prompt
 		m.promptEditor.Cancel(m.state.Prompt)
 		m.updateViewportDimensions()
-	case "enter":
+	case isEnterKey(msg):
 		// Confirm the edited prompt
 		m.state.Prompt = m.promptEditor.Value
 		m.prompt = m.promptEditor.Value
@@ -200,23 +255,23 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if m.claudeProcess != nil {
 			return m, func() tea.Msg { return RerunMsg{Prompt: m.state.Prompt} }
 		}
-	case "backspace":
+	case msg.String() == "backspace":
 		m.promptEditor.Backspace()
-	case "delete":
+	case msg.String() == "delete":
 		m.promptEditor.Delete()
-	case "left":
+	case msg.String() == "left":
 		m.promptEditor.CursorLeft()
-	case "right":
+	case msg.String() == "right":
 		m.promptEditor.CursorRight()
-	case "home", "ctrl+a":
+	case msg.String() == "home", msg.String() == "ctrl+a":
 		m.promptEditor.CursorHome()
-	case "end", "ctrl+e":
+	case msg.String() == "end", msg.String() == "ctrl+e":
 		m.promptEditor.CursorEnd()
-	case "ctrl+c":
-		return m.quitCommand()
 	default:
-		for _, r := range msg.Key().Text {
-			m.promptEditor.TypeRune(r)
+		if text := keyInputText(msg); isPrintableInputText(text) {
+			for _, r := range text {
+				m.promptEditor.TypeRune(r)
+			}
 		}
 	}
 	return m, nil
@@ -224,24 +279,22 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 // handleSearchKeyMsg processes keyboard input while search mode is active.
 func (m Model) handleSearchKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
-	switch msg.String() {
-	case "esc":
+	switch {
+	case isEscKey(msg):
 		// Cancel search, clear query
 		m.search.Clear()
 		m.updateViewportDimensions()
-	case "enter":
+	case isEnterKey(msg):
 		// Confirm search, exit input mode but keep query
 		m.search.Exit()
 		m.updateViewportDimensions()
-	case "backspace":
+	case msg.String() == "backspace":
 		m.search.Backspace()
 		m.search.UpdateMatches(m.content.String())
 		m.scrollToSearchMatch()
-	case "ctrl+c":
-		return m.quitCommand()
 	default:
 		// Type character into search query
-		if text := msg.Key().Text; text != "" {
+		if text := keyInputText(msg); isPrintableInputText(text) {
 			m.search.TypeText(text)
 			m.search.UpdateMatches(m.content.String())
 			m.scrollToSearchMatch()

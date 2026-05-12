@@ -54,6 +54,11 @@ type managedClaudeProcess interface {
 	Kill() error
 }
 
+const (
+	defaultInitialWidth  = 80
+	defaultInitialHeight = 24
+)
+
 // ModelOption is a functional option for configuring the Model.
 type ModelOption func(*Model)
 
@@ -92,6 +97,8 @@ func NewModel(opts ...ModelOption) Model {
 	vp := viewport.New()
 	vp.KeyMap = viewport.KeyMap{} // Disable viewport key handling; model handles all keys
 	m := Model{
+		width:         defaultInitialWidth,
+		height:        defaultInitialHeight,
 		spinner:       s,
 		state:         st,
 		content:       &strings.Builder{},
@@ -120,6 +127,8 @@ func NewModel(opts ...ModelOption) Model {
 		m.inputReader = os.Stdin
 	}
 
+	m.updateViewportDimensions()
+
 	// Create scanner with large buffer
 	m.scanner = bufio.NewScanner(m.inputReader)
 	const maxCapacity = 10 * 1024 * 1024 // 10MB
@@ -132,6 +141,7 @@ func NewModel(opts ...ModelOption) Model {
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
+		ResetTerminalMouseModes(),
 		m.spinner.Tick,
 		ReadStdinLine(m.scanner),
 	)
@@ -232,7 +242,6 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 func (m Model) View() tea.View {
 	v := tea.NewView("")
 	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
 	v.SetContent(m.renderLayout())
 	return v
 }
@@ -354,7 +363,7 @@ func Run() (string, error) {
 	// Initialize styles (needed for renderers)
 	render.NewMarkdownRenderer(config.Get().NoColor(), 80)
 
-	// AltScreen and MouseMode are now set declaratively in View()
+	// AltScreen is set declaratively in View()
 	var opts []tea.ProgramOption
 
 	// When stdin is not a TTY (e.g., piped input), we need to read keyboard

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/johnnyfreeman/viewscreen/events"
 )
 
@@ -30,4 +31,22 @@ func AutoExitTick() tea.Cmd {
 		time.Sleep(1 * time.Second)
 		return AutoExitTickMsg{}
 	}
+}
+
+// ResetTerminalMouseModes clears any mouse tracking mode left behind by this
+// process or another TUI. Viewscreen does not need click tracking, and stale
+// mouse sequences can otherwise be decoded as keyboard text.
+func ResetTerminalMouseModes() tea.Cmd {
+	return tea.Raw(
+		ansi.ResetModeMouseX10 +
+			ansi.ResetModeMouseNormal +
+			ansi.ResetModeMouseHighlight +
+			ansi.ResetModeMouseButtonEvent +
+			ansi.ResetModeMouseAnyEvent +
+			ansi.ResetModeMouseExtUtf8 +
+			ansi.ResetModeMouseExtSgr +
+			ansi.ResetModeMouseExtUrxvt +
+			ansi.ResetModeMouseExtSgrPixel +
+			ansi.ResetModeFocusEvent,
+	)
 }

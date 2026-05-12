@@ -443,6 +443,14 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 		}
 	})
 
+	t.Run("modified / does not enter search mode", func(t *testing.T) {
+		m := newTestModel()
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "/", Mod: tea.ModAlt})
+		if m.search.Active {
+			t.Error("expected search to remain inactive after modified /")
+		}
+	})
+
 	t.Run("/ does not enter search when modal open", func(t *testing.T) {
 		m := newTestModel()
 		m.showHelpModal = true
@@ -591,15 +599,17 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 		}
 	})
 
-	t.Run("q does not quit in search mode", func(t *testing.T) {
+	t.Run("q quits from search mode", func(t *testing.T) {
 		m := newTestModel()
+		proc := &fakeClaudeProcess{}
+		m.claudeProcess = proc
 		m.search.Enter()
-		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
-		if cmd != nil {
-			t.Error("expected no quit command when typing q in search mode")
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
+		if cmd == nil {
+			t.Error("expected quit command on q in search mode")
 		}
-		if m.search.Query != "q" {
-			t.Errorf("search query = %q, want %q", m.search.Query, "q")
+		if proc.killCount != 1 {
+			t.Errorf("Kill called %d times, want 1", proc.killCount)
 		}
 	})
 }
