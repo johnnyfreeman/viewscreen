@@ -206,6 +206,7 @@ func (m *Model) scrollToSearchMatch() {
 	if line < 0 {
 		return
 	}
+	m.followMode = false
 	m.viewport.SetYOffset(line)
 }
 

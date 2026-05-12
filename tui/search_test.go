@@ -468,6 +468,29 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 		}
 	})
 
+	t.Run("search match navigation pauses follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetHeight(5)
+		m.content.WriteString("needle one\n")
+		m.content.WriteString(strings.Repeat("filler\n", 9))
+		m.content.WriteString("needle two\n")
+		m.content.WriteString(strings.Repeat("filler\n", 20))
+		m.viewport.SetContent(m.content.String())
+		m.viewport.GotoBottom()
+		m.followMode = true
+		m.search.Query = "needle"
+		m.search.UpdateMatches(m.content.String())
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "n"})
+
+		if m.followMode {
+			t.Error("expected search navigation to pause follow mode")
+		}
+		if got := m.viewport.YOffset(); got != m.search.CurrentLine() {
+			t.Errorf("viewport YOffset = %d, want current match line %d", got, m.search.CurrentLine())
+		}
+	})
+
 	t.Run("backspace in search mode removes character", func(t *testing.T) {
 		m := newTestModel()
 		m.search.Enter()
