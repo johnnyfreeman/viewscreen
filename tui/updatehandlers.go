@@ -59,6 +59,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.showDetailsModal = false
 		} else if m.search.HasQuery() {
 			m.search.Clear()
+			m.updateViewportDimensions()
 		}
 		return m, nil
 	}
@@ -76,6 +77,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	case "/":
 		m.search.Enter()
+		m.updateViewportDimensions()
 	case "n":
 		if m.search.HasQuery() {
 			m.search.NextMatch()
@@ -89,6 +91,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "e":
 		if m.stdinDone {
 			m.promptEditor.Enter(m.state.Prompt)
+			m.updateViewportDimensions()
 		}
 	case "up", "k":
 		m.followMode = false
@@ -116,11 +119,13 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "esc":
 		// Cancel editing, restore original prompt
 		m.promptEditor.Cancel(m.state.Prompt)
+		m.updateViewportDimensions()
 	case "enter":
 		// Confirm the edited prompt
 		m.state.Prompt = m.promptEditor.Value
 		m.prompt = m.promptEditor.Value
 		m.promptEditor.Exit()
+		m.updateViewportDimensions()
 		if m.claudeProcess != nil {
 			return m, func() tea.Msg { return RerunMsg{Prompt: m.state.Prompt} }
 		}
@@ -153,9 +158,11 @@ func (m Model) handleSearchKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "esc":
 		// Cancel search, clear query
 		m.search.Clear()
+		m.updateViewportDimensions()
 	case "enter":
 		// Confirm search, exit input mode but keep query
 		m.search.Exit()
+		m.updateViewportDimensions()
 	case "backspace":
 		m.search.Backspace()
 		m.search.UpdateMatches(m.content.String())
@@ -183,6 +190,44 @@ func (m *Model) scrollToSearchMatch() {
 	m.viewport.SetYOffset(line)
 }
 
+// updateViewportDimensions recalculates the viewport size for the current
+// terminal dimensions and active bottom bars.
+func (m *Model) updateViewportDimensions() {
+	if m.width == 0 || m.height == 0 {
+		return
+	}
+
+	var contentWidth, contentHeight int
+	switch m.layoutMode {
+	case LayoutHeader:
+		contentWidth = max(m.width-2, 20)
+		contentHeight = m.height - headerHeight - 1
+	default:
+		contentWidth = max(m.width-sidebarWidth-3, 20)
+		contentHeight = m.height - 2
+	}
+
+	if m.search.Active || m.search.HasQuery() {
+		contentHeight--
+	}
+	if m.promptEditor.Active {
+		contentHeight--
+	}
+
+	m.viewport.SetWidth(contentWidth)
+	m.viewport.SetHeight(max(contentHeight, 1))
+	m.processor.SetWidth(contentWidth)
+
+	if m.processor.HasPendingTools() {
+		m.updateViewportWithPendingTools()
+	} else {
+		m.viewport.SetContent(m.content.String())
+	}
+	if m.followMode {
+		m.viewport.GotoBottom()
+	}
+}
+
 // handleWindowSizeMsg processes terminal resize events.
 func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 	m.width = msg.Width
@@ -195,39 +240,7 @@ func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 		m.layoutMode = LayoutSidebar
 	}
 
-	// Calculate content dimensions based on layout mode
-	var contentWidth, contentHeight int
-	switch m.layoutMode {
-	case LayoutHeader:
-		// Full width minus padding
-		contentWidth = max(m.width-2, 20)
-		// Height minus header and margin
-		contentHeight = m.height - headerHeight - 1
-	default:
-		// Width minus sidebar and border
-		contentWidth = max(m.width-sidebarWidth-3, 20)
-		contentHeight = m.height - 2
-	}
-
-	// Reserve space for search bar when active
-	if m.search.Active || m.search.HasQuery() {
-		contentHeight--
-	}
-
-	// Reserve space for prompt editor when active
-	if m.promptEditor.Active {
-		contentHeight--
-	}
-
-	m.viewport.SetWidth(contentWidth)
-	m.viewport.SetHeight(contentHeight)
-
-	// Update markdown renderer width so text reflows to fit visible viewport
-	m.processor.SetWidth(contentWidth)
-
-	// Update viewport content
-	m.viewport.SetContent(m.content.String())
-
+	m.updateViewportDimensions()
 	return m
 }
 
@@ -298,6 +311,7 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	m.prompt = msg.Prompt
 	m.followMode = true
 	m.search.Clear()
+	m.updateViewportDimensions()
 
 	// Spawn new claude process
 	proc, err := claudepkg.Start(msg.Prompt, nil)

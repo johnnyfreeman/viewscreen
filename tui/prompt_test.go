@@ -397,3 +397,33 @@ func TestModelPrompt(t *testing.T) {
 		}
 	})
 }
+
+func TestPromptViewportHeight(t *testing.T) {
+	t.Run("opening prompt editor resizes viewport immediately", func(t *testing.T) {
+		m := NewModel()
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
+		m.stdinDone = true
+		heightWithout := m.viewport.Height()
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})
+
+		if heightWith := m.viewport.Height(); heightWith != heightWithout-1 {
+			t.Errorf("viewport height after e = %d, want %d", heightWith, heightWithout-1)
+		}
+	})
+
+	t.Run("closing prompt editor restores viewport height immediately", func(t *testing.T) {
+		m := NewModel()
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
+		m.stdinDone = true
+		heightWithout := m.viewport.Height()
+
+		m.promptEditor.Enter("edit me")
+		m.updateViewportDimensions()
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+		if heightAfterClose := m.viewport.Height(); heightAfterClose != heightWithout {
+			t.Errorf("viewport height after closing prompt editor = %d, want %d", heightAfterClose, heightWithout)
+		}
+	})
+}

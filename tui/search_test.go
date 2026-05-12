@@ -431,4 +431,32 @@ func TestSearchViewportHeight(t *testing.T) {
 			t.Errorf("viewport height with search = %d, want %d (one less than %d)", heightWith, heightWithout-1, heightWithout)
 		}
 	})
+
+	t.Run("opening search resizes viewport immediately", func(t *testing.T) {
+		m := NewModel()
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
+		heightWithout := m.viewport.Height()
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "/"})
+
+		if heightWith := m.viewport.Height(); heightWith != heightWithout-1 {
+			t.Errorf("viewport height after / = %d, want %d", heightWith, heightWithout-1)
+		}
+	})
+
+	t.Run("clearing active search restores viewport height immediately", func(t *testing.T) {
+		m := NewModel()
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
+		heightWithout := m.viewport.Height()
+
+		m.search.Enter()
+		m.search.Query = "needle"
+		m.updateViewportDimensions()
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+		if heightAfterClear := m.viewport.Height(); heightAfterClear != heightWithout {
+			t.Errorf("viewport height after clearing search = %d, want %d", heightAfterClear, heightWithout)
+		}
+	})
 }
