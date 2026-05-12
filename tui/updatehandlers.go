@@ -264,11 +264,15 @@ func (m Model) handleRawLine(msg RawLineMsg) (Model, tea.Cmd) {
 	// Parse the line and dispatch appropriate message
 	parsedMsg := ParseEvent(msg.Line)
 	if parsedMsg != nil {
-		// Process the parsed event immediately
-		var cmd tea.Cmd
-		m, cmd = m.processEvent(parsedMsg)
-		if cmd != nil {
-			cmds = append(cmds, cmd)
+		if parseErr, ok := parsedMsg.(events.ParseError); ok {
+			m = m.handleParseError(parseErr)
+		} else {
+			// Process the parsed event immediately
+			var cmd tea.Cmd
+			m, cmd = m.processEvent(parsedMsg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		}
 	}
 

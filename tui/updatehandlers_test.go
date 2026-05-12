@@ -7,9 +7,14 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/johnnyfreeman/viewscreen/assistant"
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
+
+type noopStyleInitializer struct{}
+
+func (noopStyleInitializer) Init(bool) {}
 
 func newTestModel() Model {
 	m := NewModel()
@@ -487,6 +492,28 @@ func TestHandleParseError(t *testing.T) {
 			t.Error("expected no content change in non-verbose mode")
 		}
 	})
+}
+
+func TestHandleRawLineShowsParseErrorsInVerboseMode(t *testing.T) {
+	if _, err := config.Parse(
+		config.WithArgs([]string{"-v"}),
+		config.WithStyleInitializer(noopStyleInitializer{}),
+	); err != nil {
+		t.Fatalf("failed to enable verbose config: %v", err)
+	}
+	defer func() {
+		_, _ = config.Parse(
+			config.WithArgs(nil),
+			config.WithStyleInitializer(noopStyleInitializer{}),
+		)
+	}()
+
+	m := newTestModel()
+	m, _ = m.handleRawLine(RawLineMsg{Line: "not json"})
+
+	if got := m.content.String(); !strings.Contains(got, "Parse error: not json") {
+		t.Fatalf("content = %q, want verbose parse error", got)
+	}
 }
 
 func TestUpdateSearchMatchesOnNewContent(t *testing.T) {
