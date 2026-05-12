@@ -242,9 +242,7 @@ func (m Model) handleSearchKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	default:
 		// Type character into search query
 		if text := msg.Key().Text; text != "" {
-			for _, r := range text {
-				m.search.TypeRune(r)
-			}
+			m.search.TypeText(text)
 			m.search.UpdateMatches(m.content.String())
 			m.scrollToSearchMatch()
 		}

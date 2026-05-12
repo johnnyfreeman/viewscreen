@@ -8,6 +8,8 @@ import (
 	"github.com/johnnyfreeman/viewscreen/style"
 )
 
+var searchQueryLineBreakReplacer = strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ")
+
 // Search holds the state for the search feature.
 type Search struct {
 	Active       bool   // Whether search input is active
@@ -44,7 +46,15 @@ func (s *Search) Clear() {
 
 // TypeRune appends a rune to the query.
 func (s *Search) TypeRune(r rune) {
+	if r == '\r' || r == '\n' {
+		r = ' '
+	}
 	s.Query += string(r)
+}
+
+// TypeText appends terminal text input to the query, keeping search one-line.
+func (s *Search) TypeText(text string) {
+	s.Query += normalizeSearchQueryText(text)
 }
 
 // Backspace removes the last character from the query.
@@ -65,7 +75,7 @@ func (s *Search) UpdateMatches(content string) {
 		return
 	}
 
-	query := strings.ToLower(s.Query)
+	query := strings.ToLower(normalizeSearchQueryText(s.Query))
 	lines := strings.Split(content, "\n")
 
 	for i, line := range lines {
@@ -162,14 +172,19 @@ func RenderSearchBar(s Search, width int) string {
 		return fitBarLine(prefix+cursor+status, width)
 	}
 
-	query := leftmostCells(s.Query, queryWidth)
+	displayQuery := normalizeSearchQueryText(s.Query)
+	query := leftmostCells(displayQuery, queryWidth)
 	if s.Active {
-		query = rightmostCells(s.Query, queryWidth)
+		query = rightmostCells(displayQuery, queryWidth)
 	} else {
 		query = style.MutedText(query)
 	}
 
 	return fitBarLine(prefix+query+cursor+status, width)
+}
+
+func normalizeSearchQueryText(s string) string {
+	return searchQueryLineBreakReplacer.Replace(s)
 }
 
 func renderSearchStatus(s Search) string {

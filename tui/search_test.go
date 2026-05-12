@@ -88,6 +88,34 @@ func TestSearchBackspaceRemovesWholeUTF8Rune(t *testing.T) {
 	}
 }
 
+func TestSearchInputNormalizesLineBreaks(t *testing.T) {
+	t.Run("type rune", func(t *testing.T) {
+		s := NewSearch()
+		s.Enter()
+
+		s.TypeRune('a')
+		s.TypeRune('\n')
+		s.TypeRune('b')
+		s.TypeRune('\r')
+		s.TypeRune('c')
+
+		if s.Query != "a b c" {
+			t.Errorf("query = %q, want %q", s.Query, "a b c")
+		}
+	})
+
+	t.Run("type text", func(t *testing.T) {
+		s := NewSearch()
+		s.Enter()
+
+		s.TypeText("first\r\nsecond\nthird\rfourth")
+
+		if s.Query != "first second third fourth" {
+			t.Errorf("query = %q, want %q", s.Query, "first second third fourth")
+		}
+	})
+}
+
 func TestSearchUpdateMatches(t *testing.T) {
 	t.Run("basic matching", func(t *testing.T) {
 		s := NewSearch()
@@ -158,6 +186,21 @@ func TestSearchUpdateMatches(t *testing.T) {
 
 		if s.MatchCount() != 1 {
 			t.Errorf("MatchCount() = %d, want 1 (should match through ANSI)", s.MatchCount())
+		}
+	})
+
+	t.Run("normalizes line breaks in query before matching", func(t *testing.T) {
+		s := NewSearch()
+		s.Enter()
+		s.Query = "hello\nworld"
+
+		s.UpdateMatches("hello world\nhello there")
+
+		if s.MatchCount() != 1 {
+			t.Errorf("MatchCount() = %d, want 1", s.MatchCount())
+		}
+		if s.CurrentLine() != 0 {
+			t.Errorf("CurrentLine() = %d, want 0", s.CurrentLine())
 		}
 	})
 }
@@ -347,6 +390,28 @@ func TestRenderSearchBar(t *testing.T) {
 			t.Errorf("expected match status in %q", plain)
 		}
 	})
+
+	t.Run("renders multiline queries on one terminal row", func(t *testing.T) {
+		s := NewSearch()
+		s.Enter()
+		s.Query = "first line\nsecond line"
+
+		bar := RenderSearchBar(s, 80)
+		plain := ansi.Strip(bar)
+
+		if strings.Contains(plain, "\n") {
+			t.Errorf("expected search bar to stay on one line, got %q", plain)
+		}
+		if !strings.Contains(plain, "first line second line") {
+			t.Errorf("expected newline to render as a space, got %q", plain)
+		}
+		if width := ansi.StringWidth(bar); width != 80 {
+			t.Errorf("display width = %d, want 80", width)
+		}
+		if s.Query != "first line\nsecond line" {
+			t.Errorf("search query changed to %q", s.Query)
+		}
+	})
 }
 
 func TestItoa(t *testing.T) {
@@ -412,6 +477,17 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: '界', Text: "界"})
 		if m.search.Query != "界" {
 			t.Errorf("search query = %q, want %q", m.search.Query, "界")
+		}
+	})
+
+	t.Run("pasted multiline text stays a single-line query", func(t *testing.T) {
+		m := newTestModel()
+		m.search.Enter()
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "foo\r\nbar\nbaz"})
+
+		if m.search.Query != "foo bar baz" {
+			t.Errorf("search query = %q, want %q", m.search.Query, "foo bar baz")
 		}
 	})
 
