@@ -480,10 +480,15 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 
 	t.Run("ctrl+c quits from search mode", func(t *testing.T) {
 		m := newTestModel()
+		proc := &fakeClaudeProcess{}
+		m.claudeProcess = proc
 		m.search.Enter()
 		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected quit command on ctrl+c in search mode")
+		}
+		if proc.killCount != 1 {
+			t.Errorf("Kill called %d times, want 1", proc.killCount)
 		}
 	})
 

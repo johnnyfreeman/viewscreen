@@ -38,12 +38,18 @@ type Model struct {
 	processor         *events.EventProcessor
 	search            Search
 	promptEditor      PromptEditor
-	followMode        bool               // auto-scroll to bottom on new content
-	autoExit          bool               // --auto-exit flag enabled
-	autoExitRemaining int                // seconds left in countdown, 0 = inactive
-	claudeProcess     *claudepkg.Process // non-nil when we spawned claude
-	prompt            string             // the prompt used to spawn claude
-	inputReader       io.Reader          // where to read stream-json lines (defaults to os.Stdin)
+	followMode        bool                 // auto-scroll to bottom on new content
+	autoExit          bool                 // --auto-exit flag enabled
+	autoExitRemaining int                  // seconds left in countdown, 0 = inactive
+	claudeProcess     managedClaudeProcess // non-nil when we spawned claude
+	prompt            string               // the prompt used to spawn claude
+	inputReader       io.Reader            // where to read stream-json lines (defaults to os.Stdin)
+}
+
+type managedClaudeProcess interface {
+	Stdout() io.ReadCloser
+	Wait() error
+	Kill() error
 }
 
 // ModelOption is a functional option for configuring the Model.
@@ -254,6 +260,18 @@ func (m Model) scrollPosition() ScrollPosition {
 	}
 }
 
+func (m *Model) stopClaudeProcessIfRunning() {
+	if m.stdinDone || m.claudeProcess == nil {
+		return
+	}
+	_ = m.claudeProcess.Kill()
+}
+
+func (m Model) quitCommand() (Model, tea.Cmd) {
+	m.stopClaudeProcessIfRunning()
+	return m, tea.Quit
+}
+
 // renderLayout composes the main content area and sidebar/header
 func (m Model) renderLayout() string {
 	// Help modal overlays both layout modes
@@ -369,16 +387,23 @@ func RunWithPrompt(prompt string) (string, error) {
 
 	finalModel, err := p.Run()
 	if err != nil {
-		proc.Kill()
+		_ = proc.Kill()
+		_ = proc.Wait()
 		return "", err
 	}
 
-	// Wait for the subprocess to finish
-	proc.Wait()
-
 	if m, ok := finalModel.(Model); ok {
+		// If the user quit before Claude closed stdout, terminate it so the TUI
+		// exits immediately instead of waiting for the generation to finish.
+		m.stopClaudeProcessIfRunning()
+		if m.claudeProcess != nil {
+			_ = m.claudeProcess.Wait()
+		} else {
+			_ = proc.Wait()
+		}
 		return m.content.String(), nil
 	}
+	_ = proc.Wait()
 	return "", nil
 }
 

@@ -402,11 +402,16 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 
 	t.Run("ctrl+c quits during editing", func(t *testing.T) {
 		m := newTestModel()
+		proc := &fakeClaudeProcess{}
+		m.claudeProcess = proc
 		m.promptEditor.Enter("test")
 
 		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 		if cmd == nil {
 			t.Error("expected quit command on ctrl+c during prompt editing")
+		}
+		if proc.killCount != 1 {
+			t.Errorf("Kill called %d times, want 1", proc.killCount)
 		}
 	})
 

@@ -47,13 +47,16 @@ func (p *Process) Stdout() io.ReadCloser {
 
 // Wait waits for the subprocess to exit.
 func (p *Process) Wait() error {
+	if p == nil || p.cmd == nil {
+		return nil
+	}
 	return p.cmd.Wait()
 }
 
 // Kill terminates the subprocess.
 func (p *Process) Kill() error {
-	if p.cmd.Process != nil {
-		return p.cmd.Process.Kill()
+	if p == nil || p.cmd == nil || p.cmd.Process == nil {
+		return nil
 	}
-	return nil
+	return p.cmd.Process.Kill()
 }

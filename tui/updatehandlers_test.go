@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -11,6 +12,21 @@ import (
 	"github.com/johnnyfreeman/viewscreen/events"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
+
+type fakeClaudeProcess struct {
+	killCount int
+	waitCount int
+}
+
+func (p *fakeClaudeProcess) Stdout() io.ReadCloser { return nil }
+func (p *fakeClaudeProcess) Wait() error {
+	p.waitCount++
+	return nil
+}
+func (p *fakeClaudeProcess) Kill() error {
+	p.killCount++
+	return nil
+}
 
 type noopStyleInitializer struct{}
 
@@ -44,6 +60,38 @@ func TestHandleKeyMsg(t *testing.T) {
 
 		if cmd == nil {
 			t.Error("expected quit command on ctrl+c")
+		}
+	})
+
+	t.Run("quit kills running spawned claude process", func(t *testing.T) {
+		proc := &fakeClaudeProcess{}
+		m := newTestModel()
+		m.claudeProcess = proc
+		m.stdinDone = false
+
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
+
+		if cmd == nil {
+			t.Error("expected quit command on q")
+		}
+		if proc.killCount != 1 {
+			t.Errorf("Kill called %d times, want 1", proc.killCount)
+		}
+	})
+
+	t.Run("quit does not kill completed spawned claude process", func(t *testing.T) {
+		proc := &fakeClaudeProcess{}
+		m := newTestModel()
+		m.claudeProcess = proc
+		m.stdinDone = true
+
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
+
+		if cmd == nil {
+			t.Error("expected quit command on q")
+		}
+		if proc.killCount != 0 {
+			t.Errorf("Kill called %d times, want 0", proc.killCount)
 		}
 	})
 

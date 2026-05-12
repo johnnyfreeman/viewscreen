@@ -31,9 +31,9 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.autoExitRemaining > 0 {
 		switch msg.String() {
 		case "q", "ctrl+c":
-			return m, tea.Quit
+			return m.quitCommand()
 		case "space", "enter":
-			return m, tea.Quit
+			return m.quitCommand()
 		default:
 			m.autoExitRemaining = 0
 			return m, nil
@@ -43,7 +43,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	// Keys that work regardless of modal state
 	switch msg.String() {
 	case "q", "ctrl+c":
-		return m, tea.Quit
+		return m.quitCommand()
 	case "?":
 		m.showHelpModal = !m.showHelpModal
 		return m, nil
@@ -161,7 +161,7 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "end", "ctrl+e":
 		m.promptEditor.CursorEnd()
 	case "ctrl+c":
-		return m, tea.Quit
+		return m.quitCommand()
 	default:
 		for _, r := range msg.Key().Text {
 			m.promptEditor.TypeRune(r)
@@ -186,7 +186,7 @@ func (m Model) handleSearchKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.search.UpdateMatches(m.content.String())
 		m.scrollToSearchMatch()
 	case "ctrl+c":
-		return m, tea.Quit
+		return m.quitCommand()
 	default:
 		// Type character into search query
 		if text := msg.Key().Text; text != "" {
