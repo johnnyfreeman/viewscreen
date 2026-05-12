@@ -599,17 +599,15 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 		}
 	})
 
-	t.Run("q quits from search mode", func(t *testing.T) {
+	t.Run("q types in search mode", func(t *testing.T) {
 		m := newTestModel()
-		proc := &fakeClaudeProcess{}
-		m.claudeProcess = proc
 		m.search.Enter()
-		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
-		if cmd == nil {
-			t.Error("expected quit command on q in search mode")
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
+		if cmd != nil {
+			t.Error("expected no quit command when search is active")
 		}
-		if proc.killCount != 1 {
-			t.Errorf("Kill called %d times, want 1", proc.killCount)
+		if m.search.Query != "q" {
+			t.Errorf("search query = %q, want q", m.search.Query)
 		}
 	})
 }

@@ -339,6 +339,34 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 		}
 	})
 
+	t.Run("uses provided initial dimensions before first resize message", func(t *testing.T) {
+		m := NewModel(WithInitialSize(132, 43))
+
+		if m.width != 132 {
+			t.Errorf("width = %d, want 132", m.width)
+		}
+		if m.height != 43 {
+			t.Errorf("height = %d, want 43", m.height)
+		}
+		if m.viewport.Width() != 132-sidebarWidth-3 {
+			t.Errorf("viewport width = %d, want %d", m.viewport.Width(), 132-sidebarWidth-3)
+		}
+		if m.viewport.Height() != 41 {
+			t.Errorf("viewport height = %d, want 41", m.viewport.Height())
+		}
+	})
+
+	t.Run("provided narrow initial dimensions select header layout", func(t *testing.T) {
+		m := NewModel(WithInitialSize(70, 30))
+
+		if m.layoutMode != LayoutHeader {
+			t.Errorf("layoutMode = %d, want LayoutHeader (%d)", m.layoutMode, LayoutHeader)
+		}
+		if m.viewport.Width() != 68 {
+			t.Errorf("viewport width = %d, want 68", m.viewport.Width())
+		}
+	})
+
 	t.Run("sets dimensions on size message", func(t *testing.T) {
 		m := NewModel()
 

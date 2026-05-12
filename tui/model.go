@@ -83,6 +83,21 @@ func WithPrompt(prompt string) ModelOption {
 	}
 }
 
+// WithInitialSize seeds the model with the terminal size known by the runtime.
+// Bubble Tea delivers its own resize message later, but the model's first render
+// happens before that message is processed.
+func WithInitialSize(width, height int) ModelOption {
+	return func(m *Model) {
+		if width > 0 {
+			m.width = width
+		}
+		if height > 0 {
+			m.height = height
+		}
+		m.updateLayoutMode()
+	}
+}
+
 // NewModel creates a new TUI model
 func NewModel(opts ...ModelOption) Model {
 	// Initialize spinner with Dot spinner and lipgloss styling.
@@ -117,6 +132,8 @@ func NewModel(opts ...ModelOption) Model {
 		opt(&m)
 	}
 
+	m.updateLayoutMode()
+
 	// Set prompt on state if provided
 	if m.prompt != "" {
 		m.state.Prompt = m.prompt
@@ -141,7 +158,6 @@ func NewModel(opts ...ModelOption) Model {
 // Init initializes the model
 func (m Model) Init() tea.Cmd {
 	return tea.Batch(
-		ResetTerminalMouseModes(),
 		m.spinner.Tick,
 		ReadStdinLine(m.scanner),
 	)
@@ -362,9 +378,11 @@ func (m Model) Prompt() string {
 func Run() (string, error) {
 	// Initialize styles (needed for renderers)
 	render.NewMarkdownRenderer(config.Get().NoColor(), 80)
+	resetTerminalModes(os.Stdout)
 
 	// AltScreen is set declaratively in View()
 	var opts []tea.ProgramOption
+	width, height := detectTerminalSize(os.Stdout)
 
 	// When stdin is not a TTY (e.g., piped input), we need to read keyboard
 	// input from /dev/tty instead. Otherwise bubbletea tries to read keyboard
@@ -377,7 +395,7 @@ func Run() (string, error) {
 		}
 	}
 
-	p := tea.NewProgram(NewModel(), opts...)
+	p := tea.NewProgram(NewModel(WithInitialSize(width, height)), opts...)
 
 	finalModel, err := p.Run()
 	if err != nil {
@@ -395,6 +413,7 @@ func Run() (string, error) {
 func RunWithPrompt(prompt string) (string, error) {
 	// Initialize styles (needed for renderers)
 	render.NewMarkdownRenderer(config.Get().NoColor(), 80)
+	resetTerminalModes(os.Stdout)
 
 	proc, err := claudepkg.Start(prompt, nil)
 	if err != nil {
@@ -403,6 +422,7 @@ func RunWithPrompt(prompt string) (string, error) {
 
 	// Keyboard input comes from /dev/tty since stdin is not available
 	var teaOpts []tea.ProgramOption
+	width, height := detectTerminalSize(os.Stdout)
 	tty, err := os.Open("/dev/tty")
 	if err == nil {
 		teaOpts = append(teaOpts, tea.WithInput(tty))
@@ -413,6 +433,7 @@ func RunWithPrompt(prompt string) (string, error) {
 		WithInputReader(proc.Stdout()),
 		WithClaudeProcess(proc),
 		WithPrompt(prompt),
+		WithInitialSize(width, height),
 	)
 
 	p := tea.NewProgram(model, teaOpts...)

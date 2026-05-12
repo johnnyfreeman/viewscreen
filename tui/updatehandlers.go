@@ -16,17 +16,20 @@ import (
 
 // handleKeyMsg processes keyboard input and returns the model and any command.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
-	if isCtrlCKey(msg) || (!m.promptEditor.Active && isPlainTextKey(msg, "q")) {
+	if isCtrlCKey(msg) {
 		return m.quitCommand()
+	}
+	if isEscKey(msg) {
+		return m.handleEscKey()
 	}
 
 	// During auto-exit countdown:
-	// - q/ctrl+c: quit immediately
+	// - q: quit immediately
 	// - space/enter: skip countdown and exit (continue the loop)
 	// - any other key: cancel countdown and browse
 	if m.autoExitRemaining > 0 {
 		switch {
-		case isEnterKey(msg), isSpaceKey(msg):
+		case isPlainTextKey(msg, "q"), isEnterKey(msg), isSpaceKey(msg):
 			return m.quitCommand()
 		default:
 			m.cancelAutoExit()
@@ -47,22 +50,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 	// Keys that work regardless of modal state
 	switch {
+	case isPlainTextKey(msg, "q"):
+		return m.quitCommand()
 	case isPlainTextKey(msg, "?"):
 		m.showHelpModal = !m.showHelpModal
 		return m, nil
 	case isPlainTextKey(msg, "d"):
 		if m.layoutMode == LayoutHeader && !m.showHelpModal {
 			m.showDetailsModal = !m.showDetailsModal
-		}
-		return m, nil
-	case isEscKey(msg):
-		if m.showHelpModal {
-			m.showHelpModal = false
-		} else if m.showDetailsModal {
-			m.showDetailsModal = false
-		} else if m.search.HasQuery() {
-			m.search.Clear()
-			m.updateViewportDimensions()
 		}
 		return m, nil
 	}
@@ -120,6 +115,22 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) handleEscKey() (Model, tea.Cmd) {
+	switch {
+	case m.promptEditor.Active:
+		m.promptEditor.Cancel(m.state.Prompt)
+		m.updateViewportDimensions()
+	case m.search.Active || m.search.HasQuery():
+		m.search.Clear()
+		m.updateViewportDimensions()
+	case m.showHelpModal:
+		m.showHelpModal = false
+	case m.showDetailsModal:
+		m.showDetailsModal = false
+	}
+	return m, nil
+}
+
 func isCtrlCKey(msg tea.KeyMsg) bool {
 	key := msg.Key()
 	return msg.String() == "ctrl+c" ||
@@ -141,7 +152,13 @@ func isSpaceKey(msg tea.KeyMsg) bool {
 
 func isPlainTextKey(msg tea.KeyMsg, text string) bool {
 	key := msg.Key()
-	return hasOnlyTextModifiers(key.Mod) && key.Text == text
+	if !hasOnlyTextModifiers(key.Mod) {
+		return false
+	}
+	if key.Text == text {
+		return true
+	}
+	return key.Text == "" && len(text) == 1 && key.Code == []rune(text)[0]
 }
 
 func keyInputText(msg tea.KeyMsg) string {
@@ -242,10 +259,6 @@ func (m Model) canEditPrompt() bool {
 // handlePromptEditorKeyMsg processes keyboard input while prompt editing is active.
 func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch {
-	case isEscKey(msg):
-		// Cancel editing, restore original prompt
-		m.promptEditor.Cancel(m.state.Prompt)
-		m.updateViewportDimensions()
 	case isEnterKey(msg):
 		// Confirm the edited prompt
 		m.state.Prompt = m.promptEditor.Value
@@ -280,10 +293,6 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 // handleSearchKeyMsg processes keyboard input while search mode is active.
 func (m Model) handleSearchKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch {
-	case isEscKey(msg):
-		// Cancel search, clear query
-		m.search.Clear()
-		m.updateViewportDimensions()
 	case isEnterKey(msg):
 		// Confirm search, exit input mode but keep query
 		m.search.Exit()
@@ -320,6 +329,8 @@ func (m *Model) updateViewportDimensions() {
 		return
 	}
 
+	m.updateLayoutMode()
+
 	var contentWidth, contentHeight int
 	switch m.layoutMode {
 	case LayoutHeader:
@@ -351,17 +362,18 @@ func (m *Model) updateViewportDimensions() {
 	}
 }
 
+func (m *Model) updateLayoutMode() {
+	if m.width < breakpointWidth {
+		m.layoutMode = LayoutHeader
+		return
+	}
+	m.layoutMode = LayoutSidebar
+}
+
 // handleWindowSizeMsg processes terminal resize events.
 func (m Model) handleWindowSizeMsg(msg tea.WindowSizeMsg) Model {
 	m.width = msg.Width
 	m.height = msg.Height
-
-	// Determine layout mode based on terminal width
-	if m.width < breakpointWidth {
-		m.layoutMode = LayoutHeader
-	} else {
-		m.layoutMode = LayoutSidebar
-	}
 
 	m.updateViewportDimensions()
 	return m

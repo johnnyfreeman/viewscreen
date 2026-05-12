@@ -436,17 +436,16 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 		}
 	})
 
-	t.Run("prompt editor takes priority over other keys", func(t *testing.T) {
+	t.Run("prompt editor accepts q as text", func(t *testing.T) {
 		m := newTestModel()
 		m.promptEditor.Enter("test")
 
-		// 'q' should type 'q', not quit
 		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
 		if cmd != nil {
 			t.Error("expected no quit command when prompt editor is active")
 		}
 		if !strings.Contains(m.promptEditor.Value, "q") {
-			t.Error("expected 'q' to be typed into prompt editor")
+			t.Error("expected q to be typed into prompt editor")
 		}
 	})
 
