@@ -551,6 +551,33 @@ func TestRenderHelpModal(t *testing.T) {
 			t.Error("expected non-empty output from RenderHelpModal")
 		}
 	})
+
+	t.Run("contextual sidebar mode omits inactive details key", func(t *testing.T) {
+		output := RenderContextualHelpModal(100, 40, styles, false, LayoutSidebar, false)
+
+		if strings.Contains(output, "Toggle details") {
+			t.Error("expected sidebar help to omit details binding")
+		}
+	})
+
+	t.Run("contextual header mode includes details key", func(t *testing.T) {
+		output := RenderContextualHelpModal(100, 40, styles, false, LayoutHeader, false)
+
+		if !strings.Contains(output, "Toggle details") {
+			t.Error("expected header help to include details binding")
+		}
+	})
+
+	t.Run("auto-exit bindings match countdown key behavior", func(t *testing.T) {
+		output := RenderContextualHelpModal(100, 40, styles, true, LayoutSidebar, false)
+
+		if !strings.Contains(output, "Exit now") {
+			t.Error("expected auto-exit help to explain space exits immediately")
+		}
+		if !strings.Contains(output, "Stay open") {
+			t.Error("expected auto-exit help to explain other keys keep the TUI open")
+		}
+	})
 }
 
 func TestRenderHeader_HelpHint(t *testing.T) {
@@ -1053,6 +1080,37 @@ func TestSidebarRenderer_RenderFollowIndicator(t *testing.T) {
 		}
 		if !strings.Contains(output, "[f]") {
 			t.Error("expected '[f]' hint in output when follow mode is off")
+		}
+	})
+}
+
+func TestSidebarRenderer_RenderAutoExitStatus(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("hidden while stream is active", func(t *testing.T) {
+		output := r.RenderAutoExitStatus(false, 0)
+		if output != "" {
+			t.Errorf("expected empty status while stream is active, got %q", output)
+		}
+	})
+
+	t.Run("countdown explains exit and cancel keys", func(t *testing.T) {
+		output := r.RenderAutoExitStatus(true, 3)
+		if !strings.Contains(output, "Exiting in 3s") {
+			t.Errorf("expected countdown in output, got %q", output)
+		}
+		if !strings.Contains(output, "space/enter exits") {
+			t.Errorf("expected immediate-exit hint in output, got %q", output)
+		}
+		if !strings.Contains(output, "other key stays") {
+			t.Errorf("expected cancel hint in output, got %q", output)
+		}
+	})
+
+	t.Run("stream complete without countdown", func(t *testing.T) {
+		output := r.RenderAutoExitStatus(true, 0)
+		if !strings.Contains(output, "Stream complete") {
+			t.Errorf("expected stream complete status, got %q", output)
 		}
 	})
 }

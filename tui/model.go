@@ -22,25 +22,25 @@ import (
 
 // Model is the main Bubbletea model for the TUI
 type Model struct {
-	width            int
-	height           int
-	viewport         viewport.Model
-	spinner          spinner.Model
-	state            *state.State
-	content          *strings.Builder // pointer to avoid copy issues
-	stdinDone        bool
-	scanner          *bufio.Scanner
-	sidebarStyles    SidebarStyles
-	headerStyles     HeaderStyles
-	layoutMode       LayoutMode
-	showDetailsModal bool
-	showHelpModal    bool
-	processor        *events.EventProcessor
+	width             int
+	height            int
+	viewport          viewport.Model
+	spinner           spinner.Model
+	state             *state.State
+	content           *strings.Builder // pointer to avoid copy issues
+	stdinDone         bool
+	scanner           *bufio.Scanner
+	sidebarStyles     SidebarStyles
+	headerStyles      HeaderStyles
+	layoutMode        LayoutMode
+	showDetailsModal  bool
+	showHelpModal     bool
+	processor         *events.EventProcessor
 	search            Search
 	promptEditor      PromptEditor
-	followMode        bool // auto-scroll to bottom on new content
-	autoExit          bool // --auto-exit flag enabled
-	autoExitRemaining int  // seconds left in countdown, 0 = inactive
+	followMode        bool               // auto-scroll to bottom on new content
+	autoExit          bool               // --auto-exit flag enabled
+	autoExitRemaining int                // seconds left in countdown, 0 = inactive
 	claudeProcess     *claudepkg.Process // non-nil when we spawned claude
 	prompt            string             // the prompt used to spawn claude
 	inputReader       io.Reader          // where to read stream-json lines (defaults to os.Stdin)
@@ -248,9 +248,9 @@ func (m *Model) updateSearchMatches() {
 // scrollPosition returns the current scroll position from the viewport.
 func (m Model) scrollPosition() ScrollPosition {
 	return ScrollPosition{
-		AtTop:   m.viewport.AtTop(),
+		AtTop:    m.viewport.AtTop(),
 		AtBottom: m.viewport.AtBottom(),
-		Percent: m.viewport.ScrollPercent(),
+		Percent:  m.viewport.ScrollPercent(),
 	}
 }
 
@@ -258,7 +258,7 @@ func (m Model) scrollPosition() ScrollPosition {
 func (m Model) renderLayout() string {
 	// Help modal overlays both layout modes
 	if m.showHelpModal {
-		return RenderHelpModal(m.width, m.height, m.headerStyles, m.autoExitRemaining > 0, m.claudeProcess != nil)
+		return RenderContextualHelpModal(m.width, m.height, m.headerStyles, m.autoExitRemaining > 0, m.layoutMode, m.claudeProcess != nil)
 	}
 
 	// Render search bar and prompt bar if active

@@ -235,7 +235,8 @@ func (r *SidebarRenderer) RenderAutoExitStatus(stdinDone bool, autoExitRemaining
 	}
 	if autoExitRemaining > 0 {
 		return style.MutedText(fmt.Sprintf("Exiting in %ds...", autoExitRemaining)) + "\n" +
-			style.MutedText("space to skip") + "\n\n"
+			style.MutedText("space/enter exits") + "\n" +
+			style.MutedText("other key stays") + "\n\n"
 	}
 	return style.MutedText("Stream complete") + "\n\n"
 }
@@ -417,6 +418,19 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 // RenderHelpModal renders the keybindings help modal overlay.
 // When subprocessMode is true, "e" shows "Edit prompt & re-run" instead of "Edit prompt".
 func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, subprocessMode ...bool) string {
+	subprocess := false
+	if len(subprocessMode) > 0 {
+		subprocess = subprocessMode[0]
+	}
+	return renderHelpModal(width, height, styles, autoExitActive, true, subprocess)
+}
+
+// RenderContextualHelpModal renders help for the active layout mode.
+func RenderContextualHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, layoutMode LayoutMode, subprocessMode bool) string {
+	return renderHelpModal(width, height, styles, autoExitActive, layoutMode == LayoutHeader, subprocessMode)
+}
+
+func renderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, showDetailsBinding bool, subprocessMode bool) string {
 	var sb strings.Builder
 
 	// Title
@@ -425,7 +439,7 @@ func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool
 
 	// Determine prompt edit description
 	editPromptDesc := "Edit prompt"
-	if len(subprocessMode) > 0 && subprocessMode[0] {
+	if subprocessMode {
 		editPromptDesc = "Edit prompt & re-run"
 	}
 
@@ -443,17 +457,21 @@ func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool
 		{"/", "Search"},
 		{"n / N", "Next / prev match"},
 		{"f", "Toggle follow mode"},
-		{"d", "Toggle details"},
-		{"?", "Toggle help"},
-		{"e", editPromptDesc},
-		{"q", "Quit"},
 	}
+	if showDetailsBinding {
+		bindings = append(bindings, struct{ key, desc string }{"d", "Toggle details"})
+	}
+	bindings = append(bindings,
+		struct{ key, desc string }{"?", "Toggle help"},
+		struct{ key, desc string }{"e", editPromptDesc},
+		struct{ key, desc string }{"q", "Quit"},
+	)
 
 	if autoExitActive {
 		// Insert before the last entry (quit)
 		bindings = append(bindings[:len(bindings)-1],
-			struct{ key, desc string }{"space", "Skip countdown"},
-			struct{ key, desc string }{"any key", "Cancel and browse"},
+			struct{ key, desc string }{"space/enter", "Exit now"},
+			struct{ key, desc string }{"other key", "Stay open"},
 			bindings[len(bindings)-1],
 		)
 	}
