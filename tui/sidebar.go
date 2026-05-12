@@ -242,9 +242,9 @@ func (r *SidebarRenderer) RenderAutoExitStatus(stdinDone bool, autoExitRemaining
 
 // ScrollPosition holds the viewport scroll state for display.
 type ScrollPosition struct {
-	AtTop   bool
+	AtTop    bool
 	AtBottom bool
-	Percent float64 // 0.0 to 1.0
+	Percent  float64 // 0.0 to 1.0
 }
 
 // FormatScrollPosition returns a compact scroll position string.
@@ -403,7 +403,7 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 	trailing = append(trailing, keyHint)
 	trailingStr := strings.Join(trailing, " ")
 
-	return fmt.Sprintf("%s %s %s %s %s %s %s",
+	header := fmt.Sprintf("%s %s %s %s %s %s %s",
 		style.MutedText(leftDeco),
 		title,
 		style.MutedText(midDeco),
@@ -411,6 +411,7 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 		style.MutedText(midDeco),
 		trailingStr,
 		style.MutedText(rightDeco))
+	return fitBarLine(header, width)
 }
 
 // RenderHelpModal renders the keybindings help modal overlay.

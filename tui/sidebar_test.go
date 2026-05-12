@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
 )
@@ -450,6 +451,23 @@ func TestRenderHeader(t *testing.T) {
 		// Should contain truncation indicator
 		if !strings.Contains(output, "..") {
 			t.Error("expected truncation indicator for long model name")
+		}
+	})
+
+	t.Run("fits narrow terminal width", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "test-model"
+		s.TurnCount = 3
+		s.TotalCost = 0.05
+		width := 42
+
+		output := RenderHeader(s, width, true, ScrollPosition{AtTop: true}, false, 0)
+
+		if strings.Contains(output, "\n") {
+			t.Errorf("expected header to stay on one line, got %q", output)
+		}
+		if got := ansi.StringWidth(output); got != width {
+			t.Errorf("header width = %d, want %d; output=%q", got, width, output)
 		}
 	})
 }
