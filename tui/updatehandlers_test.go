@@ -597,6 +597,90 @@ func TestAutoExitCancelOnKeyPress(t *testing.T) {
 	})
 }
 
+func TestMouseWheelScrolling(t *testing.T) {
+	t.Run("wheel up scrolls and pauses follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.followMode = true
+
+		initialY := m.viewport.YOffset()
+		updated, cmd := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+		m = updated.(Model)
+
+		if cmd != nil {
+			t.Error("expected no command after mouse wheel scroll")
+		}
+		if m.viewport.YOffset() >= initialY {
+			t.Error("expected mouse wheel up to scroll viewport up")
+		}
+		if m.followMode {
+			t.Error("expected mouse wheel up to pause follow mode")
+		}
+	})
+
+	t.Run("wheel down to bottom resumes follow mode", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.viewport.ScrollUp(1)
+		m.followMode = false
+
+		updated, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+		m = updated.(Model)
+
+		if !m.viewport.AtBottom() {
+			t.Fatal("expected mouse wheel down to reach bottom")
+		}
+		if !m.followMode {
+			t.Error("expected follow mode to resume after wheel down reaches bottom")
+		}
+	})
+
+	t.Run("wheel down while already paused at bottom stays paused", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.followMode = false
+
+		updated, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelDown})
+		m = updated.(Model)
+
+		if m.followMode {
+			t.Error("expected follow mode to stay paused when wheeling down at bottom")
+		}
+	})
+
+	t.Run("wheel cancels auto-exit countdown", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+
+		updated, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+		m = updated.(Model)
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 after mouse wheel, got %d", m.autoExitRemaining)
+		}
+	})
+
+	t.Run("wheel does not scroll hidden content behind help modal", func(t *testing.T) {
+		m := newTestModel()
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+		m.showHelpModal = true
+
+		initialY := m.viewport.YOffset()
+		updated, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+		m = updated.(Model)
+
+		if m.viewport.YOffset() != initialY {
+			t.Errorf("viewport YOffset = %d, want %d", m.viewport.YOffset(), initialY)
+		}
+	})
+}
+
 func TestHandleParseError(t *testing.T) {
 	t.Run("no-op in non-verbose mode", func(t *testing.T) {
 		m := newTestModel()

@@ -151,6 +151,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m = m.handleWindowSizeMsg(msg)
 
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheelMsg(msg)
+
 	case spinner.TickMsg:
 		m, cmd = m.handleSpinnerTick(msg)
 		if cmd != nil {

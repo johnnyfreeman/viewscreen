@@ -116,6 +116,32 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleMouseWheelMsg keeps mouse scrolling aligned with keyboard navigation.
+func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
+	if m.showDetailsModal || m.showHelpModal {
+		return m, nil
+	}
+
+	if m.autoExitRemaining > 0 {
+		m.autoExitRemaining = 0
+	}
+
+	verticalWheel := !msg.Mod.Contains(tea.ModShift) &&
+		(msg.Button == tea.MouseWheelUp || msg.Button == tea.MouseWheelDown)
+	wasAtBottom := m.viewport.AtBottom()
+	if verticalWheel && msg.Button == tea.MouseWheelUp {
+		m.followMode = false
+	}
+
+	var cmd tea.Cmd
+	m.viewport, cmd = m.viewport.Update(msg)
+	if verticalWheel && msg.Button == tea.MouseWheelDown {
+		m.resumeFollowModeAtBottom(wasAtBottom)
+	}
+
+	return m, cmd
+}
+
 // resumeFollowModeAtBottom keeps manual browsing from getting stuck in a
 // confusing "paused at bottom" state after downward navigation reaches bottom.
 func (m *Model) resumeFollowModeAtBottom(wasAtBottom bool) {
