@@ -49,7 +49,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.showHelpModal = !m.showHelpModal
 		return m, nil
 	case "d":
-		if m.layoutMode == LayoutHeader {
+		if m.layoutMode == LayoutHeader && !m.showHelpModal {
 			m.showDetailsModal = !m.showDetailsModal
 		}
 		return m, nil

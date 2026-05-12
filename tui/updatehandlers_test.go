@@ -180,6 +180,30 @@ func TestHandleKeyMsg(t *testing.T) {
 		}
 	})
 
+	t.Run("d does not toggle hidden details while help is open", func(t *testing.T) {
+		m := newTestModel()
+		m.layoutMode = LayoutHeader
+		m.showHelpModal = true
+		m.showDetailsModal = false
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "d"})
+		if m.showDetailsModal {
+			t.Error("expected details modal to remain hidden while help modal has focus")
+		}
+		if !m.showHelpModal {
+			t.Error("expected help modal to remain open")
+		}
+
+		m.showDetailsModal = true
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "d"})
+		if !m.showDetailsModal {
+			t.Error("expected existing details modal state to remain unchanged behind help")
+		}
+		if !m.showHelpModal {
+			t.Error("expected help modal to remain open")
+		}
+	})
+
 	t.Run("esc closes details modal", func(t *testing.T) {
 		m := newTestModel()
 		m.layoutMode = LayoutHeader
