@@ -41,6 +41,7 @@ type Model struct {
 	followMode        bool                 // auto-scroll to bottom on new content
 	autoExit          bool                 // --auto-exit flag enabled
 	autoExitRemaining int                  // seconds left in countdown, 0 = inactive
+	autoExitCanceled  bool                 // user interacted before auto-exit could start
 	streamErr         error                // non-nil when stdin ended because of a scanner/read error
 	claudeProcess     managedClaudeProcess // non-nil when we spawned claude
 	prompt            string               // the prompt used to spawn claude

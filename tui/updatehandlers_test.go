@@ -414,6 +414,38 @@ func TestHandleStdinClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("skips countdown after user scrolled before stdin closed", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = true
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "k"})
+		m, cmd := m.handleStdinClosed(nil)
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 after pre-close scroll, got %d", m.autoExitRemaining)
+		}
+		if cmd != nil {
+			t.Error("expected no tick command after pre-close scroll")
+		}
+	})
+
+	t.Run("skips countdown when search is already active", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = true
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "/"})
+		m, cmd := m.handleStdinClosed(nil)
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 while search is active, got %d", m.autoExitRemaining)
+		}
+		if cmd != nil {
+			t.Error("expected no tick command while search is active")
+		}
+	})
+
 	t.Run("no countdown when autoExit disabled", func(t *testing.T) {
 		m := newTestModel()
 		m.autoExit = false
@@ -662,6 +694,24 @@ func TestMouseWheelScrolling(t *testing.T) {
 
 		if m.autoExitRemaining != 0 {
 			t.Errorf("expected autoExitRemaining=0 after mouse wheel, got %d", m.autoExitRemaining)
+		}
+	})
+
+	t.Run("wheel before stdin closes prevents auto-exit countdown", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = true
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.viewport.GotoBottom()
+
+		updated, _ := m.Update(tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+		m = updated.(Model)
+		m, cmd := m.handleStdinClosed(nil)
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 after pre-close mouse wheel, got %d", m.autoExitRemaining)
+		}
+		if cmd != nil {
+			t.Error("expected no tick command after pre-close mouse wheel")
 		}
 	})
 

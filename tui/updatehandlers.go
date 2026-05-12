@@ -14,16 +14,6 @@ import (
 
 // handleKeyMsg processes keyboard input and returns the model and any command.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
-	// When prompt editor is active, capture all keys for prompt editing
-	if m.promptEditor.Active {
-		return m.handlePromptEditorKeyMsg(msg)
-	}
-
-	// When search input is active, capture all keys for the search query
-	if m.search.Active {
-		return m.handleSearchKeyMsg(msg)
-	}
-
 	// During auto-exit countdown:
 	// - q/ctrl+c: quit immediately
 	// - space/enter: skip countdown and exit (continue the loop)
@@ -35,8 +25,20 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		case "space", "enter":
 			return m.quitCommand()
 		default:
-			m.autoExitRemaining = 0
+			m.cancelAutoExit()
 		}
+	} else {
+		m.noteUserInteraction()
+	}
+
+	// When prompt editor is active, capture all keys for prompt editing
+	if m.promptEditor.Active {
+		return m.handlePromptEditorKeyMsg(msg)
+	}
+
+	// When search input is active, capture all keys for the search query
+	if m.search.Active {
+		return m.handleSearchKeyMsg(msg)
 	}
 
 	// Keys that work regardless of modal state
@@ -118,12 +120,14 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 
 // handleMouseWheelMsg keeps mouse scrolling aligned with keyboard navigation.
 func (m Model) handleMouseWheelMsg(msg tea.MouseWheelMsg) (Model, tea.Cmd) {
-	if m.showDetailsModal || m.showHelpModal {
-		return m, nil
+	if m.autoExitRemaining > 0 {
+		m.cancelAutoExit()
+	} else {
+		m.noteUserInteraction()
 	}
 
-	if m.autoExitRemaining > 0 {
-		m.autoExitRemaining = 0
+	if m.showDetailsModal || m.showHelpModal {
+		return m, nil
 	}
 
 	verticalWheel := !msg.Mod.Contains(tea.ModShift) &&
@@ -148,6 +152,29 @@ func (m *Model) resumeFollowModeAtBottom(wasAtBottom bool) {
 	if !wasAtBottom && m.viewport.AtBottom() {
 		m.followMode = true
 	}
+}
+
+// noteUserInteraction records pre-completion input so loop-friendly auto-exit
+// does not later close a TUI the user has started browsing.
+func (m *Model) noteUserInteraction() {
+	m.autoExitCanceled = true
+}
+
+func (m *Model) cancelAutoExit() {
+	m.autoExitRemaining = 0
+	m.autoExitCanceled = true
+}
+
+func (m Model) shouldStartAutoExitCountdown() bool {
+	if !m.autoExit || m.autoExitCanceled {
+		return false
+	}
+	return m.followMode &&
+		!m.search.Active &&
+		!m.search.HasQuery() &&
+		!m.promptEditor.Active &&
+		!m.showHelpModal &&
+		!m.showDetailsModal
 }
 
 // canEditPrompt reports whether the prompt editor can perform its advertised
@@ -341,7 +368,7 @@ func (m Model) handleStdinClosed(err error) (Model, tea.Cmd) {
 	if m.claudeProcess != nil {
 		return m, nil
 	}
-	if m.autoExit {
+	if m.shouldStartAutoExitCountdown() {
 		m.autoExitRemaining = 5
 		return m, AutoExitTick()
 	}
@@ -361,6 +388,7 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	m.stdinDone = false
 	m.streamErr = nil
 	m.autoExitRemaining = 0
+	m.autoExitCanceled = false
 	st := state.NewState()
 	st.Prompt = msg.Prompt
 	m.state = st
