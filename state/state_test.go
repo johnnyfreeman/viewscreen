@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -144,6 +145,56 @@ func TestUpdateFromSystemEvent_NonEmptyFieldsDoOverwrite(t *testing.T) {
 	if s.PermissionMode != "manual" {
 		t.Errorf("PermissionMode should be 'manual', got %q", s.PermissionMode)
 	}
+}
+
+func TestUpdateFromToolUseResult(t *testing.T) {
+	t.Run("ignores absent result", func(t *testing.T) {
+		s := NewState()
+		s.SetCurrentTool("Read", "file.txt")
+		s.Todos = []Todo{{Content: "keep", Status: "pending"}}
+
+		s.UpdateFromToolUseResult(nil)
+
+		if !s.ToolInProgress {
+			t.Error("expected current tool to remain active when no tool result exists")
+		}
+		if len(s.Todos) != 1 || s.Todos[0].Content != "keep" {
+			t.Errorf("Todos = %+v, want existing todos unchanged", s.Todos)
+		}
+	})
+
+	t.Run("clears current tool for non-todo result", func(t *testing.T) {
+		s := NewState()
+		s.SetCurrentTool("Read", "file.txt")
+
+		s.UpdateFromToolUseResult(json.RawMessage(`{"filePath":"file.txt"}`))
+
+		if s.ToolInProgress {
+			t.Error("expected current tool to clear after tool result")
+		}
+	})
+
+	t.Run("updates todo list when newTodos is present", func(t *testing.T) {
+		s := NewState()
+		s.Todos = []Todo{{Content: "old", Status: "pending"}}
+
+		s.UpdateFromToolUseResult(json.RawMessage(`{"newTodos":[{"content":"new","status":"in_progress"}]}`))
+
+		if len(s.Todos) != 1 || s.Todos[0].Content != "new" {
+			t.Errorf("Todos = %+v, want new todo list", s.Todos)
+		}
+	})
+
+	t.Run("clears todo list when newTodos is empty", func(t *testing.T) {
+		s := NewState()
+		s.Todos = []Todo{{Content: "old", Status: "pending"}}
+
+		s.UpdateFromToolUseResult(json.RawMessage(`{"newTodos":[]}`))
+
+		if len(s.Todos) != 0 {
+			t.Errorf("Todos = %+v, want empty list", s.Todos)
+		}
+	})
 }
 
 func TestNewState_HasStartTime(t *testing.T) {

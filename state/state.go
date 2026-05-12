@@ -24,41 +24,41 @@ type TodoResult struct {
 // State holds the centralized session state extracted from events
 type State struct {
 	// Session info from system event
-	Model             string
-	Version           string
-	CWD               string
-	ToolsCount        int
-	Agents            []string
-	PermissionMode    string
+	Model          string
+	Version        string
+	CWD            string
+	ToolsCount     int
+	Agents         []string
+	PermissionMode string
 
 	// Original prompt (if available)
-	Prompt            string
+	Prompt string
 
 	// Runtime tracking
-	TurnCount         int
-	TotalCost         float64
+	TurnCount int
+	TotalCost float64
 
 	// Todos from TodoWrite results
-	Todos             []Todo
+	Todos []Todo
 
 	// Current tool being executed (for spinner display)
-	CurrentTool       string
-	CurrentToolInput  string
-	ToolInProgress    bool
+	CurrentTool      string
+	CurrentToolInput string
+	ToolInProgress   bool
 
 	// Usage tracking
-	InputTokens       int
-	OutputTokens      int
-	CacheCreated      int
-	CacheRead         int
+	InputTokens  int
+	OutputTokens int
+	CacheCreated int
+	CacheRead    int
 
 	// Session timing
-	StartTime         time.Time
+	StartTime time.Time
 
 	// Session status
-	IsError           bool
-	DurationMS        int
-	DurationAPIMS     int
+	IsError       bool
+	DurationMS    int
+	DurationAPIMS int
 }
 
 // NewState creates a new empty state
@@ -139,13 +139,25 @@ func (s *State) ClearCurrentTool() {
 
 // UpdateFromToolUseResult extracts state from a tool_use_result
 func (s *State) UpdateFromToolUseResult(toolUseResult json.RawMessage) {
+	if len(toolUseResult) == 0 {
+		return
+	}
+
 	// Clear tool in progress since we got a result
 	s.ClearCurrentTool()
 
-	// Try to parse as todo result
-	var todoResult TodoResult
-	if err := json.Unmarshal(toolUseResult, &todoResult); err == nil && len(todoResult.NewTodos) > 0 {
-		s.Todos = todoResult.NewTodos
+	// TodoWrite results own the full todo list. If newTodos is present as an
+	// empty array, it intentionally clears the sidebar list.
+	var raw struct {
+		NewTodos json.RawMessage `json:"newTodos"`
+	}
+	if err := json.Unmarshal(toolUseResult, &raw); err != nil || raw.NewTodos == nil {
+		return
+	}
+
+	var todos []Todo
+	if err := json.Unmarshal(raw.NewTodos, &todos); err == nil {
+		s.Todos = todos
 	}
 }
 

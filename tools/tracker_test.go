@@ -215,6 +215,52 @@ func TestToolUseTracker_ForEach(t *testing.T) {
 	}
 }
 
+func TestToolUseTracker_ForEachPreservesInsertionOrder(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	tracker.Add("tool-1", types.ContentBlock{ID: "tool-1", Name: "Bash"}, nil)
+	tracker.Add("tool-2", types.ContentBlock{ID: "tool-2", Name: "Read"}, nil)
+	tracker.Add("tool-3", types.ContentBlock{ID: "tool-3", Name: "Write"}, nil)
+
+	var got []string
+	tracker.ForEach(func(id string, pending PendingTool) {
+		got = append(got, id)
+	})
+
+	want := []string{"tool-1", "tool-2", "tool-3"}
+	if len(got) != len(want) {
+		t.Fatalf("ForEach visited %d tools, want %d: %v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ForEach order = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestToolUseTracker_AddExistingKeepsOrder(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	tracker.Add("tool-1", types.ContentBlock{ID: "tool-1", Name: "Bash"}, nil)
+	tracker.Add("tool-2", types.ContentBlock{ID: "tool-2", Name: "Read"}, nil)
+	tracker.Add("tool-1", types.ContentBlock{ID: "tool-1", Name: "Edit"}, nil)
+
+	var got []string
+	tracker.ForEach(func(id string, pending PendingTool) {
+		got = append(got, id+":"+pending.Block.Name)
+	})
+
+	want := []string{"tool-1:Edit", "tool-2:Read"}
+	if len(got) != len(want) {
+		t.Fatalf("ForEach visited %d tools, want %d: %v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("ForEach order = %v, want %v", got, want)
+		}
+	}
+}
+
 func TestToolUseTracker_Clear(t *testing.T) {
 	tracker := NewToolUseTracker()
 
@@ -348,6 +394,25 @@ func TestToolUseTracker_FlushAll_ReturnsAll(t *testing.T) {
 	}
 	if !ids["tool-1"] || !ids["tool-2"] {
 		t.Error("FlushAll() should return all pending tools")
+	}
+}
+
+func TestToolUseTracker_FlushAllPreservesInsertionOrder(t *testing.T) {
+	tracker := NewToolUseTracker()
+
+	tracker.Add("tool-1", types.ContentBlock{ID: "tool-1", Name: "Bash"}, nil)
+	tracker.Add("tool-2", types.ContentBlock{ID: "tool-2", Name: "Read"}, nil)
+	tracker.Add("tool-3", types.ContentBlock{ID: "tool-3", Name: "Write"}, nil)
+
+	orphaned := tracker.FlushAll()
+	want := []string{"tool-1", "tool-2", "tool-3"}
+	if len(orphaned) != len(want) {
+		t.Fatalf("FlushAll returned %d tools, want %d", len(orphaned), len(want))
+	}
+	for i := range want {
+		if orphaned[i].ID != want[i] {
+			t.Fatalf("FlushAll order = %+v, want %v", orphaned, want)
+		}
 	}
 }
 

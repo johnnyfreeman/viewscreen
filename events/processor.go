@@ -248,7 +248,11 @@ func (p *EventProcessor) processStream(event stream.Event) ProcessResult {
 
 	// Update state for tool progress tracking
 	if event.Event.Type == "content_block_start" && r.Stream.InToolUseBlock() {
-		p.state.SetCurrentTool(r.Stream.CurrentBlockType(), "")
+		toolName := r.Stream.CurrentToolName()
+		if toolName == "" {
+			toolName = r.Stream.CurrentBlockType()
+		}
+		p.state.SetCurrentTool(toolName, "")
 	}
 
 	return ProcessResult{Rendered: rendered}

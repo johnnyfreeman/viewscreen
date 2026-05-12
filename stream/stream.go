@@ -235,6 +235,11 @@ func (r *Renderer) CurrentBlockType() string {
 	return r.block.Type().String()
 }
 
+// CurrentToolName returns the active tool_use block's name, if any.
+func (r *Renderer) CurrentToolName() string {
+	return r.block.ToolName()
+}
+
 // SetWidth updates the word-wrap width of the markdown renderer.
 // This is called when the viewport resizes.
 func (r *Renderer) SetWidth(width int) {

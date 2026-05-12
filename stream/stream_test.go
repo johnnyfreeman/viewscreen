@@ -229,6 +229,9 @@ func TestRenderer_Render_ContentBlockStart_ToolUse(t *testing.T) {
 	if r.block.ToolName() != "Read" {
 		t.Errorf("expected toolName to be 'Read', got %s", r.block.ToolName())
 	}
+	if r.CurrentToolName() != "Read" {
+		t.Errorf("expected CurrentToolName to be 'Read', got %s", r.CurrentToolName())
+	}
 }
 
 func TestRenderer_Render_ContentBlockStart_InvalidJSON(t *testing.T) {

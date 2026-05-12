@@ -1,12 +1,14 @@
 package events
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/johnnyfreeman/viewscreen/assistant"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/state"
+	streampkg "github.com/johnnyfreeman/viewscreen/stream"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/system"
 	"github.com/johnnyfreeman/viewscreen/tools"
@@ -37,9 +39,9 @@ func TestEventProcessor_ProcessSystemEvent(t *testing.T) {
 
 	event := SystemEvent{
 		Data: system.Event{
-			Subtype:          "init",
-			CWD:              "/test/path",
-			Model:            "test-model",
+			Subtype:           "init",
+			CWD:               "/test/path",
+			Model:             "test-model",
 			ClaudeCodeVersion: "1.0.0",
 		},
 	}
@@ -287,16 +289,46 @@ func TestEventProcessor_ProcessUserEvent_MatchesTool(t *testing.T) {
 	}
 }
 
+func TestEventProcessor_ProcessStreamEvent_SetsCurrentToolName(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+	contentBlock, err := json.Marshal(types.ContentBlock{
+		Type: "tool_use",
+		ID:   "tool-stream",
+		Name: "Read",
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal content block: %v", err)
+	}
+
+	p.Process(StreamEvent{
+		Data: streampkg.Event{
+			Event: streampkg.EventData{
+				Type:         "content_block_start",
+				Index:        0,
+				ContentBlock: contentBlock,
+			},
+		},
+	})
+
+	if s.CurrentTool != "Read" {
+		t.Errorf("CurrentTool = %q, want Read", s.CurrentTool)
+	}
+	if !s.ToolInProgress {
+		t.Error("expected streaming tool to mark tool progress active")
+	}
+}
+
 func TestEventProcessor_ProcessResultEvent(t *testing.T) {
 	s := state.NewState()
 	p := NewEventProcessor(s)
 
 	event := ResultEvent{
 		Data: result.Event{
-			Subtype:    "success",
-			NumTurns:   5,
+			Subtype:      "success",
+			NumTurns:     5,
 			TotalCostUSD: 0.05,
-			DurationMS: 1000,
+			DurationMS:   1000,
 		},
 	}
 

@@ -35,6 +35,7 @@ type PendingTool struct {
 type ToolUseTracker struct {
 	pending        map[string]PendingTool
 	headerRendered map[string]bool // tracks tools whose headers were rendered early
+	order          []string
 }
 
 // NewToolUseTracker creates a new tracker.
@@ -42,11 +43,15 @@ func NewToolUseTracker() *ToolUseTracker {
 	return &ToolUseTracker{
 		pending:        make(map[string]PendingTool),
 		headerRendered: make(map[string]bool),
+		order:          make([]string, 0),
 	}
 }
 
 // Add registers a pending tool_use block.
 func (t *ToolUseTracker) Add(id string, block types.ContentBlock, parentToolUseID *string) {
+	if _, exists := t.pending[id]; !exists {
+		t.order = append(t.order, id)
+	}
 	t.pending[id] = PendingTool{
 		Block:           block,
 		ParentToolUseID: parentToolUseID,
@@ -61,8 +66,20 @@ func (t *ToolUseTracker) Get(id string) (PendingTool, bool) {
 
 // Remove deletes a pending tool by ID.
 func (t *ToolUseTracker) Remove(id string) {
+	if _, ok := t.pending[id]; ok {
+		t.removeFromOrder(id)
+	}
 	delete(t.pending, id)
 	delete(t.headerRendered, id)
+}
+
+func (t *ToolUseTracker) removeFromOrder(id string) {
+	for i, orderedID := range t.order {
+		if orderedID == id {
+			t.order = append(t.order[:i], t.order[i+1:]...)
+			return
+		}
+	}
 }
 
 // MarkHeaderRendered marks a tool's header as already rendered.
@@ -92,10 +109,12 @@ func (t *ToolUseTracker) Len() int {
 	return len(t.pending)
 }
 
-// ForEach iterates over all pending tools. The iteration order is not guaranteed.
+// ForEach iterates over pending tools in the order they were added.
 func (t *ToolUseTracker) ForEach(fn func(id string, pending PendingTool)) {
-	for id, p := range t.pending {
-		fn(id, p)
+	for _, id := range t.order {
+		if p, ok := t.pending[id]; ok {
+			fn(id, p)
+		}
 	}
 }
 
@@ -103,6 +122,7 @@ func (t *ToolUseTracker) ForEach(fn func(id string, pending PendingTool)) {
 func (t *ToolUseTracker) Clear() {
 	t.pending = make(map[string]PendingTool)
 	t.headerRendered = make(map[string]bool)
+	t.order = make([]string, 0)
 }
 
 // ResolvedTool contains the data for a tool that has been matched or orphaned.
