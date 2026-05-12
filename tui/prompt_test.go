@@ -228,6 +228,20 @@ func TestRenderPromptBar(t *testing.T) {
 			t.Errorf("display width = %d, want 20", width)
 		}
 	})
+
+	t.Run("caps long prompt to width and keeps cursor visible", func(t *testing.T) {
+		p := NewPromptEditor()
+		p.Enter(strings.Repeat("x", 80))
+
+		result := RenderPromptBar(p, 20)
+		stripped := ansi.Strip(result)
+		if width := ansi.StringWidth(result); width != 20 {
+			t.Errorf("display width = %d, want 20", width)
+		}
+		if !strings.Contains(stripped, "█") {
+			t.Errorf("expected visible cursor in %q", stripped)
+		}
+	})
 }
 
 func TestPromptEditorKeyHandling(t *testing.T) {

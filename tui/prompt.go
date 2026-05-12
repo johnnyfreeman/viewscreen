@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/x/ansi"
 	"github.com/johnnyfreeman/viewscreen/style"
 )
@@ -112,23 +110,52 @@ func RenderPromptBar(p PromptEditor, width int) string {
 	if !p.Active {
 		return ""
 	}
-
-	var sb strings.Builder
-	sb.WriteString(style.AccentText("prompt> "))
-
-	// Render text with cursor
-	before := p.Value[:p.cursor]
-	after := p.Value[p.cursor:]
-	sb.WriteString(before)
-	sb.WriteString(style.MutedText("█")) // cursor
-	sb.WriteString(after)
-
-	// Pad to full width to create a visual bar
-	line := sb.String()
-	visibleLen := ansi.StringWidth(line)
-	if visibleLen < width {
-		line += strings.Repeat(" ", width-visibleLen)
+	if width <= 0 {
+		return ""
 	}
 
-	return line
+	prefix := style.AccentText("prompt> ")
+	valueWidth := width - ansi.StringWidth(prefix)
+	if valueWidth <= 0 {
+		return fitBarLine(prefix, width)
+	}
+
+	before := p.Value[:p.cursor]
+	after := p.Value[p.cursor:]
+	cursor := style.MutedText("█")
+
+	return fitBarLine(prefix+renderPromptValue(before, cursor, after, valueWidth), width)
+}
+
+func renderPromptValue(before, cursor, after string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+
+	value := before + cursor + after
+	if ansi.StringWidth(value) <= width {
+		return value
+	}
+
+	cursorWidth := ansi.StringWidth(cursor)
+	if cursorWidth >= width {
+		return ansi.Truncate(cursor, width, "")
+	}
+
+	remaining := width - cursorWidth
+	beforeWidth := ansi.StringWidth(before)
+	afterWidth := ansi.StringWidth(after)
+
+	afterBudget := min(afterWidth, remaining/2)
+	beforeBudget := remaining - afterBudget
+	if beforeWidth < beforeBudget {
+		afterBudget += beforeBudget - beforeWidth
+		beforeBudget = beforeWidth
+	}
+	if afterWidth < afterBudget {
+		beforeBudget += afterBudget - afterWidth
+		afterBudget = afterWidth
+	}
+
+	return rightmostCells(before, beforeBudget) + cursor + leftmostCells(after, afterBudget)
 }

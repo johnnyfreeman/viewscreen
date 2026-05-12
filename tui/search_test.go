@@ -328,6 +328,25 @@ func TestRenderSearchBar(t *testing.T) {
 			t.Errorf("display width = %d, want 20", width)
 		}
 	})
+
+	t.Run("caps long active search to width and keeps cursor visible", func(t *testing.T) {
+		s := NewSearch()
+		s.Enter()
+		s.Query = strings.Repeat("x", 80)
+		s.UpdateMatches("no matching content")
+
+		bar := RenderSearchBar(s, 20)
+		plain := ansi.Strip(bar)
+		if width := ansi.StringWidth(bar); width != 20 {
+			t.Errorf("display width = %d, want 20", width)
+		}
+		if !strings.Contains(plain, "█") {
+			t.Errorf("expected visible cursor in %q", plain)
+		}
+		if !strings.Contains(plain, "no matches") {
+			t.Errorf("expected match status in %q", plain)
+		}
+	})
 }
 
 func TestItoa(t *testing.T) {

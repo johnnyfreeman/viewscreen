@@ -145,44 +145,42 @@ func RenderSearchBar(s Search, width int) string {
 	if !s.Active && !s.HasQuery() {
 		return ""
 	}
-
-	var sb strings.Builder
-
-	if s.Active {
-		sb.WriteString(style.AccentText("/"))
-		sb.WriteString(s.Query)
-		sb.WriteString(style.MutedText("█")) // cursor
-	} else {
-		sb.WriteString(style.MutedText("/"))
-		sb.WriteString(style.MutedText(s.Query))
+	if width <= 0 {
+		return ""
 	}
 
-	// Show match count
+	prefix := style.MutedText("/")
+	cursor := ""
+	if s.Active {
+		prefix = style.AccentText("/")
+		cursor = style.MutedText("█")
+	}
+
+	status := renderSearchStatus(s)
+	queryWidth := width - ansi.StringWidth(prefix) - ansi.StringWidth(cursor) - ansi.StringWidth(status)
+	if queryWidth < 0 {
+		return fitBarLine(prefix+cursor+status, width)
+	}
+
+	query := leftmostCells(s.Query, queryWidth)
+	if s.Active {
+		query = rightmostCells(s.Query, queryWidth)
+	} else {
+		query = style.MutedText(query)
+	}
+
+	return fitBarLine(prefix+query+cursor+status, width)
+}
+
+func renderSearchStatus(s Search) string {
 	if s.HasQuery() {
 		count := s.MatchCount()
 		if count == 0 {
-			sb.WriteString("  ")
-			sb.WriteString(style.ErrorText("no matches"))
-		} else {
-			sb.WriteString("  ")
-			sb.WriteString(style.MutedText(
-				strings.Join([]string{
-					itoa(s.CurrentMatchIndex()),
-					"/",
-					itoa(count),
-				}, ""),
-			))
+			return "  " + style.ErrorText("no matches")
 		}
+		return "  " + style.MutedText(itoa(s.CurrentMatchIndex())+"/"+itoa(count))
 	}
-
-	// Pad to full width to create a visual bar
-	line := sb.String()
-	visibleLen := ansi.StringWidth(line)
-	if visibleLen < width {
-		line += strings.Repeat(" ", width-visibleLen)
-	}
-
-	return line
+	return ""
 }
 
 // itoa is a simple int-to-string without importing strconv.
