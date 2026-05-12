@@ -515,6 +515,43 @@ func TestAutoExitCancelOnKeyPress(t *testing.T) {
 		}
 	})
 
+	t.Run("cancel key still performs normal action", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "?"})
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 after key press, got %d", m.autoExitRemaining)
+		}
+		if !m.showHelpModal {
+			t.Error("expected ? to open help after cancelling countdown")
+		}
+		if cmd != nil {
+			t.Error("expected no command after opening help")
+		}
+	})
+
+	t.Run("navigation key cancels countdown and scrolls", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+		m.viewport.SetContent(strings.Repeat("line\n", 100))
+		m.followMode = true
+
+		initialY := m.viewport.YOffset()
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "j"})
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 after key press, got %d", m.autoExitRemaining)
+		}
+		if m.viewport.YOffset() <= initialY {
+			t.Error("expected j to scroll after cancelling countdown")
+		}
+		if cmd != nil {
+			t.Error("expected no command after scrolling")
+		}
+	})
+
 	t.Run("q still quits during countdown", func(t *testing.T) {
 		m := newTestModel()
 		m.autoExitRemaining = 3

@@ -36,7 +36,6 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m.quitCommand()
 		default:
 			m.autoExitRemaining = 0
-			return m, nil
 		}
 	}
 
