@@ -1,9 +1,13 @@
 package tui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/x/ansi"
 	"github.com/johnnyfreeman/viewscreen/style"
 )
+
+var promptBarNewlineReplacer = strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ")
 
 // PromptEditor holds the state for the prompt editing feature.
 // When active, it captures keyboard input to let the user edit the prompt
@@ -120,11 +124,15 @@ func RenderPromptBar(p PromptEditor, width int) string {
 		return fitBarLine(prefix, width)
 	}
 
-	before := p.Value[:p.cursor]
-	after := p.Value[p.cursor:]
+	before := sanitizePromptBarSegment(p.Value[:p.cursor])
+	after := sanitizePromptBarSegment(p.Value[p.cursor:])
 	cursor := style.MutedText("█")
 
 	return fitBarLine(prefix+renderPromptValue(before, cursor, after, valueWidth), width)
+}
+
+func sanitizePromptBarSegment(s string) string {
+	return promptBarNewlineReplacer.Replace(s)
 }
 
 func renderPromptValue(before, cursor, after string, width int) string {

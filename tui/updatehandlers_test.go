@@ -329,7 +329,7 @@ func TestHandleSpinnerTick(t *testing.T) {
 	t.Run("updates spinner", func(t *testing.T) {
 		m := newTestModel()
 
-		m, cmd := m.handleSpinnerTick(spinner.TickMsg{})
+		_, cmd := m.handleSpinnerTick(spinner.TickMsg{})
 
 		if cmd == nil {
 			t.Error("expected spinner command after tick")

@@ -242,6 +242,26 @@ func TestRenderPromptBar(t *testing.T) {
 			t.Errorf("expected visible cursor in %q", stripped)
 		}
 	})
+
+	t.Run("renders multiline prompts on one terminal row", func(t *testing.T) {
+		p := NewPromptEditor()
+		p.Enter("first line\nsecond line")
+
+		result := RenderPromptBar(p, 80)
+		stripped := ansi.Strip(result)
+		if strings.Contains(stripped, "\n") {
+			t.Errorf("expected prompt bar to stay on one line, got %q", stripped)
+		}
+		if !strings.Contains(stripped, "first line second line") {
+			t.Errorf("expected newline to render as a space, got %q", stripped)
+		}
+		if width := ansi.StringWidth(result); width != 80 {
+			t.Errorf("display width = %d, want 80", width)
+		}
+		if p.Value != "first line\nsecond line" {
+			t.Errorf("prompt value changed to %q", p.Value)
+		}
+	})
 }
 
 func TestPromptEditorKeyHandling(t *testing.T) {
