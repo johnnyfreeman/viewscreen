@@ -549,6 +549,32 @@ func TestRenderDetailsModal(t *testing.T) {
 	}
 }
 
+func TestRenderDetailsModalFitsNarrowTerminal(t *testing.T) {
+	s := state.NewState()
+	s.Model = "claude-opus"
+	s.TurnCount = 5
+	s.TotalCost = 0.1234
+	s.Prompt = "Review this narrow terminal rendering behavior"
+	s.ToolInProgress = true
+	s.CurrentTool = "Read"
+	s.Todos = []state.Todo{
+		{Content: "Inspect modal sizing", Status: "in_progress"},
+	}
+
+	styles := NewHeaderStyles()
+	sp := newTestSpinner()
+	width := 30
+
+	output := RenderDetailsModal(s, sp, width, 40, styles, true, ScrollPosition{AtTop: true}, false, 0)
+
+	if got := maxRenderedLineWidth(output); got > width {
+		t.Fatalf("details modal line width = %d, want <= %d; output=%q", got, width, output)
+	}
+	if !strings.Contains(output, "Press d or Esc to close") {
+		t.Error("expected close hint in narrow details modal")
+	}
+}
+
 func TestRenderHelpModal(t *testing.T) {
 	styles := NewHeaderStyles()
 
@@ -633,6 +659,32 @@ func TestRenderHelpModal(t *testing.T) {
 			t.Error("expected auto-exit help to explain other keys keep the TUI open")
 		}
 	})
+
+	t.Run("fits narrow terminal width", func(t *testing.T) {
+		width := 30
+
+		output := RenderContextualHelpModal(width, 40, styles, true, LayoutHeader, true)
+
+		if got := maxRenderedLineWidth(output); got > width {
+			t.Fatalf("help modal line width = %d, want <= %d; output=%q", got, width, output)
+		}
+		if !strings.Contains(output, "Keybindings") {
+			t.Error("expected title in narrow help modal")
+		}
+		if !strings.Contains(output, "Stay open") {
+			t.Error("expected auto-exit stay-open hint in narrow help modal")
+		}
+	})
+}
+
+func maxRenderedLineWidth(s string) int {
+	maxWidth := 0
+	for _, line := range strings.Split(s, "\n") {
+		if width := ansi.StringWidth(line); width > maxWidth {
+			maxWidth = width
+		}
+	}
+	return maxWidth
 }
 
 func TestRenderHeader_HelpHint(t *testing.T) {

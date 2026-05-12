@@ -23,7 +23,7 @@ const (
 	sidebarWidth    = 30
 	breakpointWidth = 80 // below this, use header mode
 	headerHeight    = 1  // single line header
-	modalWidth      = 40 // width of details modal
+	modalWidth      = 40 // preferred width of details/help modals
 )
 
 // LayoutMode determines how the UI is rendered based on terminal width
@@ -510,7 +510,7 @@ func renderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool
 	sb.WriteString("\n")
 	sb.WriteString(style.MutedText("Press ? or Esc to close"))
 
-	modalContent := styles.Modal.Render(sb.String())
+	modalContent := modalStyleForWidth(styles, width).Render(sb.String())
 
 	// Center the modal
 	modalHeight := strings.Count(modalContent, "\n") + 1
@@ -575,7 +575,7 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	sb.WriteString("\n")
 	sb.WriteString(style.MutedText("Press d or Esc to close"))
 
-	modalContent := styles.Modal.Render(sb.String())
+	modalContent := modalStyleForWidth(styles, width).Render(sb.String())
 
 	// Center the modal
 	modalHeight := strings.Count(modalContent, "\n") + 1
@@ -604,4 +604,11 @@ func optionalStreamError(errs []error) error {
 		return nil
 	}
 	return errs[0]
+}
+
+func modalStyleForWidth(styles HeaderStyles, terminalWidth int) lipgloss.Style {
+	if terminalWidth <= 0 {
+		return styles.Modal
+	}
+	return styles.Modal.Width(min(modalWidth, terminalWidth))
 }
