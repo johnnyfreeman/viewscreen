@@ -71,6 +71,23 @@ func TestSearchBackspace(t *testing.T) {
 	}
 }
 
+func TestSearchBackspaceRemovesWholeUTF8Rune(t *testing.T) {
+	s := NewSearch()
+	s.Enter()
+	s.TypeRune('é')
+	s.TypeRune('界')
+
+	s.Backspace()
+	if s.Query != "é" {
+		t.Errorf("query = %q, want %q", s.Query, "é")
+	}
+
+	s.Backspace()
+	if s.Query != "" {
+		t.Errorf("query = %q, want empty", s.Query)
+	}
+}
+
 func TestSearchUpdateMatches(t *testing.T) {
 	t.Run("basic matching", func(t *testing.T) {
 		s := NewSearch()
@@ -300,6 +317,17 @@ func TestRenderSearchBar(t *testing.T) {
 			t.Error("expected non-empty bar when query exists after exit")
 		}
 	})
+
+	t.Run("pads by display width with wide query text", func(t *testing.T) {
+		s := NewSearch()
+		s.Enter()
+		s.Query = "界"
+
+		bar := RenderSearchBar(s, 20)
+		if width := ansi.StringWidth(bar); width != 20 {
+			t.Errorf("display width = %d, want 20", width)
+		}
+	})
 }
 
 func TestItoa(t *testing.T) {
@@ -347,6 +375,24 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "i"})
 		if m.search.Query != "hi" {
 			t.Errorf("search query = %q, want %q", m.search.Query, "hi")
+		}
+	})
+
+	t.Run("space in search mode adds to query", func(t *testing.T) {
+		m := newTestModel()
+		m.search.Enter()
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+		if m.search.Query != " " {
+			t.Errorf("search query = %q, want a space", m.search.Query)
+		}
+	})
+
+	t.Run("unicode in search mode adds whole rune", func(t *testing.T) {
+		m := newTestModel()
+		m.search.Enter()
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: '界', Text: "界"})
+		if m.search.Query != "界" {
+			t.Errorf("search query = %q, want %q", m.search.Query, "界")
 		}
 	})
 

@@ -144,9 +144,8 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	case "ctrl+c":
 		return m, tea.Quit
 	default:
-		text := msg.String()
-		if len(text) == 1 {
-			m.promptEditor.TypeRune(rune(text[0]))
+		for _, r := range msg.Key().Text {
+			m.promptEditor.TypeRune(r)
 		}
 	}
 	return m, nil
@@ -171,9 +170,10 @@ func (m Model) handleSearchKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, tea.Quit
 	default:
 		// Type character into search query
-		text := msg.String()
-		if len(text) == 1 {
-			m.search.TypeRune(rune(text[0]))
+		if text := msg.Key().Text; text != "" {
+			for _, r := range text {
+				m.search.TypeRune(r)
+			}
 			m.search.UpdateMatches(m.content.String())
 			m.scrollToSearchMatch()
 		}

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/x/ansi"
 	"github.com/johnnyfreeman/viewscreen/style"
@@ -48,8 +49,9 @@ func (s *Search) TypeRune(r rune) {
 
 // Backspace removes the last character from the query.
 func (s *Search) Backspace() {
-	if len(s.Query) > 0 {
-		s.Query = s.Query[:len(s.Query)-1]
+	if s.Query != "" {
+		_, size := utf8.DecodeLastRuneInString(s.Query)
+		s.Query = s.Query[:len(s.Query)-size]
 	}
 }
 
@@ -175,7 +177,7 @@ func RenderSearchBar(s Search, width int) string {
 
 	// Pad to full width to create a visual bar
 	line := sb.String()
-	visibleLen := len(ansi.Strip(line))
+	visibleLen := ansi.StringWidth(line)
 	if visibleLen < width {
 		line += strings.Repeat(" ", width-visibleLen)
 	}

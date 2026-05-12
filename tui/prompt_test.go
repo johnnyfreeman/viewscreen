@@ -219,6 +219,15 @@ func TestRenderPromptBar(t *testing.T) {
 			t.Errorf("expected padded length >= 40, got %d", len(stripped))
 		}
 	})
+
+	t.Run("pads by display width with wide text", func(t *testing.T) {
+		p := NewPromptEditor()
+		p.Enter("界")
+		result := RenderPromptBar(p, 20)
+		if width := ansi.StringWidth(result); width != 20 {
+			t.Errorf("display width = %d, want 20", width)
+		}
+	})
 }
 
 func TestPromptEditorKeyHandling(t *testing.T) {
@@ -308,6 +317,26 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "i"})
 		if m.promptEditor.Value != "hi" {
 			t.Errorf("promptEditor.Value = %q, want %q", m.promptEditor.Value, "hi")
+		}
+	})
+
+	t.Run("typing space adds a space", func(t *testing.T) {
+		m := newTestModel()
+		m.promptEditor.Enter("")
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
+		if m.promptEditor.Value != " " {
+			t.Errorf("promptEditor.Value = %q, want a space", m.promptEditor.Value)
+		}
+	})
+
+	t.Run("typing unicode adds whole rune", func(t *testing.T) {
+		m := newTestModel()
+		m.promptEditor.Enter("")
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: '界', Text: "界"})
+		if m.promptEditor.Value != "界" {
+			t.Errorf("promptEditor.Value = %q, want %q", m.promptEditor.Value, "界")
 		}
 	})
 

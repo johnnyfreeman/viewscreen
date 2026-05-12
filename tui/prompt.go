@@ -125,7 +125,7 @@ func RenderPromptBar(p PromptEditor, width int) string {
 
 	// Pad to full width to create a visual bar
 	line := sb.String()
-	visibleLen := len(ansi.Strip(line))
+	visibleLen := ansi.StringWidth(line)
 	if visibleLen < width {
 		line += strings.Repeat(" ", width-visibleLen)
 	}
