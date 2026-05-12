@@ -89,7 +89,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 			m.scrollToSearchMatch()
 		}
 	case "e":
-		if m.stdinDone {
+		if m.canEditPrompt() {
 			m.promptEditor.Enter(m.state.Prompt)
 			m.updateViewportDimensions()
 		}
@@ -111,6 +111,13 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.viewport.GotoBottom()
 	}
 	return m, nil
+}
+
+// canEditPrompt reports whether the prompt editor can perform its advertised
+// action. Prompt edits only have an effect when this TUI spawned Claude and can
+// re-run it after the current stream finishes.
+func (m Model) canEditPrompt() bool {
+	return m.stdinDone && m.claudeProcess != nil
 }
 
 // handlePromptEditorKeyMsg processes keyboard input while prompt editing is active.

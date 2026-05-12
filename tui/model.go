@@ -258,7 +258,7 @@ func (m Model) scrollPosition() ScrollPosition {
 func (m Model) renderLayout() string {
 	// Help modal overlays both layout modes
 	if m.showHelpModal {
-		return RenderContextualHelpModal(m.width, m.height, m.headerStyles, m.autoExitRemaining > 0, m.layoutMode, m.claudeProcess != nil)
+		return RenderContextualHelpModal(m.width, m.height, m.headerStyles, m.autoExitRemaining > 0, m.layoutMode, m.canEditPrompt())
 	}
 
 	// Render search bar and prompt bar if active

@@ -416,32 +416,26 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 }
 
 // RenderHelpModal renders the keybindings help modal overlay.
-// When subprocessMode is true, "e" shows "Edit prompt & re-run" instead of "Edit prompt".
-func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, subprocessMode ...bool) string {
-	subprocess := false
-	if len(subprocessMode) > 0 {
-		subprocess = subprocessMode[0]
+// When canEditPrompt is true, it includes the prompt edit/re-run binding.
+func RenderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, canEditPromptOpt ...bool) string {
+	canEditPrompt := false
+	if len(canEditPromptOpt) > 0 {
+		canEditPrompt = canEditPromptOpt[0]
 	}
-	return renderHelpModal(width, height, styles, autoExitActive, true, subprocess)
+	return renderHelpModal(width, height, styles, autoExitActive, true, canEditPrompt)
 }
 
 // RenderContextualHelpModal renders help for the active layout mode.
-func RenderContextualHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, layoutMode LayoutMode, subprocessMode bool) string {
-	return renderHelpModal(width, height, styles, autoExitActive, layoutMode == LayoutHeader, subprocessMode)
+func RenderContextualHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, layoutMode LayoutMode, canEditPrompt bool) string {
+	return renderHelpModal(width, height, styles, autoExitActive, layoutMode == LayoutHeader, canEditPrompt)
 }
 
-func renderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, showDetailsBinding bool, subprocessMode bool) string {
+func renderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool, showDetailsBinding bool, canEditPrompt bool) string {
 	var sb strings.Builder
 
 	// Title
 	sb.WriteString(style.SidebarValueText("Keybindings"))
 	sb.WriteString("\n\n")
-
-	// Determine prompt edit description
-	editPromptDesc := "Edit prompt"
-	if subprocessMode {
-		editPromptDesc = "Edit prompt & re-run"
-	}
 
 	// Keybinding entries
 	bindings := []struct {
@@ -461,9 +455,11 @@ func renderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool
 	if showDetailsBinding {
 		bindings = append(bindings, struct{ key, desc string }{"d", "Toggle details"})
 	}
+	if canEditPrompt {
+		bindings = append(bindings, struct{ key, desc string }{"e", "Edit prompt & re-run"})
+	}
 	bindings = append(bindings,
 		struct{ key, desc string }{"?", "Toggle help"},
-		struct{ key, desc string }{"e", editPromptDesc},
 		struct{ key, desc string }{"q", "Quit"},
 	)
 

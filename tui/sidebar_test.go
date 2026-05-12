@@ -560,6 +560,22 @@ func TestRenderHelpModal(t *testing.T) {
 		}
 	})
 
+	t.Run("omits prompt editing when re-run is unavailable", func(t *testing.T) {
+		output := RenderContextualHelpModal(100, 40, styles, false, LayoutSidebar, false)
+
+		if strings.Contains(output, "Edit prompt") {
+			t.Error("expected help to omit inert prompt editing binding")
+		}
+	})
+
+	t.Run("includes prompt editing when re-run is available", func(t *testing.T) {
+		output := RenderContextualHelpModal(100, 40, styles, false, LayoutSidebar, true)
+
+		if !strings.Contains(output, "Edit prompt & re-run") {
+			t.Error("expected help to include prompt edit/re-run binding")
+		}
+	})
+
 	t.Run("contextual header mode includes details key", func(t *testing.T) {
 		output := RenderContextualHelpModal(100, 40, styles, false, LayoutHeader, false)
 
