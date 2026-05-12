@@ -201,6 +201,7 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 	// Append rendered content
 	if result.Rendered != "" {
 		m.content.WriteString(result.Rendered)
+		m.updateSearchMatches()
 	}
 
 	// Update viewport based on whether there are pending tools
@@ -234,6 +235,14 @@ func (m *Model) updateViewportWithPendingTools() {
 		content += m.processor.RenderPendingTool(pending, m.spinner.View())
 	})
 	m.viewport.SetContent(content)
+}
+
+// updateSearchMatches keeps the search status in sync as streamed content grows.
+func (m *Model) updateSearchMatches() {
+	if !m.search.HasQuery() {
+		return
+	}
+	m.search.UpdateMatchesPreservingSelection(m.content.String())
 }
 
 // scrollPosition returns the current scroll position from the viewport.

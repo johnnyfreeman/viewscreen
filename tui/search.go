@@ -79,6 +79,23 @@ func (s *Search) UpdateMatches(content string) {
 	}
 }
 
+// UpdateMatchesPreservingSelection refreshes matches while keeping the
+// currently selected line selected when it still matches.
+func (s *Search) UpdateMatchesPreservingSelection(content string) {
+	currentLine := s.CurrentLine()
+	s.UpdateMatches(content)
+
+	if currentLine < 0 {
+		return
+	}
+	for i, line := range s.matchLines {
+		if line == currentLine {
+			s.currentMatch = i
+			return
+		}
+	}
+}
+
 // NextMatch advances to the next match, wrapping around.
 func (s *Search) NextMatch() {
 	if len(s.matchLines) == 0 {

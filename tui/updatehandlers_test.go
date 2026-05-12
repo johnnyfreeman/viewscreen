@@ -6,7 +6,9 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/johnnyfreeman/viewscreen/assistant"
 	"github.com/johnnyfreeman/viewscreen/events"
+	"github.com/johnnyfreeman/viewscreen/types"
 )
 
 func newTestModel() Model {
@@ -485,6 +487,42 @@ func TestHandleParseError(t *testing.T) {
 			t.Error("expected no content change in non-verbose mode")
 		}
 	})
+}
+
+func TestUpdateSearchMatchesOnNewContent(t *testing.T) {
+	m := newTestModel()
+	m.search.Query = "needle"
+	m.content.WriteString("needle one")
+	m.search.UpdateMatches(m.content.String())
+
+	m.content.WriteString("\nneedle two")
+	m.updateSearchMatches()
+
+	if m.search.MatchCount() != 2 {
+		t.Errorf("MatchCount() = %d, want 2", m.search.MatchCount())
+	}
+}
+
+func TestProcessEventRefreshesSearchMatches(t *testing.T) {
+	m := newTestModel()
+	m.content.WriteString("needle one\n")
+	m.viewport.SetContent(m.content.String())
+	m.search.Query = "needle"
+	m.search.UpdateMatches(m.content.String())
+
+	m, _ = m.processEvent(events.AssistantEvent{
+		Data: assistant.Event{
+			Message: assistant.Message{
+				Content: []types.ContentBlock{
+					{Type: "text", Text: "needle two"},
+				},
+			},
+		},
+	})
+
+	if m.search.MatchCount() != 2 {
+		t.Errorf("MatchCount() = %d, want 2", m.search.MatchCount())
+	}
 }
 
 func TestFollowMode(t *testing.T) {

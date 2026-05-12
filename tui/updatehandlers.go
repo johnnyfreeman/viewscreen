@@ -353,6 +353,7 @@ func (m Model) handleAutoExitTick() (Model, tea.Cmd) {
 func (m Model) handleParseError(msg events.ParseError) Model {
 	if config.Get().IsVerbose() {
 		m.content.WriteString("Parse error: " + msg.Line + "\n")
+		m.updateSearchMatches()
 		m.viewport.SetContent(m.content.String())
 		if m.followMode {
 			m.viewport.GotoBottom()

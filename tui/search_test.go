@@ -216,6 +216,26 @@ func TestSearchNavigationNoMatches(t *testing.T) {
 	}
 }
 
+func TestSearchUpdateMatchesPreservingSelection(t *testing.T) {
+	s := NewSearch()
+	s.Enter()
+	s.Query = "match"
+	s.UpdateMatches("match one\nno\nmatch two")
+	s.NextMatch()
+
+	s.UpdateMatchesPreservingSelection("match one\nno\nmatch two\nmatch three")
+
+	if s.MatchCount() != 3 {
+		t.Errorf("MatchCount() = %d, want 3", s.MatchCount())
+	}
+	if s.CurrentMatchIndex() != 2 {
+		t.Errorf("CurrentMatchIndex() = %d, want 2", s.CurrentMatchIndex())
+	}
+	if s.CurrentLine() != 2 {
+		t.Errorf("CurrentLine() = %d, want 2", s.CurrentLine())
+	}
+}
+
 func TestRenderSearchBar(t *testing.T) {
 	t.Run("no search active and no query", func(t *testing.T) {
 		s := NewSearch()
