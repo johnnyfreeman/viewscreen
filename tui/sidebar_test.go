@@ -471,6 +471,44 @@ func TestRenderHeader(t *testing.T) {
 			t.Errorf("header width = %d, want %d; output=%q", got, width, output)
 		}
 	})
+
+	t.Run("keeps status and help visible when compact", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "test-model"
+		width := 30
+
+		output := RenderHeader(s, width, true, ScrollPosition{AtBottom: true}, true, 0)
+		plain := ansi.Strip(output)
+
+		if got := ansi.StringWidth(output); got != width {
+			t.Errorf("header width = %d, want %d; output=%q", got, width, output)
+		}
+		if !strings.Contains(plain, "Done") {
+			t.Errorf("expected compact header to keep Done status, got %q", plain)
+		}
+		if !strings.Contains(plain, "[?]") {
+			t.Errorf("expected compact header to keep help hint, got %q", plain)
+		}
+	})
+
+	t.Run("keeps input error visible when compact", func(t *testing.T) {
+		s := state.NewState()
+		s.Model = "test-model"
+		width := 30
+
+		output := RenderHeader(s, width, true, ScrollPosition{AtBottom: true}, true, 0, errors.New("reader failed"))
+		plain := ansi.Strip(output)
+
+		if got := ansi.StringWidth(output); got != width {
+			t.Errorf("header width = %d, want %d; output=%q", got, width, output)
+		}
+		if !strings.Contains(plain, "Input error") {
+			t.Errorf("expected compact header to keep input error, got %q", plain)
+		}
+		if !strings.Contains(plain, "[?]") {
+			t.Errorf("expected compact header to keep help hint, got %q", plain)
+		}
+	})
 }
 
 func TestRenderDetailsModal(t *testing.T) {

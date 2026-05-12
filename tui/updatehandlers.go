@@ -270,10 +270,10 @@ func (m *Model) updateViewportDimensions() {
 	var contentWidth, contentHeight int
 	switch m.layoutMode {
 	case LayoutHeader:
-		contentWidth = max(m.width-2, 20)
+		contentWidth = max(m.width-2, 1)
 		contentHeight = m.height - headerHeight - 1
 	default:
-		contentWidth = max(m.width-sidebarWidth-3, 20)
+		contentWidth = max(m.width-sidebarWidth-3, 1)
 		contentHeight = m.height - 2
 	}
 

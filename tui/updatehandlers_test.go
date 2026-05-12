@@ -369,6 +369,22 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 		}
 	})
 
+	t.Run("tiny header mode keeps viewport inside terminal", func(t *testing.T) {
+		m := NewModel()
+
+		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 10, Height: 5})
+
+		if m.layoutMode != LayoutHeader {
+			t.Fatalf("layoutMode = %d, want LayoutHeader (%d)", m.layoutMode, LayoutHeader)
+		}
+		if m.viewport.Width() != 8 {
+			t.Errorf("viewport width = %d, want 8", m.viewport.Width())
+		}
+		if m.viewport.Width() > m.width {
+			t.Errorf("viewport width = %d exceeds terminal width %d", m.viewport.Width(), m.width)
+		}
+	})
+
 	t.Run("header mode adjusts height for header", func(t *testing.T) {
 		m := NewModel()
 

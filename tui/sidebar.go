@@ -13,6 +13,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/textutil"
@@ -420,7 +421,26 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 		style.MutedText(midDeco),
 		trailingStr,
 		style.MutedText(rightDeco))
+	if ansi.StringWidth(header) > width {
+		return renderCompactHeader(title, model, scrollStr, trailingStr, width)
+	}
 	return fitBarLine(header, width)
+}
+
+func renderCompactHeader(title, model, scrollStr, trailingStr string, width int) string {
+	candidates := []string{
+		strings.Join([]string{title, model, scrollStr, trailingStr}, " "),
+		strings.Join([]string{title, scrollStr, trailingStr}, " "),
+		strings.Join([]string{title, trailingStr}, " "),
+		trailingStr,
+	}
+
+	for _, candidate := range candidates {
+		if ansi.StringWidth(candidate) <= width {
+			return fitBarLine(candidate, width)
+		}
+	}
+	return fitBarLine(trailingStr, width)
 }
 
 // RenderHelpModal renders the keybindings help modal overlay.
