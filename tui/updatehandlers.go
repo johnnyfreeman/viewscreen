@@ -302,8 +302,15 @@ func (m Model) handleRawLine(msg RawLineMsg) (Model, tea.Cmd) {
 }
 
 // handleStdinClosed processes the stdin closed signal.
-func (m Model) handleStdinClosed() (Model, tea.Cmd) {
+func (m Model) handleStdinClosed(err error) (Model, tea.Cmd) {
 	m.stdinDone = true
+	m.streamErr = err
+	if err != nil {
+		m.autoExitRemaining = 0
+		m.state.ClearCurrentTool()
+		m.appendStreamError(err)
+		return m, nil
+	}
 	// In subprocess mode, don't auto-exit — user may want to browse or re-run
 	if m.claudeProcess != nil {
 		return m, nil
@@ -326,6 +333,7 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	// Reset state
 	m.content = &strings.Builder{}
 	m.stdinDone = false
+	m.streamErr = nil
 	m.autoExitRemaining = 0
 	st := state.NewState()
 	st.Prompt = msg.Prompt

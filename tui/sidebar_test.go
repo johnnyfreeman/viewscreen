@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -1129,6 +1130,33 @@ func TestSidebarRenderer_RenderAutoExitStatus(t *testing.T) {
 			t.Errorf("expected stream complete status, got %q", output)
 		}
 	})
+
+	t.Run("read error replaces stream complete status", func(t *testing.T) {
+		output := r.RenderAutoExitStatus(true, 0, errors.New("reader failed"))
+		if !strings.Contains(output, "Input error") {
+			t.Errorf("expected input error status, got %q", output)
+		}
+		if !strings.Contains(output, "reader failed") {
+			t.Errorf("expected reader error details, got %q", output)
+		}
+		if strings.Contains(output, "Stream complete") {
+			t.Errorf("expected stream complete status to be hidden on error, got %q", output)
+		}
+	})
+}
+
+func TestRenderHeader_StreamError(t *testing.T) {
+	s := state.NewState()
+	s.Model = "test-model"
+
+	output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true}, true, 0, errors.New("reader failed"))
+
+	if !strings.Contains(output, "Input error") {
+		t.Errorf("expected input error hint in header, got %q", output)
+	}
+	if strings.Contains(output, "Done") {
+		t.Errorf("expected Done hint to be hidden on error, got %q", output)
+	}
 }
 
 func TestSidebarRenderer_Render_FollowMode(t *testing.T) {

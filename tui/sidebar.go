@@ -229,9 +229,13 @@ func (r *SidebarRenderer) RenderFollowIndicator(followMode bool) string {
 }
 
 // RenderAutoExitStatus renders the auto-exit countdown or stream complete status.
-func (r *SidebarRenderer) RenderAutoExitStatus(stdinDone bool, autoExitRemaining int) string {
+func (r *SidebarRenderer) RenderAutoExitStatus(stdinDone bool, autoExitRemaining int, streamErrOpt ...error) string {
 	if !stdinDone {
 		return ""
+	}
+	if streamErr := optionalStreamError(streamErrOpt); streamErr != nil {
+		return style.ErrorText("Input error") + "\n" +
+			style.MutedText(textutil.WrapText(streamErr.Error(), r.width-4)) + "\n\n"
 	}
 	if autoExitRemaining > 0 {
 		return style.MutedText(fmt.Sprintf("Exiting in %ds...", autoExitRemaining)) + "\n" +
@@ -273,12 +277,13 @@ func (r *SidebarRenderer) RenderScrollPosition(pos ScrollPosition) string {
 }
 
 // Render renders the complete sidebar by composing all sections.
-func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int) string {
+func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int, streamErrOpt ...error) string {
 	var sb strings.Builder
+	streamErr := optionalStreamError(streamErrOpt)
 
 	sb.WriteString(r.RenderLogo())
 	sb.WriteString("\n")
-	sb.WriteString(r.RenderAutoExitStatus(stdinDone, autoExitRemaining))
+	sb.WriteString(r.RenderAutoExitStatus(stdinDone, autoExitRemaining, streamErr))
 	sb.WriteString(r.RenderFollowIndicator(followMode))
 	sb.WriteString(r.RenderPrompt(s.Prompt))
 	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
@@ -299,9 +304,9 @@ func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, sc
 
 // RenderSidebar renders the sidebar with session info and todos.
 // This is the main entry point, kept for backward compatibility.
-func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int) string {
+func RenderSidebar(s *state.State, spinner spinner.Model, height int, styles SidebarStyles, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int, streamErrOpt ...error) string {
 	r := NewSidebarRenderer(styles, spinner)
-	return r.Render(s, height, followMode, scrollPos, stdinDone, autoExitRemaining)
+	return r.Render(s, height, followMode, scrollPos, stdinDone, autoExitRemaining, optionalStreamError(streamErrOpt))
 }
 
 // HeaderStyles holds the lipgloss styles for header layout.
@@ -324,7 +329,7 @@ func NewHeaderStyles() HeaderStyles {
 
 // RenderHeader renders a single-line header for narrow terminals.
 // Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 │ 42% ─── [?] ───
-func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int) string {
+func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int, streamErrOpt ...error) string {
 	logo := NewLogoRenderer()
 
 	// Build the info section: model │ turns │ cost
@@ -350,7 +355,10 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 	// Auto-exit hint
 	autoExitHint := ""
 	autoExitHintLen := 0
-	if stdinDone && autoExitRemaining > 0 {
+	if streamErr := optionalStreamError(streamErrOpt); stdinDone && streamErr != nil {
+		autoExitHint = style.ErrorText("Input error")
+		autoExitHintLen = len("Input error")
+	} else if stdinDone && autoExitRemaining > 0 {
 		autoExitHint = style.MutedText(fmt.Sprintf("Exit %ds", autoExitRemaining))
 		autoExitHintLen = 6 + len(fmt.Sprintf("%d", autoExitRemaining)) // "Exit " + N + "s"
 	} else if stdinDone {
@@ -506,8 +514,9 @@ func renderHelpModal(width, height int, styles HeaderStyles, autoExitActive bool
 }
 
 // RenderDetailsModal renders the details modal overlay.
-func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int) string {
+func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, styles HeaderStyles, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int, streamErrOpt ...error) string {
 	r := NewSidebarRenderer(NewSidebarStyles(), sp)
+	streamErr := optionalStreamError(streamErrOpt)
 
 	var sb strings.Builder
 
@@ -516,7 +525,7 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	sb.WriteString("\n")
 
 	// Auto-exit status
-	sb.WriteString(r.RenderAutoExitStatus(stdinDone, autoExitRemaining))
+	sb.WriteString(r.RenderAutoExitStatus(stdinDone, autoExitRemaining, streamErr))
 
 	// Follow mode indicator
 	sb.WriteString(r.RenderFollowIndicator(followMode))
@@ -568,4 +577,11 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	}
 
 	return result.String()
+}
+
+func optionalStreamError(errs []error) error {
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs[0]
 }

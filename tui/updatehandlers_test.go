@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -389,7 +390,7 @@ func TestHandleStdinClosed(t *testing.T) {
 	t.Run("sets stdinDone", func(t *testing.T) {
 		m := newTestModel()
 
-		m, _ = m.handleStdinClosed()
+		m, _ = m.handleStdinClosed(nil)
 
 		if !m.stdinDone {
 			t.Error("expected stdinDone to be true")
@@ -400,7 +401,7 @@ func TestHandleStdinClosed(t *testing.T) {
 		m := newTestModel()
 		m.autoExit = true
 
-		m, cmd := m.handleStdinClosed()
+		m, cmd := m.handleStdinClosed(nil)
 
 		if !m.stdinDone {
 			t.Error("expected stdinDone to be true")
@@ -417,13 +418,43 @@ func TestHandleStdinClosed(t *testing.T) {
 		m := newTestModel()
 		m.autoExit = false
 
-		m, cmd := m.handleStdinClosed()
+		m, cmd := m.handleStdinClosed(nil)
 
 		if m.autoExitRemaining != 0 {
 			t.Errorf("expected autoExitRemaining=0, got %d", m.autoExitRemaining)
 		}
 		if cmd != nil {
 			t.Error("expected no command when autoExit disabled")
+		}
+	})
+
+	t.Run("shows read error and skips auto-exit countdown", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = true
+		m.content.WriteString("partial output")
+		m.viewport.SetContent(m.content.String())
+		m.state.SetCurrentTool("Read", "file.txt")
+		readErr := errors.New("bufio.Scanner: token too long")
+
+		m, cmd := m.handleStdinClosed(readErr)
+
+		if !m.stdinDone {
+			t.Error("expected stdinDone to be true")
+		}
+		if !errors.Is(m.streamErr, readErr) {
+			t.Fatalf("streamErr = %v, want %v", m.streamErr, readErr)
+		}
+		if cmd != nil {
+			t.Error("expected no auto-exit tick command on read error")
+		}
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 on read error, got %d", m.autoExitRemaining)
+		}
+		if m.state.ToolInProgress {
+			t.Error("expected tool progress to clear when input stream fails")
+		}
+		if got := m.content.String(); !strings.Contains(got, "Input error: bufio.Scanner: token too long") {
+			t.Fatalf("content = %q, want visible input error", got)
 		}
 	})
 }

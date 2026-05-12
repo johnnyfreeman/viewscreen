@@ -41,6 +41,7 @@ type Model struct {
 	followMode        bool                 // auto-scroll to bottom on new content
 	autoExit          bool                 // --auto-exit flag enabled
 	autoExitRemaining int                  // seconds left in countdown, 0 = inactive
+	streamErr         error                // non-nil when stdin ended because of a scanner/read error
 	claudeProcess     managedClaudeProcess // non-nil when we spawned claude
 	prompt            string               // the prompt used to spawn claude
 	inputReader       io.Reader            // where to read stream-json lines (defaults to os.Stdin)
@@ -163,7 +164,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case StdinClosedMsg:
-		m, cmd = m.handleStdinClosed()
+		m, cmd = m.handleStdinClosed(msg.Err)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -251,6 +252,24 @@ func (m *Model) updateSearchMatches() {
 	m.search.UpdateMatchesPreservingSelection(m.content.String())
 }
 
+func (m *Model) appendStreamError(err error) {
+	if err == nil {
+		return
+	}
+	content := m.content.String()
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		m.content.WriteString("\n")
+	}
+	m.content.WriteString(style.ErrorText("Input error: "))
+	m.content.WriteString(err.Error())
+	m.content.WriteString("\n")
+	m.updateSearchMatches()
+	m.viewport.SetContent(m.content.String())
+	if m.followMode {
+		m.viewport.GotoBottom()
+	}
+}
+
 // scrollPosition returns the current scroll position from the viewport.
 func (m Model) scrollPosition() ScrollPosition {
 	return ScrollPosition{
@@ -287,7 +306,7 @@ func (m Model) renderLayout() string {
 	switch m.layoutMode {
 	case LayoutHeader:
 		// Header mode: single-line header on top, content below at full width
-		header := RenderHeader(m.state, m.width, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining)
+		header := RenderHeader(m.state, m.width, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining, m.streamErr)
 		parts := []string{header, m.viewport.View()}
 		if searchBar != "" {
 			parts = append(parts, searchBar)
@@ -299,13 +318,13 @@ func (m Model) renderLayout() string {
 
 		// Overlay modal if showing details
 		if m.showDetailsModal {
-			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining)
+			modal := RenderDetailsModal(m.state, m.spinner, m.width, m.height, m.headerStyles, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining, m.streamErr)
 			return modal
 		}
 		return layout
 	default:
 		// Sidebar mode: content left, sidebar right
-		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining)
+		sidebar := RenderSidebar(m.state, m.spinner, m.height, m.sidebarStyles, m.followMode, scrollPos, m.stdinDone, m.autoExitRemaining, m.streamErr)
 		mainParts := []string{m.viewport.View()}
 		if searchBar != "" {
 			mainParts = append(mainParts, searchBar)
