@@ -9,6 +9,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
+	"github.com/johnnyfreeman/viewscreen/textutil"
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
@@ -42,7 +43,6 @@ type Event struct {
 	APIKeySource      string      `json:"apiKeySource"`
 	OutputStyle       string      `json:"output_style"`
 }
-
 
 // Renderer handles rendering system events
 type Renderer struct {
@@ -91,24 +91,24 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 // renderTo writes the system event to the given output
 func (r *Renderer) renderTo(out *render.Output, event Event) {
 	fmt.Fprintln(out, style.BulletHeader("Session Started"))
-	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedText("Model:"), event.Model)
-	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Version:"), event.ClaudeCodeVersion)
-	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("CWD:"), event.CWD)
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputPrefix(), r.styleApplier.MutedText("Model:"), cleanMetadata(event.Model))
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Version:"), cleanMetadata(event.ClaudeCodeVersion))
+	fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("CWD:"), cleanMetadata(event.CWD))
 	fmt.Fprintf(out, "%s%s %d available\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Tools:"), len(event.Tools))
 	if r.config.IsVerbose() && len(event.Agents) > 0 {
-		fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Agents:"), strings.Join(event.Agents, ", "))
+		fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Agents:"), strings.Join(cleanMetadataList(event.Agents), ", "))
 	}
 	if r.config.IsVerbose() && len(event.MCPServers) > 0 {
 		names := make([]string, len(event.MCPServers))
 		for i, s := range event.MCPServers {
-			names[i] = s.Name
+			names[i] = cleanMetadata(s.Name)
 		}
 		fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("MCP Servers:"), strings.Join(names, ", "))
 	}
 	if r.config.IsVerbose() && len(event.Plugins) > 0 {
 		names := make([]string, len(event.Plugins))
 		for i, p := range event.Plugins {
-			names[i] = p.Name
+			names[i] = cleanMetadata(p.Name)
 		}
 		fmt.Fprintf(out, "%s%s %s\n", r.styleApplier.OutputContinue(), r.styleApplier.MutedText("Plugins:"), strings.Join(names, ", "))
 	}
@@ -127,3 +127,14 @@ func (r *Renderer) RenderToString(event Event) string {
 	return out.String()
 }
 
+func cleanMetadata(s string) string {
+	return textutil.StripTerminalControls(s)
+}
+
+func cleanMetadataList(values []string) []string {
+	cleaned := make([]string, len(values))
+	for i, value := range values {
+		cleaned[i] = cleanMetadata(value)
+	}
+	return cleaned
+}

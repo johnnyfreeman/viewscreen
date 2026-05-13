@@ -134,7 +134,7 @@ func TestRenderer_Render_BasicEvent(t *testing.T) {
 }
 
 func TestRenderer_Render_NoColorMode(t *testing.T) {
-	style.Init(true) // Disable color
+	style.Init(true)        // Disable color
 	defer style.Init(false) // Restore for other tests
 
 	output := &bytes.Buffer{}
@@ -166,6 +166,40 @@ func TestRenderer_Render_NoColorMode(t *testing.T) {
 	// Should not contain color escape sequences (only bold \x1b[1m is allowed)
 	if strings.Contains(result, "\x1b[38") {
 		t.Error("no-color mode should not have color codes")
+	}
+}
+
+func TestRenderer_Render_CleansTerminalControlsFromMetadata(t *testing.T) {
+	output := &bytes.Buffer{}
+	styleMock := testutil.MockStyleApplier{NoColorVal: true}
+	configMock := testutil.MockConfigProvider{VerboseLevelVal: 1}
+
+	r := NewRenderer(
+		WithOutput(output),
+		WithStyleApplier(styleMock),
+		WithConfigProvider(configMock),
+	)
+
+	event := Event{
+		Model:             "claude-opus-4-7[1m]",
+		ClaudeCodeVersion: "\x1b[31m2.1.128\x1b[0m",
+		CWD:               "/tmp/project",
+		Tools:             []string{"Read"},
+		Agents:            []string{"agent[1m]"},
+		MCPServers:        []MCPServer{{Name: "\x1b[32mserver\x1b[0m"}},
+		Plugins:           []Plugin{{Name: "plugin[0m]"}},
+	}
+
+	r.Render(event)
+
+	result := testutil.StripANSI(output.String())
+	if strings.Contains(result, "[1m]") || strings.Contains(result, "[0m]") || strings.Contains(result, "\x1b[") {
+		t.Errorf("expected metadata terminal controls to be stripped, got: %q", result)
+	}
+	for _, want := range []string{"claude-opus-4-7", "2.1.128", "agent", "server", "plugin"} {
+		if !strings.Contains(result, want) {
+			t.Errorf("expected cleaned metadata %q in output, got: %q", want, result)
+		}
 	}
 }
 
@@ -450,7 +484,6 @@ func TestEvent_JSONUnmarshal(t *testing.T) {
 		})
 	}
 }
-
 
 func TestDefaultStyleApplier(t *testing.T) {
 	dsa := render.DefaultStyleApplier{}

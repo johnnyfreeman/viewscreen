@@ -241,6 +241,39 @@ func main() {
 	}
 }
 
+func TestStripTerminalControls(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "ansi escapes",
+			input:    "plain \x1b[31mred\x1b[0m text",
+			expected: "plain red text",
+		},
+		{
+			name:     "orphaned sgr fragment",
+			input:    "claude-opus-4-7[1m]",
+			expected: "claude-opus-4-7",
+		},
+		{
+			name:     "preserves normal brackets",
+			input:    "model [latest]",
+			expected: "model [latest]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := StripTerminalControls(tt.input)
+			if result != tt.expected {
+				t.Errorf("StripTerminalControls(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestTruncateLines(t *testing.T) {
 	tests := []struct {
 		name              string

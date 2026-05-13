@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/johnnyfreeman/viewscreen/claude"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/parser"
 	"github.com/johnnyfreeman/viewscreen/tui"
@@ -19,8 +21,15 @@ var stdinReader io.Reader = os.Stdin
 type Runner struct {
 	errOutput     io.Writer
 	parserFactory func() *parser.Parser
+	promptStarter func(string, io.Reader) (promptProcess, error)
 	exitFunc      func(int)
 	configOpts    []config.Option
+}
+
+type promptProcess interface {
+	Stdout() io.ReadCloser
+	Wait() error
+	Kill() error
 }
 
 // RunnerOption is a functional option for configuring a Runner
@@ -37,6 +46,13 @@ func WithErrOutput(w io.Writer) RunnerOption {
 func WithParserFactory(f func() *parser.Parser) RunnerOption {
 	return func(r *Runner) {
 		r.parserFactory = f
+	}
+}
+
+// WithPromptStarter sets a custom prompt process starter.
+func WithPromptStarter(f func(string, io.Reader) (promptProcess, error)) RunnerOption {
+	return func(r *Runner) {
+		r.promptStarter = f
 	}
 }
 
@@ -59,8 +75,11 @@ func NewRunner(opts ...RunnerOption) *Runner {
 	r := &Runner{
 		errOutput:     os.Stderr,
 		parserFactory: parser.NewParser,
-		exitFunc:      os.Exit,
-		configOpts:    []config.Option{config.WithArgs(os.Args[1:])},
+		promptStarter: func(prompt string, stdin io.Reader) (promptProcess, error) {
+			return claude.Start(prompt, stdin)
+		},
+		exitFunc:   os.Exit,
+		configOpts: []config.Option{config.WithArgs(os.Args[1:])},
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -92,9 +111,10 @@ func (r *Runner) Run() {
 	// 2. stdout is a TTY (interactive terminal)
 	useTUI := !cfg.NoTUI && term.IsTerminal(int(os.Stdout.Fd()))
 
-	if useTUI {
-		// If we have a prompt, spawn claude and stream into the TUI
-		if prompt != "" {
+	// If we have a prompt, spawn claude and stream its JSON output either into
+	// the TUI or directly through the legacy renderer when stdout is not a TTY.
+	if prompt != "" {
+		if useTUI {
 			content, err := tui.RunWithPrompt(prompt)
 			if err != nil {
 				fmt.Fprintf(r.errOutput, "TUI error: %v\n", err)
@@ -106,6 +126,14 @@ func (r *Runner) Run() {
 			return
 		}
 
+		if err := r.runPromptLegacy(prompt); err != nil {
+			fmt.Fprintf(r.errOutput, "%v\n", err)
+			r.exitFunc(1)
+		}
+		return
+	}
+
+	if useTUI {
 		// Auto-enable --auto-exit when stdin is piped (loop-friendly default).
 		// When stdin is a pipe, the user is running something like:
 		//   while :; do cat ... | claude ... | viewscreen; done
@@ -135,6 +163,31 @@ func (r *Runner) Run() {
 		fmt.Fprintf(r.errOutput, "%v\n", err)
 		r.exitFunc(1)
 	}
+}
+
+func (r *Runner) runPromptLegacy(prompt string) error {
+	proc, err := r.promptStarter(prompt, nil)
+	if err != nil {
+		return err
+	}
+
+	stdout := proc.Stdout()
+	if stdout == nil {
+		_ = proc.Kill()
+		_ = proc.Wait()
+		return errors.New("claude stdout unavailable")
+	}
+
+	p := parser.NewParserWithOptions(parser.WithInput(stdout))
+	parseErr := p.Run()
+	waitErr := proc.Wait()
+	if parseErr != nil {
+		return parseErr
+	}
+	if waitErr != nil {
+		return waitErr
+	}
+	return nil
 }
 
 func main() {

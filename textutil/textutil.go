@@ -7,6 +7,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Truncate shortens a string to maxLen characters, adding "..." if truncated.
@@ -36,6 +38,15 @@ var lineNumberRegex = regexp.MustCompile(`(?m)^\s*\d+→`)
 // StripLineNumbers removes line number prefixes (e.g., "     1→") from content.
 func StripLineNumbers(s string) string {
 	return lineNumberRegex.ReplaceAllString(s, "")
+}
+
+// orphanedSGRFragmentRegex matches SGR fragments that have already lost their
+// ESC prefix, such as "[1m]" in metadata emitted by upstream tools.
+var orphanedSGRFragmentRegex = regexp.MustCompile(`\[\d+(?:[;:]\d+)*[A-Za-z]\]`)
+
+// StripTerminalControls removes terminal control sequences from inline text.
+func StripTerminalControls(s string) string {
+	return orphanedSGRFragmentRegex.ReplaceAllString(ansi.Strip(s), "")
 }
 
 // DefaultMaxLines is the default number of lines to show before truncating.

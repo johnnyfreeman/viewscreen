@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 
@@ -102,6 +103,27 @@ func (e *errorReader) Read(p []byte) (n int, err error) {
 	return 0, errors.New("simulated read error")
 }
 
+type fakePromptProcess struct {
+	stdout     io.ReadCloser
+	waitCalled bool
+	killCalled bool
+	waitErr    error
+}
+
+func (p *fakePromptProcess) Stdout() io.ReadCloser {
+	return p.stdout
+}
+
+func (p *fakePromptProcess) Wait() error {
+	p.waitCalled = true
+	return p.waitErr
+}
+
+func (p *fakePromptProcess) Kill() error {
+	p.killCalled = true
+	return nil
+}
+
 func TestRunner_Run_Success(t *testing.T) {
 	factoryCalled := false
 
@@ -190,6 +212,47 @@ func TestRunner_Run_MultipleEvents(t *testing.T) {
 
 	// Should not panic or call exit
 	r.Run()
+}
+
+func TestRunner_Run_PromptNoTUIStartsClaude(t *testing.T) {
+	proc := &fakePromptProcess{stdout: io.NopCloser(strings.NewReader(""))}
+	var gotPrompt string
+	starterCalled := false
+	parserFactoryCalled := false
+
+	r := NewRunner(
+		WithConfigOpts(config.WithArgs([]string{"-no-tui", "-p", "can you tell me how viewscreen works?"})),
+		WithPromptStarter(func(prompt string, stdin io.Reader) (promptProcess, error) {
+			starterCalled = true
+			gotPrompt = prompt
+			if stdin != nil {
+				t.Fatalf("expected nil stdin reader for positional prompt")
+			}
+			return proc, nil
+		}),
+		WithParserFactory(func() *parser.Parser {
+			parserFactoryCalled = true
+			return parser.NewParserWithOptions(parser.WithInput(strings.NewReader("")))
+		}),
+	)
+
+	r.Run()
+
+	if !starterCalled {
+		t.Fatal("expected prompt starter to be called")
+	}
+	if gotPrompt != "can you tell me how viewscreen works?" {
+		t.Errorf("prompt = %q, want %q", gotPrompt, "can you tell me how viewscreen works?")
+	}
+	if !proc.waitCalled {
+		t.Error("expected prompt process to be waited")
+	}
+	if proc.killCalled {
+		t.Error("did not expect prompt process to be killed")
+	}
+	if parserFactoryCalled {
+		t.Error("did not expect legacy stdin parser factory for prompt mode")
+	}
 }
 
 func TestWithErrOutput_Option(t *testing.T) {
