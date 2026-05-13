@@ -2,7 +2,9 @@ package tui
 
 import (
 	"errors"
+	"io"
 	"os"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	claudepkg "github.com/johnnyfreeman/viewscreen/claude"
@@ -24,10 +26,11 @@ func Run() (string, error) {
 
 	var opts []tea.ProgramOption
 	width, height := detectTerminalSize(os.Stdout)
+	stdinIsTTY := isatty(os.Stdin.Fd())
 
 	// When stdin is not a TTY (e.g., piped input), keyboard input must come
 	// from /dev/tty instead of the stream-json pipe.
-	if !isatty(os.Stdin.Fd()) {
+	if !stdinIsTTY {
 		tty, err := os.Open("/dev/tty")
 		if err == nil {
 			opts = append(opts, tea.WithInput(tty))
@@ -36,6 +39,7 @@ func Run() (string, error) {
 	}
 
 	p := tea.NewProgram(NewModel(
+		WithInputReader(streamInputReader(os.Stdin, stdinIsTTY)),
 		WithInitialSize(width, height),
 		WithAutoExit(cfg.AutoExit),
 		WithVerboseParseErrors(cfg.IsVerbose()),
@@ -50,6 +54,13 @@ func Run() (string, error) {
 		return m.content.String(), nil
 	}
 	return "", nil
+}
+
+func streamInputReader(stdin io.Reader, stdinIsTTY bool) io.Reader {
+	if stdinIsTTY || stdin == nil {
+		return strings.NewReader("")
+	}
+	return stdin
 }
 
 // RunWithPrompt spawns claude with the given prompt and runs the TUI on its output.
