@@ -384,8 +384,9 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 		if m.height != 43 {
 			t.Errorf("height = %d, want 43", m.height)
 		}
-		if m.viewport.Width() != 132-sidebarWidth-3 {
-			t.Errorf("viewport width = %d, want %d", m.viewport.Width(), 132-sidebarWidth-3)
+		expectedWidth := 132 - sidebarRenderedWidth(m.sidebarStyles)
+		if m.viewport.Width() != expectedWidth {
+			t.Errorf("viewport width = %d, want %d", m.viewport.Width(), expectedWidth)
 		}
 		if m.viewport.Height() != 41 {
 			t.Errorf("viewport height = %d, want 41", m.viewport.Height())
@@ -434,8 +435,7 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
 
-		// Content width should be total - sidebar - border
-		expectedWidth := 120 - sidebarWidth - 3
+		expectedWidth := 120 - sidebarRenderedWidth(m.sidebarStyles)
 		if m.viewport.Width() != expectedWidth {
 			t.Errorf("viewport width = %d, want %d", m.viewport.Width(), expectedWidth)
 		}
@@ -516,6 +516,21 @@ func TestHandleWindowSizeMsg(t *testing.T) {
 			t.Errorf("below breakpoint (79): layoutMode = %d, want LayoutHeader", m.layoutMode)
 		}
 	})
+}
+
+func TestRenderLayout_SidebarModeFitsTerminalWidth(t *testing.T) {
+	m := NewModel(WithInitialSize(120, 24))
+	m.state.Model = "test-model"
+	m.state.Prompt = "can you tell me how viewscreen works?"
+	m.stdinDone = true
+
+	m.content.WriteString(strings.Repeat("x", m.viewport.Width()) + "\n")
+	m.viewport.SetContent(m.content.String())
+
+	output := m.renderLayout()
+	if got := maxRenderedLineWidth(output); got > m.width {
+		t.Fatalf("rendered line width = %d, want <= %d; output=%q", got, m.width, output)
+	}
 }
 
 func TestHandleSpinnerTick(t *testing.T) {

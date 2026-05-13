@@ -26,6 +26,14 @@ const (
 	modalWidth      = 40 // preferred width of details/help modals
 )
 
+func sidebarRenderedWidth(styles SidebarStyles) int {
+	width := styles.Container.GetWidth()
+	if width <= 0 {
+		width = sidebarWidth
+	}
+	return width + styles.Container.GetHorizontalFrameSize()
+}
+
 // LayoutMode determines how the UI is rendered based on terminal width
 type LayoutMode int
 

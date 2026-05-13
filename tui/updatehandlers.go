@@ -341,7 +341,7 @@ func (m *Model) updateViewportDimensions() {
 		contentWidth = max(m.width-2, 1)
 		contentHeight = m.height - headerHeight - 1
 	default:
-		contentWidth = max(m.width-sidebarWidth-3, 1)
+		contentWidth = max(m.width-sidebarRenderedWidth(m.sidebarStyles), 1)
 		contentHeight = m.height - 2
 	}
 

@@ -394,6 +394,9 @@ func TestNewSidebarStyles(t *testing.T) {
 	if styles.Container.GetWidth() != sidebarWidth {
 		t.Errorf("Container width = %d, want %d", styles.Container.GetWidth(), sidebarWidth)
 	}
+	if got, want := sidebarRenderedWidth(styles), sidebarWidth+styles.Container.GetHorizontalFrameSize(); got != want {
+		t.Errorf("rendered sidebar width = %d, want %d", got, want)
+	}
 }
 
 func TestNewHeaderStyles(t *testing.T) {
