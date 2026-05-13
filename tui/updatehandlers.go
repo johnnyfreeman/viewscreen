@@ -251,10 +251,10 @@ func (m Model) shouldStartAutoExitCountdown() bool {
 }
 
 // canEditPrompt reports whether the prompt editor can perform its advertised
-// action. Prompt edits only have an effect when this TUI spawned Claude and can
-// re-run it after the current stream finishes.
+// action. Prompt edits only have an effect after the current stream finishes
+// and when this TUI still has a starter capable of launching another run.
 func (m Model) canEditPrompt() bool {
-	return m.stdinDone && m.claudeProcess != nil && m.claudeStarter != nil
+	return m.stdinDone && m.claudeStarter != nil
 }
 
 // handlePromptEditorKeyMsg processes keyboard input while prompt editing is active.
@@ -475,6 +475,8 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	}
 	stdout := proc.Stdout()
 	if stdout == nil {
+		_ = proc.Kill()
+		_ = proc.Wait()
 		m.failRerunStart(errors.New("claude stdout unavailable"))
 		return m, nil
 	}

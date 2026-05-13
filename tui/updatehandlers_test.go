@@ -687,9 +687,10 @@ func TestHandleRerun(t *testing.T) {
 	})
 
 	t.Run("reports missing stdout from started process", func(t *testing.T) {
+		newProc := &fakeClaudeProcess{}
 		m := newTestModel()
 		m.claudeStarter = func(string) (managedClaudeProcess, error) {
-			return &fakeClaudeProcess{}, nil
+			return newProc, nil
 		}
 
 		m, cmd := m.handleRerun(RerunMsg{Prompt: "new prompt"})
@@ -702,6 +703,12 @@ func TestHandleRerun(t *testing.T) {
 		}
 		if got := m.content.String(); !strings.Contains(got, "claude stdout unavailable") {
 			t.Fatalf("content = %q, want stdout error", got)
+		}
+		if newProc.killCount != 1 {
+			t.Errorf("new Kill called %d times, want 1", newProc.killCount)
+		}
+		if newProc.waitCount != 1 {
+			t.Errorf("new Wait called %d times, want 1", newProc.waitCount)
 		}
 	})
 }

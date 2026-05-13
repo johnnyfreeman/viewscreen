@@ -283,6 +283,23 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 		}
 	})
 
+	t.Run("e still opens editor after failed rerun clears process", func(t *testing.T) {
+		m := newTestModel()
+		m.stdinDone = true
+		m.state.Prompt = "failed prompt"
+		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+			return &fakeClaudeProcess{}, nil
+		}
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})
+		if !m.promptEditor.Active {
+			t.Error("expected prompt editor to stay available after rerun startup failure")
+		}
+		if m.promptEditor.Value != "failed prompt" {
+			t.Errorf("promptEditor.Value = %q, want %q", m.promptEditor.Value, "failed prompt")
+		}
+	})
+
 	t.Run("e does nothing when TUI cannot re-run prompt", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
