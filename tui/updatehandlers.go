@@ -428,10 +428,6 @@ func (m Model) handleStdinClosed(err error) (Model, tea.Cmd) {
 		m.appendStreamError(err)
 		return m, nil
 	}
-	// In subprocess mode, don't auto-exit — user may want to browse or re-run
-	if m.claudeProcess != nil {
-		return m, nil
-	}
 	if m.shouldStartAutoExitCountdown() {
 		m.autoExitRemaining = 5
 		return m, AutoExitTick()

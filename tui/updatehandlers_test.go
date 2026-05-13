@@ -518,6 +518,36 @@ func TestHandleStdinClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("starts countdown for spawned claude when autoExit enabled", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = true
+		m.claudeProcess = &fakeClaudeProcess{}
+
+		m, cmd := m.handleStdinClosed(nil)
+
+		if m.autoExitRemaining != 5 {
+			t.Errorf("expected autoExitRemaining=5 for spawned claude, got %d", m.autoExitRemaining)
+		}
+		if cmd == nil {
+			t.Error("expected tick command when autoExit is explicit in spawned claude mode")
+		}
+	})
+
+	t.Run("keeps spawned claude TUI open when autoExit disabled", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = false
+		m.claudeProcess = &fakeClaudeProcess{}
+
+		m, cmd := m.handleStdinClosed(nil)
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 without autoExit, got %d", m.autoExitRemaining)
+		}
+		if cmd != nil {
+			t.Error("expected no tick command when autoExit is disabled in spawned claude mode")
+		}
+	})
+
 	t.Run("skips countdown after user scrolled before stdin closed", func(t *testing.T) {
 		m := newTestModel()
 		m.autoExit = true
