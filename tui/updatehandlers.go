@@ -266,7 +266,7 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.prompt = m.promptEditor.Value
 		m.promptEditor.Exit()
 		m.updateViewportDimensions()
-		if m.claudeProcess != nil && m.claudeStarter != nil {
+		if m.claudeStarter != nil {
 			return m, func() tea.Msg { return RerunMsg{Prompt: m.state.Prompt} }
 		}
 	case msg.String() == "backspace":

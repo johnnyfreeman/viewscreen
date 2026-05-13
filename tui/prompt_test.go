@@ -371,6 +371,34 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 		}
 	})
 
+	t.Run("enter queues rerun when starter exists without active process", func(t *testing.T) {
+		m := newTestModel()
+		m.stdinDone = true
+		m.state.Prompt = "failed prompt"
+		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+			return &fakeClaudeProcess{}, nil
+		}
+		m.promptEditor.Enter("failed prompt")
+		m.promptEditor.TypeRune('!')
+
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEnter})
+		if m.promptEditor.Active {
+			t.Error("expected prompt editor to be inactive after enter")
+		}
+		if cmd == nil {
+			t.Fatal("expected rerun command when starter exists")
+		}
+
+		msg := cmd()
+		rerun, ok := msg.(RerunMsg)
+		if !ok {
+			t.Fatalf("command returned %T, want RerunMsg", msg)
+		}
+		if rerun.Prompt != "failed prompt!" {
+			t.Errorf("RerunMsg.Prompt = %q, want %q", rerun.Prompt, "failed prompt!")
+		}
+	})
+
 	t.Run("esc cancels and restores original", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
