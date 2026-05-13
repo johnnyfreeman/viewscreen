@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/viewport"
@@ -44,6 +45,7 @@ type Model struct {
 	claudeStarter     claudeProcessStarter // starts replacement claude runs for prompt edits
 	prompt            string               // the prompt used to spawn claude
 	inputReader       io.Reader            // where to read stream-json lines (defaults to os.Stdin)
+	ignoreInputUntil  time.Time            // drops startup terminal report bytes parsed as text keys
 }
 
 type managedClaudeProcess interface {
@@ -58,6 +60,7 @@ const (
 	defaultInitialWidth  = 80
 	defaultInitialHeight = 24
 	maxScannerCapacity   = 10 * 1024 * 1024
+	startupInputGrace    = 500 * time.Millisecond
 )
 
 // ModelOption is a functional option for configuring the Model.
@@ -117,6 +120,16 @@ func WithInitialSize(width, height int) ModelOption {
 			m.height = height
 		}
 		m.updateLayoutMode()
+	}
+}
+
+// WithStartupInputGrace ignores printable key input briefly while terminals
+// answer Bubble Tea's startup capability probes.
+func WithStartupInputGrace(d time.Duration) ModelOption {
+	return func(m *Model) {
+		if d > 0 {
+			m.ignoreInputUntil = time.Now().Add(d)
+		}
 	}
 }
 
@@ -193,11 +206,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		m, cmd = m.handleKeyMsg(msg)
 		if cmd != nil {
 			return m, cmd // KeyMsg may return tea.Quit
 		}
+
+	case tea.KeyReleaseMsg:
+		return m, nil
 
 	case tea.WindowSizeMsg:
 		m = m.handleWindowSizeMsg(msg)
@@ -408,4 +424,11 @@ func (m Model) Prompt() string {
 		return m.promptEditor.Value
 	}
 	return m.state.Prompt
+}
+
+func (m Model) shouldIgnoreStartupTextKey(msg tea.KeyMsg) bool {
+	if m.ignoreInputUntil.IsZero() || !time.Now().Before(m.ignoreInputUntil) {
+		return false
+	}
+	return isPrintableInputText(keyInputText(msg))
 }

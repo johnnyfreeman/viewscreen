@@ -41,6 +41,7 @@ func Run() (string, error) {
 	p := tea.NewProgram(NewModel(
 		WithInputReader(streamInputReader(os.Stdin, stdinIsTTY)),
 		WithInitialSize(width, height),
+		WithStartupInputGrace(startupInputGrace),
 		WithAutoExit(cfg.AutoExit),
 		WithVerboseParseErrors(cfg.IsVerbose()),
 	), opts...)
@@ -95,6 +96,7 @@ func RunWithPrompt(prompt string) (string, error) {
 		WithClaudeStarter(startClaudeProcess),
 		WithPrompt(prompt),
 		WithInitialSize(width, height),
+		WithStartupInputGrace(startupInputGrace),
 		WithAutoExit(cfg.AutoExit),
 		WithVerboseParseErrors(cfg.IsVerbose()),
 	)

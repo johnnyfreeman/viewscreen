@@ -45,8 +45,7 @@ func resetTerminalModes(w io.Writer) {
 }
 
 func terminalModeResetSequence() string {
-	return ansi.KittyKeyboard(0, 1) +
-		ansi.ResetModeBracketedPaste +
+	return ansi.ResetModeBracketedPaste +
 		ansi.ResetModeMouseX10 +
 		ansi.ResetModeMouseNormal +
 		ansi.ResetModeMouseHighlight +

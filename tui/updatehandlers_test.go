@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -57,6 +58,45 @@ func TestHandleKeyMsg(t *testing.T) {
 
 		if cmd == nil {
 			t.Error("expected quit command on ctrl+c")
+		}
+	})
+
+	t.Run("startup text input is ignored", func(t *testing.T) {
+		m := newTestModel()
+		m.ignoreInputUntil = time.Now().Add(time.Minute)
+
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "?"})
+		if cmd != nil {
+			t.Error("expected no command for ignored startup text")
+		}
+		if m.showHelpModal {
+			t.Error("expected startup text not to toggle help")
+		}
+		if m.autoExitCanceled {
+			t.Error("expected ignored startup text not to count as user interaction")
+		}
+	})
+
+	t.Run("startup grace still allows ctrl+c", func(t *testing.T) {
+		m := newTestModel()
+		m.ignoreInputUntil = time.Now().Add(time.Minute)
+
+		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+		if cmd == nil {
+			t.Error("expected ctrl+c to quit during startup grace")
+		}
+	})
+
+	t.Run("key releases are ignored", func(t *testing.T) {
+		m := newTestModel()
+
+		next, cmd := m.Update(tea.KeyReleaseMsg{Text: "?"})
+		if cmd != nil {
+			t.Error("expected no command for key release")
+		}
+		got := next.(Model)
+		if got.showHelpModal {
+			t.Error("expected key release not to toggle help")
 		}
 	})
 

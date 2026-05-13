@@ -19,6 +19,9 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if isCtrlCKey(msg) {
 		return m.quitCommand()
 	}
+	if m.shouldIgnoreStartupTextKey(msg) {
+		return m, nil
+	}
 
 	// During auto-exit countdown:
 	// - q: quit immediately

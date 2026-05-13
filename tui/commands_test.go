@@ -11,7 +11,6 @@ func TestTerminalModeResetSequence(t *testing.T) {
 	seq := terminalModeResetSequence()
 
 	for _, want := range []string{
-		ansi.KittyKeyboard(0, 1),
 		ansi.ResetModeBracketedPaste,
 		ansi.ResetModeMouseX10,
 		ansi.ResetModeMouseNormal,
