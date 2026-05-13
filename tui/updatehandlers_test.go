@@ -550,6 +550,21 @@ func TestHandleStdinClosed(t *testing.T) {
 		}
 	})
 
+	t.Run("skips countdown after escape before stdin closed", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExit = true
+
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEscape})
+		m, cmd := m.handleStdinClosed(nil)
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 after pre-close escape, got %d", m.autoExitRemaining)
+		}
+		if cmd != nil {
+			t.Error("expected no tick command after pre-close escape")
+		}
+	})
+
 	t.Run("no countdown when autoExit disabled", func(t *testing.T) {
 		m := newTestModel()
 		m.autoExit = false
@@ -825,6 +840,23 @@ func TestAutoExitCancelOnKeyPress(t *testing.T) {
 
 		if cmd == nil {
 			t.Error("expected quit command on enter during countdown")
+		}
+	})
+
+	t.Run("escape cancels countdown and stays open", func(t *testing.T) {
+		m := newTestModel()
+		m.autoExitRemaining = 3
+
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: tea.KeyEscape})
+
+		if m.autoExitRemaining != 0 {
+			t.Errorf("expected autoExitRemaining=0 after escape, got %d", m.autoExitRemaining)
+		}
+		if !m.autoExitCanceled {
+			t.Error("expected escape to cancel auto-exit")
+		}
+		if cmd != nil {
+			t.Error("expected no quit command after escape cancels countdown")
 		}
 	})
 }

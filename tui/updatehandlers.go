@@ -19,9 +19,6 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if isCtrlCKey(msg) {
 		return m.quitCommand()
 	}
-	if isEscKey(msg) {
-		return m.handleEscKey()
-	}
 
 	// During auto-exit countdown:
 	// - q: quit immediately
@@ -36,6 +33,10 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 	} else {
 		m.noteUserInteraction()
+	}
+
+	if isEscKey(msg) {
+		return m.handleEscKey()
 	}
 
 	// When prompt editor is active, capture all keys for prompt editing
