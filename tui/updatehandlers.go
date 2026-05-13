@@ -299,13 +299,13 @@ func (m Model) handleSearchKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.updateViewportDimensions()
 	case msg.String() == "backspace":
 		m.search.Backspace()
-		m.search.UpdateMatches(m.content.String())
+		m.search.UpdateMatches(m.visibleContent())
 		m.scrollToSearchMatch()
 	default:
 		// Type character into search query
 		if text := keyInputText(msg); isPrintableInputText(text) {
 			m.search.TypeText(text)
-			m.search.UpdateMatches(m.content.String())
+			m.search.UpdateMatches(m.visibleContent())
 			m.scrollToSearchMatch()
 		}
 	}

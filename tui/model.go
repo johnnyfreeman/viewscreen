@@ -262,8 +262,8 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 	// Append rendered content
 	if result.Rendered != "" {
 		m.content.WriteString(result.Rendered)
-		m.updateSearchMatches()
 	}
+	m.updateSearchMatches()
 
 	// Update viewport based on whether there are pending tools
 	if result.HasPendingTools {
@@ -288,13 +288,25 @@ func (m Model) View() tea.View {
 
 // updateViewportWithPendingTools updates the viewport content, rendering pending tools with spinner
 func (m *Model) updateViewportWithPendingTools() {
+	m.viewport.SetContent(m.visibleContent())
+}
+
+// visibleContent returns the complete text currently shown in the viewport,
+// including transient pending tool headers that have not yet resolved.
+func (m *Model) visibleContent() string {
 	content := m.content.String()
-	// Render pending tools with spinner instead of bullet.
-	// Apply Ultraviolet styling to the spinner for proper style/content separation.
+	if !m.processor.HasPendingTools() {
+		return content
+	}
+
+	var sb strings.Builder
+	sb.WriteString(content)
 	m.processor.ForEachPendingTool(func(id string, pending tools.PendingTool) {
-		content += m.processor.RenderPendingTool(pending, m.spinner.View())
+		// Render pending tools with spinner instead of bullet.
+		// Apply Ultraviolet styling to the spinner for proper style/content separation.
+		sb.WriteString(m.processor.RenderPendingTool(pending, m.spinner.View()))
 	})
-	m.viewport.SetContent(content)
+	return sb.String()
 }
 
 // updateSearchMatches keeps the search status in sync as streamed content grows.
@@ -302,7 +314,7 @@ func (m *Model) updateSearchMatches() {
 	if !m.search.HasQuery() {
 		return
 	}
-	m.search.UpdateMatchesPreservingSelection(m.content.String())
+	m.search.UpdateMatchesPreservingSelection(m.visibleContent())
 }
 
 func (m *Model) appendStreamError(err error) {

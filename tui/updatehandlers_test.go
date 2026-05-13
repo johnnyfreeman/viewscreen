@@ -989,6 +989,43 @@ func TestProcessEventRefreshesSearchMatches(t *testing.T) {
 	}
 }
 
+func TestSearchIncludesVisiblePendingTools(t *testing.T) {
+	m := newTestModel()
+
+	m, _ = m.processEvent(events.AssistantEvent{
+		Data: assistant.Event{
+			Message: assistant.Message{
+				Content: []types.ContentBlock{
+					{
+						Type:  "tool_use",
+						ID:    "tool-1",
+						Name:  "Read",
+						Input: []byte(`{"file_path":"needle.txt"}`),
+					},
+				},
+			},
+		},
+	})
+	if !m.processor.HasPendingTools() {
+		t.Fatal("expected assistant tool_use to render as a pending tool")
+	}
+	if got := m.viewport.View(); !strings.Contains(got, "needle.txt") {
+		t.Fatalf("viewport = %q, want visible pending tool path", got)
+	}
+
+	m.search.Enter()
+	for _, r := range "needle" {
+		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: string(r), Code: r})
+	}
+
+	if m.search.MatchCount() != 1 {
+		t.Errorf("MatchCount() = %d, want 1 for visible pending tool", m.search.MatchCount())
+	}
+	if m.search.CurrentLine() < 0 {
+		t.Error("expected current search match to point at the pending tool line")
+	}
+}
+
 func TestFollowMode(t *testing.T) {
 	t.Run("default follow mode is on", func(t *testing.T) {
 		m := newTestModel()
