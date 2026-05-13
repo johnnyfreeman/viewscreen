@@ -13,6 +13,11 @@ type StdinClosedMsg struct {
 // AutoExitTickMsg is sent each second during the auto-exit countdown.
 type AutoExitTickMsg struct{}
 
+// ClaudeExitedMsg is sent after a spawned claude subprocess has been reaped.
+type ClaudeExitedMsg struct {
+	Err error
+}
+
 // RerunMsg triggers a fresh claude run with the given prompt.
 type RerunMsg struct {
 	Prompt string

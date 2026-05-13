@@ -4,12 +4,15 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 )
 
 // Process wraps an exec.Cmd for a running claude subprocess.
 type Process struct {
-	cmd    *exec.Cmd
-	stdout io.ReadCloser
+	cmd      *exec.Cmd
+	stdout   io.ReadCloser
+	waitOnce sync.Once
+	waitErr  error
 }
 
 // Start spawns claude with the given prompt in stream-json mode.
@@ -50,7 +53,10 @@ func (p *Process) Wait() error {
 	if p == nil || p.cmd == nil {
 		return nil
 	}
-	return p.cmd.Wait()
+	p.waitOnce.Do(func() {
+		p.waitErr = p.cmd.Wait()
+	})
+	return p.waitErr
 }
 
 // Kill terminates the subprocess.

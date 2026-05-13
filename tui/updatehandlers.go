@@ -423,19 +423,31 @@ func (m Model) handleRawLine(msg RawLineMsg) (Model, tea.Cmd) {
 
 // handleStdinClosed processes the stdin closed signal.
 func (m Model) handleStdinClosed(err error) (Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	m.stdinDone = true
 	m.streamErr = err
+	if m.claudeProcess != nil {
+		cmds = append(cmds, WaitClaudeProcess(m.claudeProcess))
+	}
 	if err != nil {
 		m.autoExitRemaining = 0
 		m.state.ClearCurrentTool()
 		m.appendStreamError(err)
-		return m, nil
+		return m, tea.Batch(cmds...)
 	}
 	if m.shouldStartAutoExitCountdown() {
 		m.autoExitRemaining = 5
-		return m, AutoExitTick()
+		cmds = append(cmds, AutoExitTick())
 	}
-	return m, nil
+	return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleClaudeExited(msg ClaudeExitedMsg) Model {
+	if m.claudeProcess != nil {
+		m.claudeProcess = nil
+	}
+	return m
 }
 
 // handleRerun kills the old claude process, resets state, and spawns a new run.

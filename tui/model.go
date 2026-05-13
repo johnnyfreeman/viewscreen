@@ -245,6 +245,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
+	case ClaudeExitedMsg:
+		m = m.handleClaudeExited(msg)
+
 	case RerunMsg:
 		m, cmd = m.handleRerun(msg)
 		if cmd != nil {

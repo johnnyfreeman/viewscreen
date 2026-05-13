@@ -35,6 +35,16 @@ func AutoExitTick() tea.Cmd {
 	}
 }
 
+// WaitClaudeProcess reaps a spawned claude subprocess without blocking Update.
+func WaitClaudeProcess(proc managedClaudeProcess) tea.Cmd {
+	if proc == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		return ClaudeExitedMsg{Err: proc.Wait()}
+	}
+}
+
 // resetTerminalModes clears terminal modes that can leak in from a previous TUI
 // before Bubble Tea starts reading input.
 func resetTerminalModes(w io.Writer) {

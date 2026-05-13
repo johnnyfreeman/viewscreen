@@ -574,17 +574,25 @@ func TestHandleStdinClosed(t *testing.T) {
 	})
 
 	t.Run("keeps spawned claude TUI open when autoExit disabled", func(t *testing.T) {
+		proc := &fakeClaudeProcess{}
 		m := newTestModel()
 		m.autoExit = false
-		m.claudeProcess = &fakeClaudeProcess{}
+		m.claudeProcess = proc
 
 		m, cmd := m.handleStdinClosed(nil)
 
 		if m.autoExitRemaining != 0 {
 			t.Errorf("expected autoExitRemaining=0 without autoExit, got %d", m.autoExitRemaining)
 		}
-		if cmd != nil {
-			t.Error("expected no tick command when autoExit is disabled in spawned claude mode")
+		if cmd == nil {
+			t.Fatal("expected wait command to reap spawned claude process")
+		}
+		msg := cmd()
+		if _, ok := msg.(ClaudeExitedMsg); !ok {
+			t.Fatalf("command returned %T, want ClaudeExitedMsg", msg)
+		}
+		if proc.waitCount != 1 {
+			t.Errorf("Wait called %d times, want 1", proc.waitCount)
 		}
 	})
 
@@ -676,6 +684,20 @@ func TestHandleStdinClosed(t *testing.T) {
 		}
 		if got := m.content.String(); !strings.Contains(got, "Input error: bufio.Scanner: token too long") {
 			t.Fatalf("content = %q, want visible input error", got)
+		}
+	})
+}
+
+func TestHandleClaudeExited(t *testing.T) {
+	t.Run("clears completed spawned process", func(t *testing.T) {
+		proc := &fakeClaudeProcess{}
+		m := newTestModel()
+		m.claudeProcess = proc
+
+		m = m.handleClaudeExited(ClaudeExitedMsg{})
+
+		if m.claudeProcess != nil {
+			t.Error("expected completed claude process to be cleared")
 		}
 	})
 }
