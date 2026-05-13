@@ -429,9 +429,11 @@ func (m Model) Prompt() string {
 	return m.state.Prompt
 }
 
-func (m Model) shouldIgnoreStartupTextKey(msg tea.KeyMsg) bool {
-	if m.ignoreInputUntil.IsZero() || !time.Now().Before(m.ignoreInputUntil) {
-		return false
+func (m Model) shouldIgnoreKeyInputNoise(msg tea.KeyMsg) bool {
+	if isTerminalReportFragment(keyInputText(msg)) || isCodeOnlyPrintableKey(msg) {
+		return true
 	}
-	return isPrintableInputText(keyInputText(msg))
+	return !m.ignoreInputUntil.IsZero() &&
+		time.Now().Before(m.ignoreInputUntil) &&
+		isPrintableInputText(keyInputText(msg))
 }

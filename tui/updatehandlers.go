@@ -19,7 +19,7 @@ func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if isCtrlCKey(msg) {
 		return m.quitCommand()
 	}
-	if m.shouldIgnoreStartupTextKey(msg) {
+	if m.shouldIgnoreKeyInputNoise(msg) {
 		return m, nil
 	}
 
@@ -171,6 +171,26 @@ func keyInputText(msg tea.KeyMsg) string {
 		return ""
 	}
 	return key.Text
+}
+
+func isCodeOnlyPrintableKey(msg tea.KeyMsg) bool {
+	key := msg.Key()
+	return key.Text == "" &&
+		key.Code != 0 &&
+		key.Code <= unicode.MaxRune &&
+		unicode.IsPrint(key.Code) &&
+		hasOnlyTextModifiers(key.Mod)
+}
+
+func isTerminalReportFragment(text string) bool {
+	if text == "" {
+		return false
+	}
+	if strings.ContainsAny(text, "\x1b\x9b") {
+		return true
+	}
+	return strings.Contains(text, "[?") &&
+		(strings.Contains(text, "$y") || strings.HasSuffix(text, "u") || strings.HasSuffix(text, "c"))
 }
 
 func hasOnlyTextModifiers(mod tea.KeyMod) bool {

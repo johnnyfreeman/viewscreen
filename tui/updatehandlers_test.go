@@ -77,6 +77,46 @@ func TestHandleKeyMsg(t *testing.T) {
 		}
 	})
 
+	t.Run("code-only printable input is ignored as terminal noise", func(t *testing.T) {
+		m := newTestModel()
+		m.followMode = true
+
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: '/'})
+		if cmd != nil {
+			t.Error("expected no command for code-only printable input")
+		}
+		if m.search.Active {
+			t.Error("expected code-only slash not to enter search")
+		}
+
+		m, cmd = m.handleKeyMsg(tea.KeyPressMsg{Code: 'f'})
+		if cmd != nil {
+			t.Error("expected no command for code-only printable input")
+		}
+		if !m.followMode {
+			t.Error("expected code-only f not to pause follow mode")
+		}
+		if m.autoExitCanceled {
+			t.Error("expected ignored terminal noise not to count as user interaction")
+		}
+	})
+
+	t.Run("terminal report text is ignored", func(t *testing.T) {
+		m := newTestModel()
+		m.search.Enter()
+
+		m, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "[?2026;2$y"})
+		if cmd != nil {
+			t.Error("expected no command for terminal report fragment")
+		}
+		if m.search.Query != "" {
+			t.Errorf("search query = %q, want empty", m.search.Query)
+		}
+		if m.autoExitCanceled {
+			t.Error("expected ignored terminal report not to count as user interaction")
+		}
+	})
+
 	t.Run("startup grace still allows ctrl+c", func(t *testing.T) {
 		m := newTestModel()
 		m.ignoreInputUntil = time.Now().Add(time.Minute)
