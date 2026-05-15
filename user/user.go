@@ -46,9 +46,9 @@ type Event struct {
 	types.BaseEvent
 	Message       Message         `json:"message"`
 	ToolUseResult json.RawMessage `json:"tool_use_result"`
+	Timestamp     string          `json:"timestamp"`
 	IsSynthetic   bool            `json:"isSynthetic"`
 }
-
 
 // Renderer handles rendering user events
 type Renderer struct {

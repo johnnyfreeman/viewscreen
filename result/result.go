@@ -52,8 +52,10 @@ type Event struct {
 	types.BaseEvent
 	Subtype           string                `json:"subtype"`
 	IsError           bool                  `json:"is_error"`
+	APIErrorStatus    json.RawMessage       `json:"api_error_status"`
 	DurationMS        int                   `json:"duration_ms"`
 	DurationAPIMS     int                   `json:"duration_api_ms"`
+	TTFTMs            int                   `json:"ttft_ms"`
 	NumTurns          int                   `json:"num_turns"`
 	Result            string                `json:"result"`
 	StopReason        string                `json:"stop_reason"`
@@ -62,6 +64,7 @@ type Event struct {
 	ModelUsage        map[string]ModelUsage `json:"modelUsage"`
 	PermissionDenials []PermissionDenial    `json:"permission_denials"`
 	Errors            []string              `json:"errors"`
+	TerminalReason    string                `json:"terminal_reason"`
 	FastModeState     string                `json:"fast_mode_state"`
 }
 
@@ -159,4 +162,3 @@ func (r *Renderer) RenderToString(event Event) string {
 	r.renderTo(out, event)
 	return out.String()
 }
-

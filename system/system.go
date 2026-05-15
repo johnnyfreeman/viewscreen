@@ -21,27 +21,30 @@ type MCPServer struct {
 
 // Plugin represents a configured plugin
 type Plugin struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name   string `json:"name"`
+	Path   string `json:"path"`
+	Source string `json:"source"`
 }
 
 // Event represents a system initialization event
 type Event struct {
 	types.BaseEvent
-	Subtype           string      `json:"subtype"`
-	CWD               string      `json:"cwd"`
-	Tools             []string    `json:"tools"`
-	Model             string      `json:"model"`
-	PermissionMode    string      `json:"permissionMode"`
-	ClaudeCodeVersion string      `json:"claude_code_version"`
-	Agents            []string    `json:"agents"`
-	MCPServers        []MCPServer `json:"mcp_servers"`
-	SlashCommands     []string    `json:"slash_commands"`
-	Skills            []string    `json:"skills"`
-	Plugins           []Plugin    `json:"plugins"`
-	FastModeState     string      `json:"fast_mode_state"`
-	APIKeySource      string      `json:"apiKeySource"`
-	OutputStyle       string      `json:"output_style"`
+	Subtype           string            `json:"subtype"`
+	CWD               string            `json:"cwd"`
+	Tools             []string          `json:"tools"`
+	Model             string            `json:"model"`
+	PermissionMode    string            `json:"permissionMode"`
+	ClaudeCodeVersion string            `json:"claude_code_version"`
+	Agents            []string          `json:"agents"`
+	MCPServers        []MCPServer       `json:"mcp_servers"`
+	SlashCommands     []string          `json:"slash_commands"`
+	Skills            []string          `json:"skills"`
+	Plugins           []Plugin          `json:"plugins"`
+	FastModeState     string            `json:"fast_mode_state"`
+	APIKeySource      string            `json:"apiKeySource"`
+	OutputStyle       string            `json:"output_style"`
+	AnalyticsDisabled bool              `json:"analytics_disabled"`
+	MemoryPaths       map[string]string `json:"memory_paths"`
 }
 
 // Renderer handles rendering system events

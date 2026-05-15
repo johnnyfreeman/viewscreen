@@ -1,6 +1,7 @@
 package assistant
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -16,22 +17,24 @@ import (
 
 // Message represents the message object in assistant events
 type Message struct {
-	Model      string               `json:"model"`
-	ID         string               `json:"id"`
-	Type       string               `json:"type"`
-	Role       string               `json:"role"`
-	Content    []types.ContentBlock `json:"content"`
-	StopReason *string              `json:"stop_reason"`
-	Usage      *types.Usage         `json:"usage"`
+	Model       string               `json:"model"`
+	ID          string               `json:"id"`
+	Type        string               `json:"type"`
+	Role        string               `json:"role"`
+	Content     []types.ContentBlock `json:"content"`
+	StopReason  *string              `json:"stop_reason"`
+	StopDetails json.RawMessage      `json:"stop_details"`
+	Usage       *types.Usage         `json:"usage"`
+	Diagnostics json.RawMessage      `json:"diagnostics"`
 }
 
 // Event represents an assistant message event
 type Event struct {
 	types.BaseEvent
-	Message Message `json:"message"`
-	Error   string  `json:"error,omitempty"`
+	Message   Message `json:"message"`
+	RequestID string  `json:"request_id"`
+	Error     string  `json:"error,omitempty"`
 }
-
 
 // ToolUseRenderer is a function type for rendering tool use blocks to a writer
 type ToolUseRenderer func(out *render.Output, block types.ContentBlock)

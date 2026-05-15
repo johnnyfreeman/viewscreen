@@ -2,6 +2,7 @@ package result
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -495,6 +496,36 @@ func TestEvent_Fields(t *testing.T) {
 	}
 	if len(event.Errors) != 2 {
 		t.Errorf("Errors: got %d, want 2", len(event.Errors))
+	}
+}
+
+func TestEvent_JSONUnmarshal_NewFields(t *testing.T) {
+	// Fields added to the result event in Claude Code 2.1.142.
+	input := `{
+		"type": "result",
+		"subtype": "success",
+		"is_error": false,
+		"api_error_status": null,
+		"duration_ms": 2481,
+		"duration_api_ms": 2462,
+		"ttft_ms": 2365,
+		"terminal_reason": "completed",
+		"fast_mode_state": "off"
+	}`
+
+	var event Event
+	if err := json.Unmarshal([]byte(input), &event); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if event.TTFTMs != 2365 {
+		t.Errorf("TTFTMs: got %d, want 2365", event.TTFTMs)
+	}
+	if event.TerminalReason != "completed" {
+		t.Errorf("TerminalReason: got %q, want 'completed'", event.TerminalReason)
+	}
+	if string(event.APIErrorStatus) != "null" {
+		t.Errorf("APIErrorStatus: got %q, want 'null'", string(event.APIErrorStatus))
 	}
 }
 

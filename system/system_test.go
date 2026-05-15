@@ -467,6 +467,34 @@ func TestEvent_JSONUnmarshal(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "event with fields added in claude code 2.1.142",
+			json: `{
+				"type": "system",
+				"model": "claude-opus-4-7",
+				"claude_code_version": "2.1.142",
+				"cwd": "/",
+				"tools": [],
+				"analytics_disabled": false,
+				"memory_paths": {"auto": "/home/user/.claude/memory/"},
+				"plugins": [{"name": "gopls-lsp", "path": "/p/gopls", "source": "gopls-lsp@claude-plugins-official"}]
+			}`,
+			wantErr: false,
+			validate: func(t *testing.T, e Event) {
+				if e.AnalyticsDisabled {
+					t.Errorf("expected AnalyticsDisabled false, got true")
+				}
+				if got := e.MemoryPaths["auto"]; got != "/home/user/.claude/memory/" {
+					t.Errorf("expected memory_paths[auto] set, got %q", got)
+				}
+				if len(e.Plugins) != 1 {
+					t.Fatalf("expected 1 plugin, got %d", len(e.Plugins))
+				}
+				if e.Plugins[0].Source != "gopls-lsp@claude-plugins-official" {
+					t.Errorf("expected plugin Source set, got %q", e.Plugins[0].Source)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {

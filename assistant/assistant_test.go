@@ -567,6 +567,36 @@ func TestEvent_JSONUnmarshal(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "event with fields added in claude code 2.1.142",
+			json: `{
+				"type": "assistant",
+				"request_id": "req_011Cb52M78mj1ajZ5xHGkker",
+				"message": {
+					"content": [
+						{"type": "thinking", "thinking": "", "signature": "Evc..."}
+					],
+					"stop_details": null,
+					"diagnostics": null
+				}
+			}`,
+			wantErr: false,
+			validate: func(t *testing.T, e Event) {
+				if e.RequestID != "req_011Cb52M78mj1ajZ5xHGkker" {
+					t.Errorf("expected RequestID set, got %q", e.RequestID)
+				}
+				if len(e.Message.Content) != 1 {
+					t.Fatalf("expected 1 content block, got %d", len(e.Message.Content))
+				}
+				block := e.Message.Content[0]
+				if block.Type != "thinking" {
+					t.Errorf("expected type 'thinking', got %q", block.Type)
+				}
+				if block.Signature != "Evc..." {
+					t.Errorf("expected signature set, got %q", block.Signature)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
