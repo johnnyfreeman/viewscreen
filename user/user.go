@@ -138,6 +138,7 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 	r.resultRegistry.Register(NewEditRenderer(r.styleApplier, r.highlighter, r.config))
 	r.resultRegistry.Register(NewWriteRenderer(r.styleApplier, r.highlighter, r.config))
 	r.resultRegistry.Register(NewTodoRenderer(r.styleApplier))
+	r.resultRegistry.Register(NewTaskListRenderer(r.styleApplier))
 	return r
 }
 

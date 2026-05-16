@@ -21,6 +21,15 @@ type TodoResult struct {
 	NewTodos []Todo `json:"newTodos"`
 }
 
+// TaskListItem represents one task in a TaskList tool result.
+// The Task* tools replaced TodoWrite in Claude Code 2.1.142.
+type TaskListItem struct {
+	ID        string   `json:"id"`
+	Subject   string   `json:"subject"`
+	Status    string   `json:"status"`
+	BlockedBy []string `json:"blockedBy"`
+}
+
 // State holds the centralized session state extracted from events
 type State struct {
 	// Session info from system event
@@ -146,18 +155,33 @@ func (s *State) UpdateFromToolUseResult(toolUseResult json.RawMessage) {
 	// Clear tool in progress since we got a result
 	s.ClearCurrentTool()
 
-	// TodoWrite results own the full todo list. If newTodos is present as an
-	// empty array, it intentionally clears the sidebar list.
+	// TodoWrite (newTodos) and TaskList (tasks) results each own the full task
+	// list. An empty array intentionally clears the sidebar list.
 	var raw struct {
 		NewTodos json.RawMessage `json:"newTodos"`
+		Tasks    json.RawMessage `json:"tasks"`
 	}
-	if err := json.Unmarshal(toolUseResult, &raw); err != nil || raw.NewTodos == nil {
+	if err := json.Unmarshal(toolUseResult, &raw); err != nil {
 		return
 	}
 
-	var todos []Todo
-	if err := json.Unmarshal(raw.NewTodos, &todos); err == nil {
-		s.Todos = todos
+	if raw.NewTodos != nil {
+		var todos []Todo
+		if err := json.Unmarshal(raw.NewTodos, &todos); err == nil {
+			s.Todos = todos
+		}
+		return
+	}
+
+	if raw.Tasks != nil {
+		var tasks []TaskListItem
+		if err := json.Unmarshal(raw.Tasks, &tasks); err == nil {
+			todos := make([]Todo, len(tasks))
+			for i, t := range tasks {
+				todos[i] = Todo{Content: t.Subject, Status: t.Status}
+			}
+			s.Todos = todos
+		}
 	}
 }
 

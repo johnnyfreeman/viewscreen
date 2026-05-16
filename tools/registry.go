@@ -18,6 +18,11 @@ type ToolDefinition struct {
 	// Empty for tools that don't show arguments.
 	HeaderField string
 
+	// HeaderFallback is tried if HeaderField is not found in the input.
+	// Used by tools whose input field was renamed across Claude Code versions
+	// (e.g. task_id -> taskId).
+	HeaderFallback string
+
 	// FilePathField is the input field containing a file path (for syntax highlighting).
 	// Empty for tools that don't operate on files.
 	FilePathField string
@@ -50,6 +55,11 @@ func (d ToolDefinition) RenderHeader(input map[string]interface{}) string {
 	if d.HeaderField != "" {
 		if val, ok := input[d.HeaderField].(string); ok {
 			return val
+		}
+		if d.HeaderFallback != "" {
+			if val, ok := input[d.HeaderFallback].(string); ok {
+				return val
+			}
 		}
 	}
 	return ""
@@ -166,9 +176,17 @@ var builtinTools = []ToolDefinition{
 	{Name: "WebFetch", HeaderField: "url"},
 	{Name: "WebSearch", HeaderField: "query"},
 	{Name: "Skill", HeaderField: "skill"},
-	{Name: "TaskOutput", HeaderField: "task_id"},
-	{Name: "TaskStop", HeaderField: "task_id"},
 	{Name: "ToolSearch", HeaderField: "query"},
+	{Name: "ScheduleWakeup", HeaderField: "reason"},
+	{Name: "ShareOnboardingGuide", HeaderField: "mode"},
+
+	// Task tracking tools. TaskOutput/TaskStop accept task_id in older Claude
+	// Code versions and taskId in newer ones.
+	{Name: "TaskCreate", HeaderField: "subject"},
+	{Name: "TaskUpdate", HeaderField: "taskId", HeaderFallback: "task_id"},
+	{Name: "TaskGet", HeaderField: "taskId", HeaderFallback: "task_id"},
+	{Name: "TaskOutput", HeaderField: "taskId", HeaderFallback: "task_id"},
+	{Name: "TaskStop", HeaderField: "taskId", HeaderFallback: "task_id"},
 
 	// Array counters - count items with singular/plural formatting
 	{Name: "TodoWrite", CountField: "todos", Singular: "item", Plural: "items"},
@@ -177,6 +195,10 @@ var builtinTools = []ToolDefinition{
 	// No-op renderers - tools with no meaningful arguments to display
 	{Name: "EnterPlanMode"},
 	{Name: "ExitPlanMode"},
+	{Name: "TaskList"},
+	{Name: "Monitor"},
+	{Name: "PushNotification"},
+	{Name: "RemoteTrigger"},
 }
 
 func init() {

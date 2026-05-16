@@ -195,6 +195,36 @@ func TestUpdateFromToolUseResult(t *testing.T) {
 			t.Errorf("Todos = %+v, want empty list", s.Todos)
 		}
 	})
+
+	t.Run("updates todo list from TaskList tasks", func(t *testing.T) {
+		s := NewState()
+		s.Todos = []Todo{{Content: "old", Status: "pending"}}
+
+		s.UpdateFromToolUseResult(json.RawMessage(
+			`{"tasks":[{"id":"1","subject":"Design schema","status":"completed","blockedBy":[]},` +
+				`{"id":"2","subject":"Build API","status":"in_progress","blockedBy":[]}]}`))
+
+		if len(s.Todos) != 2 {
+			t.Fatalf("Todos = %+v, want 2 tasks", s.Todos)
+		}
+		if s.Todos[0].Content != "Design schema" || s.Todos[0].Status != "completed" {
+			t.Errorf("Todos[0] = %+v, want Design schema/completed", s.Todos[0])
+		}
+		if s.Todos[1].Content != "Build API" || s.Todos[1].Status != "in_progress" {
+			t.Errorf("Todos[1] = %+v, want Build API/in_progress", s.Todos[1])
+		}
+	})
+
+	t.Run("clears todo list when tasks is empty", func(t *testing.T) {
+		s := NewState()
+		s.Todos = []Todo{{Content: "old", Status: "pending"}}
+
+		s.UpdateFromToolUseResult(json.RawMessage(`{"tasks":[]}`))
+
+		if len(s.Todos) != 0 {
+			t.Errorf("Todos = %+v, want empty list", s.Todos)
+		}
+	})
 }
 
 func TestNewState_HasStartTime(t *testing.T) {

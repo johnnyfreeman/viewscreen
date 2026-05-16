@@ -305,6 +305,30 @@ func TestGetToolArg(t *testing.T) {
 			input:    nil,
 			expected: "",
 		},
+		{
+			name:     "TaskCreate shows subject",
+			toolName: "TaskCreate",
+			input:    map[string]interface{}{"subject": "Build API", "description": "..."},
+			expected: "Build API",
+		},
+		{
+			name:     "TaskUpdate shows taskId",
+			toolName: "TaskUpdate",
+			input:    map[string]interface{}{"taskId": "2", "status": "in_progress"},
+			expected: "2",
+		},
+		{
+			name:     "TaskStop falls back to legacy task_id field",
+			toolName: "TaskStop",
+			input:    map[string]interface{}{"task_id": "b1db92c"},
+			expected: "b1db92c",
+		},
+		{
+			name:     "TaskList shows no argument",
+			toolName: "TaskList",
+			input:    map[string]interface{}{},
+			expected: "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -425,7 +449,6 @@ func TestIsFilePathTool(t *testing.T) {
 		})
 	}
 }
-
 
 func TestToolDefinition_RenderHeader(t *testing.T) {
 	tests := []struct {
@@ -587,4 +610,3 @@ func TestToolDefinition_IsFilePathTool(t *testing.T) {
 		})
 	}
 }
-
