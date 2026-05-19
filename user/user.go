@@ -139,6 +139,8 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 	r.resultRegistry.Register(NewWriteRenderer(r.styleApplier, r.highlighter, r.config))
 	r.resultRegistry.Register(NewTodoRenderer(r.styleApplier))
 	r.resultRegistry.Register(NewTaskListRenderer(r.styleApplier))
+	r.resultRegistry.Register(NewTaskCreateRenderer(r.styleApplier))
+	r.resultRegistry.Register(NewTaskUpdateRenderer(r.styleApplier))
 	return r
 }
 
@@ -175,6 +177,9 @@ func (r *Renderer) renderTo(out *render.Output, event Event, outputPrefix, outpu
 		Output:         out,
 		OutputPrefix:   outputPrefix,
 		OutputContinue: outputContinue,
+	}
+	if r.toolContext != nil {
+		ctx.ToolName = r.toolContext.ToolName
 	}
 	if r.resultRegistry.TryRender(ctx, event.ToolUseResult) {
 		return

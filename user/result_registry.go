@@ -12,6 +12,10 @@ type RenderContext struct {
 	Output         *render.Output
 	OutputPrefix   string
 	OutputContinue string
+	// ToolName is the tool that produced the result, when known. It lets
+	// renderers disambiguate tool results that share a JSON shape (e.g.
+	// TaskCreate and TaskGet both return a "task" object).
+	ToolName string
 }
 
 // ResultRenderer defines the interface for rendering specific tool result types.

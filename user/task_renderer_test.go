@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/testutil"
 )
 
@@ -64,4 +65,55 @@ func TestRenderer_Render_TaskListResult_Empty(t *testing.T) {
 	if out := buf.String(); strings.Contains(out, "✓") || strings.Contains(out, "○") {
 		t.Errorf("expected no status indicators for empty task list, got: %q", out)
 	}
+}
+
+func TestTaskCreateRenderer(t *testing.T) {
+	r := NewTaskCreateRenderer(testutil.MockStyleApplier{})
+
+	t.Run("renders created task id", func(t *testing.T) {
+		out := render.StringOutput()
+		ctx := &RenderContext{Output: out, ToolName: "TaskCreate"}
+		if !r.TryRender(ctx, json.RawMessage(`{"task":{"id":"7","subject":"Build API"}}`)) {
+			t.Fatal("expected TryRender to handle TaskCreate result")
+		}
+		if !strings.Contains(out.String(), "created task #7") {
+			t.Errorf("output = %q, want 'created task #7'", out.String())
+		}
+	})
+
+	t.Run("ignores result from a different tool", func(t *testing.T) {
+		out := render.StringOutput()
+		ctx := &RenderContext{Output: out, ToolName: "TaskGet"}
+		if r.TryRender(ctx, json.RawMessage(`{"task":{"id":"7","subject":"Build API"}}`)) {
+			t.Error("TaskCreateRenderer must not claim a TaskGet result")
+		}
+	})
+}
+
+func TestTaskUpdateRenderer(t *testing.T) {
+	r := NewTaskUpdateRenderer(testutil.MockStyleApplier{})
+
+	t.Run("renders status change", func(t *testing.T) {
+		out := render.StringOutput()
+		ctx := &RenderContext{Output: out, ToolName: "TaskUpdate"}
+		ok := r.TryRender(ctx, json.RawMessage(
+			`{"success":true,"taskId":"1","updatedFields":["status"],"statusChange":{"from":"pending","to":"in_progress"}}`))
+		if !ok {
+			t.Fatal("expected TryRender to handle TaskUpdate result")
+		}
+		if got := out.String(); !strings.Contains(got, "pending") || !strings.Contains(got, "in_progress") || !strings.Contains(got, "→") {
+			t.Errorf("output = %q, want 'pending → in_progress'", got)
+		}
+	})
+
+	t.Run("falls back to updated fields when no status change", func(t *testing.T) {
+		out := render.StringOutput()
+		ctx := &RenderContext{Output: out, ToolName: "TaskUpdate"}
+		if !r.TryRender(ctx, json.RawMessage(`{"success":true,"taskId":"1","updatedFields":["subject"]}`)) {
+			t.Fatal("expected TryRender to handle TaskUpdate result")
+		}
+		if !strings.Contains(out.String(), "updated subject") {
+			t.Errorf("output = %q, want 'updated subject'", out.String())
+		}
+	})
 }
