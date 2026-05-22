@@ -122,3 +122,97 @@ func TestProcessCodex_CommandLifecycle(t *testing.T) {
 		t.Errorf("completed should not repeat the header, got %q", completed.Rendered)
 	}
 }
+
+func TestProcessCodex_CommandDrivesSpinner(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+	item := codex.Item{ID: "c1", Type: codex.ItemCommandExecution, Command: "/usr/bin/zsh -lc 'go test ./...'", Status: "in_progress"}
+
+	// A started command becomes the running tool, with the unwrapped command
+	// as the spinner input.
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemStarted, Item: &item}})
+	if !s.ToolInProgress {
+		t.Fatal("ToolInProgress = false after item.started, want true")
+	}
+	if s.CurrentTool != "Shell" {
+		t.Errorf("CurrentTool = %q, want Shell", s.CurrentTool)
+	}
+	if s.CurrentToolInput != "go test ./..." {
+		t.Errorf("CurrentToolInput = %q, want unwrapped command", s.CurrentToolInput)
+	}
+
+	// Completing the command clears the spinner.
+	item.Status = "completed"
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &item}})
+	if s.ToolInProgress {
+		t.Error("ToolInProgress = true after item.completed, want false")
+	}
+}
+
+func TestProcessCodex_MCPCallDrivesSpinner(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+	item := codex.Item{ID: "m1", Type: codex.ItemMCPToolCall, Server: "github", Tool: "create_issue", Status: "in_progress"}
+
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemStarted, Item: &item}})
+	if s.CurrentTool != "github.create_issue" {
+		t.Errorf("CurrentTool = %q, want github.create_issue", s.CurrentTool)
+	}
+
+	item.Status = "completed"
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &item}})
+	if s.ToolInProgress {
+		t.Error("ToolInProgress = true after MCP item.completed, want false")
+	}
+}
+
+func TestProcessCodex_TurnEndClearsSpinner(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+	item := codex.Item{ID: "c1", Type: codex.ItemCommandExecution, Command: "sleep 100", Status: "in_progress"}
+
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemStarted, Item: &item}})
+	if !s.ToolInProgress {
+		t.Fatal("expected a running tool before the turn ends")
+	}
+
+	// A turn that ends without a matching item.completed must not leave a
+	// stale spinner running.
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeTurnCompleted}})
+	if s.ToolInProgress {
+		t.Error("ToolInProgress = true after turn.completed, want false")
+	}
+}
+
+func TestProcessCodex_TodoListPopulatesSidebar(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+	item := codex.Item{
+		ID:   "t1",
+		Type: codex.ItemTodoList,
+		Items: []codex.TodoItem{
+			{Text: "Write the test", Completed: true},
+			{Text: "Make it pass", Completed: false},
+		},
+	}
+
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemStarted, Item: &item}})
+	if len(s.Todos) != 2 {
+		t.Fatalf("len(Todos) = %d, want 2", len(s.Todos))
+	}
+	if s.Todos[0].Status != "completed" || s.Todos[1].Status != "pending" {
+		t.Errorf("Todos statuses = %q/%q, want completed/pending", s.Todos[0].Status, s.Todos[1].Status)
+	}
+	completed, total := s.TodoProgress()
+	if completed != 1 || total != 2 {
+		t.Errorf("TodoProgress = %d/%d, want 1/2", completed, total)
+	}
+
+	// A later update with more items checked off replaces the list so the
+	// sidebar tracks the latest completion state.
+	item.Items[1].Completed = true
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &item}})
+	if completed, total := s.TodoProgress(); completed != 2 || total != 2 {
+		t.Errorf("after update TodoProgress = %d/%d, want 2/2", completed, total)
+	}
+}

@@ -204,7 +204,7 @@ func (r *Renderer) renderReasoning(text string) string {
 func (r *Renderer) renderCommand(phase string, item *Item) string {
 	out := render.StringOutput()
 	if r.once(item.ID) {
-		fmt.Fprint(out, header("Shell", shellCommandText(item.Command)))
+		fmt.Fprint(out, header("Shell", ShellCommand(item.Command)))
 	}
 	if phase == "completed" {
 		r.writeCommandOutput(out, item)
@@ -258,7 +258,7 @@ func (r *Renderer) renderTodoList(item *Item) string {
 func (r *Renderer) renderMCPToolCall(phase string, item *Item) string {
 	out := render.StringOutput()
 	if r.once(item.ID) {
-		fmt.Fprint(out, header(mcpLabel(item), ""))
+		fmt.Fprint(out, header(MCPLabel(item), ""))
 	}
 	if phase == "completed" && item.Status == "failed" {
 		pw := textutil.NewPrefixedWriter(out, style.OutputPrefix, style.OutputContinue)
@@ -294,9 +294,11 @@ func header(label, arg string) string {
 	return b.String()
 }
 
-// shellCommandText extracts the inner command from codex's shell invocation,
-// which wraps commands as "<shell> -lc <script>".
-func shellCommandText(cmd string) string {
+// ShellCommand extracts the inner command from codex's shell invocation,
+// which wraps commands as "<shell> -lc <script>". It is exported so callers
+// that need the human-readable command (e.g. the live spinner label) share the
+// same unwrapping the renderer uses for command headers.
+func ShellCommand(cmd string) string {
 	for _, sep := range []string{" -lc ", " -c "} {
 		if i := strings.Index(cmd, sep); i != -1 {
 			return unquote(strings.TrimSpace(cmd[i+len(sep):]))
@@ -337,7 +339,10 @@ func changeKindLabel(kind string) string {
 	}
 }
 
-func mcpLabel(item *Item) string {
+// MCPLabel returns a "server.tool" label for an mcp_tool_call item, falling
+// back to whichever of server/tool is present. It is exported so the live
+// spinner can label an in-flight MCP call the same way the header does.
+func MCPLabel(item *Item) string {
 	switch {
 	case item.Server != "" && item.Tool != "":
 		return item.Server + "." + item.Tool

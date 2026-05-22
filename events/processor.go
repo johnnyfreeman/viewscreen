@@ -298,13 +298,72 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 }
 
 // processCodex handles an event from the Codex CLI stream. Codex events are
-// rendered by a dedicated codex.Renderer; per-turn token usage is folded into
-// the shared state so the TUI sidebar reflects it.
+// rendered by a dedicated codex.Renderer; this method also folds the event's
+// effect into the shared state (token usage, the live "Running" spinner, and
+// the sidebar task list) so the TUI reflects a codex stream the same way it
+// reflects a Claude one.
 func (p *EventProcessor) processCodex(event codex.Event) ProcessResult {
-	if event.Type == codex.TypeTurnCompleted && event.Usage != nil {
-		u := event.Usage
-		p.state.AccumulateUsage(u.InputTokens, u.OutputTokens, 0, u.CachedInputTokens)
-		p.state.ReasoningTokens += u.ReasoningOutputTokens
-	}
+	p.applyCodexState(event)
 	return ProcessResult{Rendered: p.renderers.Codex.Render(event)}
+}
+
+// applyCodexState updates the shared TUI state from a codex event. Codex runs
+// one item at a time, so an item.started for a long-running item (a shell
+// command or MCP call) sets the current tool for the spinner, and the matching
+// item.completed — or the end of the turn — clears it.
+func (p *EventProcessor) applyCodexState(event codex.Event) {
+	switch event.Type {
+	case codex.TypeTurnCompleted:
+		if event.Usage != nil {
+			u := event.Usage
+			p.state.AccumulateUsage(u.InputTokens, u.OutputTokens, 0, u.CachedInputTokens)
+			p.state.ReasoningTokens += u.ReasoningOutputTokens
+		}
+		p.state.ClearCurrentTool()
+	case codex.TypeTurnFailed:
+		p.state.ClearCurrentTool()
+	case codex.TypeItemStarted, codex.TypeItemUpdated, codex.TypeItemCompleted:
+		p.applyCodexItem(event.Type, event.Item)
+	}
+}
+
+// applyCodexItem applies a single codex work item to the spinner and task list.
+func (p *EventProcessor) applyCodexItem(phase string, item *codex.Item) {
+	if item == nil {
+		return
+	}
+	completed := phase == codex.TypeItemCompleted
+	switch item.Type {
+	case codex.ItemTodoList:
+		// Replace the sidebar task list on every update so it tracks the
+		// latest completion state, even though the inline render dedupes by id.
+		p.state.Todos = codexTodos(item.Items)
+	case codex.ItemCommandExecution:
+		if completed {
+			p.state.ClearCurrentTool()
+		} else {
+			p.state.SetCurrentTool("Shell", codex.ShellCommand(item.Command))
+		}
+	case codex.ItemMCPToolCall:
+		if completed {
+			p.state.ClearCurrentTool()
+		} else {
+			p.state.SetCurrentTool(codex.MCPLabel(item), "")
+		}
+	}
+}
+
+// codexTodos maps codex todo_list items onto the shared todo model. Codex only
+// reports a boolean completion (no explicit in-progress marker), so each item is
+// either completed or pending.
+func codexTodos(items []codex.TodoItem) []state.Todo {
+	todos := make([]state.Todo, len(items))
+	for i, it := range items {
+		status := "pending"
+		if it.Completed {
+			status = "completed"
+		}
+		todos[i] = state.Todo{Content: it.Text, Status: status}
+	}
+	return todos
 }

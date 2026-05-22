@@ -273,7 +273,7 @@ func TestRender_NilItem(t *testing.T) {
 	}
 }
 
-func TestShellCommandText(t *testing.T) {
+func TestShellCommand(t *testing.T) {
 	cases := map[string]string{
 		"/usr/bin/zsh -lc ls":            "ls",
 		"/usr/bin/zsh -lc 'cat foo.txt'": "cat foo.txt",
@@ -281,8 +281,8 @@ func TestShellCommandText(t *testing.T) {
 		"plain command":                  "plain command",
 	}
 	for in, want := range cases {
-		if got := shellCommandText(in); got != want {
-			t.Errorf("shellCommandText(%q) = %q, want %q", in, got, want)
+		if got := ShellCommand(in); got != want {
+			t.Errorf("ShellCommand(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
