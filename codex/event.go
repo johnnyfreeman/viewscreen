@@ -83,7 +83,11 @@ type Item struct {
 	Status           string `json:"status,omitempty"`
 
 	// file_change items.
-	Changes []FileChange `json:"changes,omitempty"`
+	Changes         []FileChange `json:"changes,omitempty"`
+	Patch           string       `json:"patch,omitempty"`
+	Diff            string       `json:"diff,omitempty"`
+	UnifiedDiff     string       `json:"unified_diff,omitempty"`
+	StructuredPatch []PatchHunk  `json:"structuredPatch,omitempty"`
 
 	// todo_list items.
 	Items []TodoItem `json:"items,omitempty"`
@@ -98,8 +102,22 @@ type Item struct {
 
 // FileChange is a single path touched by a file_change item.
 type FileChange struct {
-	Path string `json:"path"`
-	Kind string `json:"kind"` // "add", "update", or "delete"
+	Path            string      `json:"path"`
+	Kind            string      `json:"kind"` // "add", "update", or "delete"
+	Patch           string      `json:"patch,omitempty"`
+	Diff            string      `json:"diff,omitempty"`
+	UnifiedDiff     string      `json:"unified_diff,omitempty"`
+	StructuredPatch []PatchHunk `json:"structuredPatch,omitempty"`
+}
+
+// PatchHunk is a structured file-change hunk, matching Claude's structured
+// patch shape when Codex exposes equivalent detail.
+type PatchHunk struct {
+	OldStart int      `json:"oldStart"`
+	OldLines int      `json:"oldLines"`
+	NewStart int      `json:"newStart"`
+	NewLines int      `json:"newLines"`
+	Lines    []string `json:"lines"`
 }
 
 // TodoItem is a single entry in a todo_list item.

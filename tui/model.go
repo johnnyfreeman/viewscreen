@@ -12,9 +12,11 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/johnnyfreeman/viewscreen/events"
+	"github.com/johnnyfreeman/viewscreen/jsonl"
+	renderpkg "github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
-	"github.com/johnnyfreeman/viewscreen/tools"
+	"github.com/johnnyfreeman/viewscreen/timeline"
 )
 
 // Model is the main Bubbletea model for the TUI
@@ -24,7 +26,8 @@ type Model struct {
 	viewport          viewport.Model
 	spinner           spinner.Model
 	state             *state.State
-	content           *strings.Builder // pointer to avoid copy issues
+	timeline          []timeline.Entry
+	content           *strings.Builder // rendered cache; pointer avoids copy issues
 	stdinDone         bool
 	scanner           *bufio.Scanner
 	sidebarStyles     SidebarStyles
@@ -33,6 +36,7 @@ type Model struct {
 	showDetailsModal  bool
 	showHelpModal     bool
 	processor         *events.EventProcessor
+	timelineRenderer  *renderpkg.TimelineRenderer
 	search            Search
 	promptEditor      PromptEditor
 	followMode        bool                // auto-scroll to bottom on new content
@@ -59,7 +63,6 @@ type agentProcessStarter func(prompt string) (managedAgentProcess, error)
 const (
 	defaultInitialWidth  = 80
 	defaultInitialHeight = 24
-	maxScannerCapacity   = 10 * 1024 * 1024
 	startupInputGrace    = 500 * time.Millisecond
 )
 
@@ -159,19 +162,21 @@ func NewModel(opts ...ModelOption) Model {
 	vp := viewport.New()
 	vp.KeyMap = viewport.KeyMap{} // Disable viewport key handling; model handles all keys
 	m := Model{
-		width:         defaultInitialWidth,
-		height:        defaultInitialHeight,
-		spinner:       s,
-		state:         st,
-		content:       &strings.Builder{},
-		viewport:      vp,
-		sidebarStyles: NewSidebarStyles(),
-		headerStyles:  NewHeaderStyles(),
-		layoutMode:    LayoutSidebar, // default to sidebar mode
-		processor:     events.NewEventProcessor(st),
-		search:        NewSearch(),
-		promptEditor:  NewPromptEditor(),
-		followMode:    true, // auto-scroll to bottom by default
+		width:            defaultInitialWidth,
+		height:           defaultInitialHeight,
+		spinner:          s,
+		state:            st,
+		timeline:         make([]timeline.Entry, 0),
+		content:          &strings.Builder{},
+		viewport:         vp,
+		sidebarStyles:    NewSidebarStyles(),
+		headerStyles:     NewHeaderStyles(),
+		layoutMode:       LayoutSidebar, // default to sidebar mode
+		processor:        events.NewEventProcessor(st),
+		timelineRenderer: renderpkg.NewTimelineRenderer(),
+		search:           NewSearch(),
+		promptEditor:     NewPromptEditor(),
+		followMode:       true, // auto-scroll to bottom by default
 	}
 
 	for _, opt := range opts {
@@ -198,10 +203,7 @@ func NewModel(opts ...ModelOption) Model {
 }
 
 func newStreamScanner(r io.Reader) *bufio.Scanner {
-	scanner := bufio.NewScanner(r)
-	buf := make([]byte, maxScannerCapacity)
-	scanner.Buffer(buf, maxScannerCapacity)
-	return scanner
+	return jsonl.NewScanner(r)
 }
 
 // Init initializes the model
@@ -290,9 +292,13 @@ func (m Model) processEvent(msg tea.Msg) (Model, tea.Cmd) {
 	// Process the event through the EventProcessor
 	result := m.processor.Process(event)
 
-	// Append rendered content
-	if result.Rendered != "" {
-		m.content.WriteString(result.Rendered)
+	// Append committed timeline entries and refresh the rendered cache.
+	if len(result.Batch.Entries) > 0 {
+		if len(m.timeline) == 0 && m.content.Len() > 0 {
+			m.timeline = append(m.timeline, timeline.Entry{Kind: "legacy", Body: m.content.String()})
+		}
+		m.timeline = append(m.timeline, result.Batch.Entries...)
+		m.rebuildRenderedContent()
 	}
 	m.updateSearchMatches()
 
@@ -332,12 +338,18 @@ func (m *Model) visibleContent() string {
 
 	var sb strings.Builder
 	sb.WriteString(content)
-	m.processor.ForEachPendingTool(func(id string, pending tools.PendingTool) {
-		// Render pending tools with spinner instead of bullet.
-		// Apply Ultraviolet styling to the spinner for proper style/content separation.
-		sb.WriteString(m.processor.RenderPendingTool(pending, m.spinner.View()))
-	})
+	for _, activity := range m.processor.PendingActivities() {
+		if activity.HeaderRendered {
+			continue
+		}
+		sb.WriteString(m.timelineRenderer.RenderActivity(activity, m.spinner.View()))
+	}
 	return sb.String()
+}
+
+func (m *Model) rebuildRenderedContent() {
+	m.content = &strings.Builder{}
+	m.content.WriteString(m.timelineRenderer.RenderEntries(m.timeline))
 }
 
 // updateSearchMatches keeps the search status in sync as streamed content grows.
@@ -352,13 +364,13 @@ func (m *Model) appendStreamError(err error) {
 	if err == nil {
 		return
 	}
-	content := m.content.String()
-	if content != "" && !strings.HasSuffix(content, "\n") {
-		m.content.WriteString("\n")
+	body := ""
+	if content := m.content.String(); content != "" && !strings.HasSuffix(content, "\n") {
+		body += "\n"
 	}
-	m.content.WriteString(style.ErrorText("Input error: "))
-	m.content.WriteString(err.Error())
-	m.content.WriteString("\n")
+	body += style.ErrorText("Input error: ") + err.Error() + "\n"
+	m.timeline = append(m.timeline, timeline.Entry{Kind: "error", Body: body})
+	m.rebuildRenderedContent()
 	m.updateSearchMatches()
 	m.viewport.SetContent(m.content.String())
 	if m.followMode {

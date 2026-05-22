@@ -7,6 +7,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/system"
+	"github.com/johnnyfreeman/viewscreen/timeline"
 )
 
 // Todo represents a tracked task item from TodoWrite tool results.
@@ -151,6 +152,83 @@ func (s *State) AccumulateUsage(input, output, cacheCreated, cacheRead int) {
 	s.OutputTokens += output
 	s.CacheCreated += cacheCreated
 	s.CacheRead += cacheRead
+}
+
+// ApplyPatch applies a provider-neutral timeline state update.
+func (s *State) ApplyPatch(p timeline.StatePatch) {
+	if p.Agent != nil {
+		s.Agent = *p.Agent
+	}
+	if p.Model != nil && *p.Model != "" {
+		s.Model = *p.Model
+	}
+	if p.Version != nil && *p.Version != "" {
+		s.Version = *p.Version
+	}
+	if p.CWD != nil && *p.CWD != "" {
+		s.CWD = *p.CWD
+	}
+	if p.ToolsCount != nil && *p.ToolsCount > 0 {
+		s.ToolsCount = *p.ToolsCount
+	}
+	if len(p.Agents) > 0 {
+		s.Agents = append([]string(nil), p.Agents...)
+	}
+	if p.PermissionMode != nil && *p.PermissionMode != "" {
+		s.PermissionMode = *p.PermissionMode
+	}
+	if p.Prompt != nil {
+		s.Prompt = *p.Prompt
+	}
+	if p.IncrementTurns != 0 {
+		s.TurnCount += p.IncrementTurns
+	}
+	if p.TurnCount != nil {
+		s.TurnCount = *p.TurnCount
+	}
+	if p.TotalCost != nil {
+		s.TotalCost = *p.TotalCost
+	}
+	if p.ReplaceTodos {
+		s.Todos = make([]Todo, len(p.Todos))
+		for i, todo := range p.Todos {
+			s.Todos[i] = Todo{Content: todo.Content, Status: todo.Status, ActiveForm: todo.ActiveForm}
+		}
+	}
+	if p.ClearActivity {
+		s.ClearCurrentTool()
+	}
+	if p.CurrentActivity != nil {
+		s.SetCurrentTool(p.CurrentActivity.Name, p.CurrentActivity.Input)
+	}
+	if p.AddUsage != nil {
+		s.AccumulateUsage(p.AddUsage.InputTokens, p.AddUsage.OutputTokens, p.AddUsage.CacheCreated, p.AddUsage.CacheRead)
+		s.ReasoningTokens += p.AddUsage.ReasoningTokens
+	}
+	if p.InputTokens != nil {
+		s.InputTokens = *p.InputTokens
+	}
+	if p.OutputTokens != nil {
+		s.OutputTokens = *p.OutputTokens
+	}
+	if p.CacheCreated != nil {
+		s.CacheCreated = *p.CacheCreated
+	}
+	if p.CacheRead != nil {
+		s.CacheRead = *p.CacheRead
+	}
+	if p.ReasoningTokens != nil {
+		s.ReasoningTokens = *p.ReasoningTokens
+	}
+	if p.IsError != nil {
+		s.IsError = *p.IsError
+	}
+	if p.DurationMS != nil {
+		s.DurationMS = *p.DurationMS
+	}
+	if p.DurationAPIMS != nil {
+		s.DurationAPIMS = *p.DurationAPIMS
+	}
 }
 
 // SetCurrentTool sets the current tool being executed

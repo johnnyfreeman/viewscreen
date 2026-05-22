@@ -9,7 +9,9 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/johnnyfreeman/viewscreen/events"
+	renderpkg "github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/state"
+	"github.com/johnnyfreeman/viewscreen/timeline"
 )
 
 var errAgentStarterUnavailable = errors.New("agent starter unavailable")
@@ -480,6 +482,7 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 
 	// Reset state
 	m.content = &strings.Builder{}
+	m.timeline = nil
 	m.stdinDone = false
 	m.streamErr = nil
 	m.autoExitRemaining = 0
@@ -488,6 +491,7 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	st.Prompt = msg.Prompt
 	m.state = st
 	m.processor = events.NewEventProcessor(st)
+	m.timelineRenderer = renderpkg.NewTimelineRenderer()
 	m.prompt = msg.Prompt
 	m.followMode = true
 	m.agentProcess = nil
@@ -523,7 +527,8 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 }
 
 func (m *Model) failRerunStart(err error) {
-	m.content.WriteString("Error starting agent: " + err.Error() + "\n")
+	m.timeline = append(m.timeline, timeline.Entry{Kind: "error", Body: "Error starting agent: " + err.Error() + "\n"})
+	m.rebuildRenderedContent()
 	m.viewport.SetContent(m.content.String())
 	m.stdinDone = true
 }
@@ -543,7 +548,8 @@ func (m Model) handleAutoExitTick() (Model, tea.Cmd) {
 // handleParseError processes event parsing errors.
 func (m Model) handleParseError(msg events.ParseError) Model {
 	if m.showParseErrors {
-		m.content.WriteString("Parse error: " + msg.Line + "\n")
+		m.timeline = append(m.timeline, timeline.Entry{Kind: "parse_error", Body: "Parse error: " + msg.Line + "\n"})
+		m.rebuildRenderedContent()
 		m.updateSearchMatches()
 		m.viewport.SetContent(m.content.String())
 		if m.followMode {

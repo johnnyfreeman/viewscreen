@@ -31,6 +31,7 @@ const argWidth = 80
 // followed by an item.completed for the same id).
 type Renderer struct {
 	md         *render.MarkdownRenderer
+	code       render.CodeHighlighter
 	config     config.Provider
 	headerSeen map[string]bool
 	width      int
@@ -43,6 +44,7 @@ type RendererOption func(*Renderer)
 func WithConfigProvider(cp config.Provider) RendererOption {
 	return func(r *Renderer) {
 		r.config = cp
+		r.code = render.NewCodeRenderer(cp.NoColor())
 	}
 }
 
@@ -59,6 +61,7 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 	r := &Renderer{
 		config:     cfg,
 		md:         render.NewMarkdownRenderer(cfg.NoColor(), terminal.Width()),
+		code:       render.NewCodeRenderer(cfg.NoColor()),
 		headerSeen: make(map[string]bool),
 		width:      terminal.Width(),
 	}
@@ -175,10 +178,7 @@ func (r *Renderer) renderItem(phase string, item *Item) string {
 	case ItemCommandExecution:
 		return r.renderCommand(phase, item)
 	case ItemFileChange:
-		if !r.once(item.ID) {
-			return ""
-		}
-		return r.renderFileChange(item)
+		return r.renderFileChange(phase, item)
 	case ItemTodoList:
 		if !r.once(item.ID) {
 			return ""
@@ -239,16 +239,93 @@ func (r *Renderer) writeCommandOutput(out *render.Output, item *Item) {
 	}
 }
 
-func (r *Renderer) renderFileChange(item *Item) string {
+func (r *Renderer) renderFileChange(phase string, item *Item) string {
 	out := render.StringOutput()
-	fmt.Fprint(out, header("Edit", FileChangeSummary(item.Changes)))
-	if len(item.Changes) > 1 {
-		pw := textutil.NewPrefixedWriter(out, style.OutputPrefix, style.OutputContinue)
-		for _, c := range item.Changes {
-			pw.WriteLinef("%s %s", changeKindLabel(c.Kind), c.Path)
-		}
+	if r.once(item.ID) {
+		fmt.Fprint(out, header("Edit", FileChangeSummary(item.Changes)))
+	}
+	if phase == "updated" || phase == "completed" {
+		r.writeFileChangeDetails(out, item)
 	}
 	return out.String()
+}
+
+func (r *Renderer) writeFileChangeDetails(out *render.Output, item *Item) {
+	pw := textutil.NewPrefixedWriter(out, style.OutputPrefix, style.OutputContinue)
+	if len(item.Changes) == 0 {
+		pw.WriteLine(style.MutedText("(no file details)"))
+	} else {
+		for _, c := range item.Changes {
+			pw.WriteLinef("%s %s", changeKindLabel(c.Kind), c.Path)
+			r.writeStructuredPatch(out, c.Path, c.StructuredPatch)
+			r.writeRawDiff(out, firstNonEmpty(c.Patch, c.Diff, c.UnifiedDiff))
+		}
+	}
+	r.writeStructuredPatch(out, FileChangeSummary(item.Changes), item.StructuredPatch)
+	r.writeRawDiff(out, firstNonEmpty(item.Patch, item.Diff, item.UnifiedDiff))
+	if item.Status == "failed" {
+		pw.WriteLine(style.ErrorText("failed"))
+	}
+}
+
+func (r *Renderer) writeStructuredPatch(out *render.Output, path string, patch []PatchHunk) {
+	if len(patch) == 0 {
+		return
+	}
+	maxLine := 0
+	for _, hunk := range patch {
+		if endOld := hunk.OldStart + hunk.OldLines; endOld > maxLine {
+			maxLine = endOld
+		}
+		if endNew := hunk.NewStart + hunk.NewLines; endNew > maxLine {
+			maxLine = endNew
+		}
+	}
+	numWidth := len(fmt.Sprintf("%d", maxLine))
+	pw := textutil.NewPrefixedWriter(out, style.OutputPrefix, style.OutputContinue)
+	for _, hunk := range patch {
+		oldLine := hunk.OldStart
+		newLine := hunk.NewStart
+		for _, line := range hunk.Lines {
+			if line == "" {
+				continue
+			}
+			prefix := line[0]
+			content := line[1:]
+			lineNum, op := "", " "
+			switch prefix {
+			case '+':
+				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
+				op = style.SuccessText("+")
+				content = r.code.HighlightFileWithBg(content, path, style.DiffAddBg)
+				newLine++
+			case '-':
+				lineNum = fmt.Sprintf("%*d", numWidth, oldLine)
+				op = style.ErrorText("-")
+				content = r.code.HighlightFileWithBg(content, path, style.DiffRemoveBg)
+				oldLine++
+			default:
+				lineNum = fmt.Sprintf("%*d", numWidth, newLine)
+				content = r.code.HighlightFile(content, path)
+				oldLine++
+				newLine++
+			}
+			pw.WriteLinef("%s %s %s %s", style.LineNumberText(lineNum), style.LineNumberSepText("│"), op, content)
+		}
+	}
+}
+
+func (r *Renderer) writeRawDiff(out *render.Output, diff string) {
+	diff = strings.TrimRight(diff, "\n")
+	if diff == "" {
+		return
+	}
+	pw := textutil.NewPrefixedWriter(out, style.OutputPrefix, style.OutputContinue)
+	for _, line := range strings.Split(r.code.Highlight(diff, "diff"), "\n") {
+		if line != "" {
+			pw.WriteLine(line)
+		}
+	}
 }
 
 func (r *Renderer) renderTodoList(item *Item) string {

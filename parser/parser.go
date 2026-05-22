@@ -1,12 +1,12 @@
 package parser
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/johnnyfreeman/viewscreen/events"
+	"github.com/johnnyfreeman/viewscreen/jsonl"
 	"github.com/johnnyfreeman/viewscreen/state"
 )
 
@@ -89,12 +89,7 @@ func (p *Parser) Renderers() *events.RendererSet {
 
 // Run reads events from input and renders them
 func (p *Parser) Run() error {
-	scanner := bufio.NewScanner(p.input)
-
-	// Increase buffer size for large JSON lines
-	const maxCapacity = 10 * 1024 * 1024 // 10MB
-	buf := make([]byte, maxCapacity)
-	scanner.Buffer(buf, maxCapacity)
+	scanner := jsonl.NewScanner(p.input)
 
 	for scanner.Scan() {
 		line := scanner.Text()

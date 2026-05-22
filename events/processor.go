@@ -1,6 +1,7 @@
 package events
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/assistant"
@@ -11,6 +12,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/stream"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/system"
+	"github.com/johnnyfreeman/viewscreen/timeline"
 	"github.com/johnnyfreeman/viewscreen/tools"
 	"github.com/johnnyfreeman/viewscreen/user"
 )
@@ -19,6 +21,8 @@ import (
 type ProcessResult struct {
 	// Rendered is the rendered content to append to output
 	Rendered string
+	// Batch is the provider-neutral timeline update produced by the event.
+	Batch timeline.Batch
 	// HasPendingTools indicates whether there are pending tools waiting for results
 	HasPendingTools bool
 }
@@ -31,6 +35,8 @@ type EventProcessor struct {
 
 	codexActiveTools map[string]codexActiveTool
 	codexToolOrder   []string
+	activities       map[string]timeline.Activity
+	activityOrder    []string
 }
 
 type codexActiveTool struct {
@@ -44,6 +50,7 @@ func NewEventProcessor(s *state.State) *EventProcessor {
 		renderers:        NewRendererSet(),
 		state:            s,
 		codexActiveTools: make(map[string]codexActiveTool),
+		activities:       make(map[string]timeline.Activity),
 	}
 }
 
@@ -55,6 +62,7 @@ func NewEventProcessorWithRenderers(s *state.State, rs *RendererSet) *EventProce
 		renderers:        rs,
 		state:            s,
 		codexActiveTools: make(map[string]codexActiveTool),
+		activities:       make(map[string]timeline.Activity),
 	}
 }
 
@@ -94,6 +102,100 @@ func (p *EventProcessor) Process(event Event) ProcessResult {
 	}
 }
 
+func processResultFromRendered(rendered, kind string) ProcessResult {
+	return processResultFromBatch(rendered, kind, timeline.StatePatch{})
+}
+
+func processResultFromBatch(rendered, kind string, patch timeline.StatePatch) ProcessResult {
+	res := ProcessResult{Rendered: rendered, Batch: timeline.Batch{Patch: patch}}
+	if rendered != "" {
+		res.Batch.Entries = append(res.Batch.Entries, timeline.Entry{Kind: kind, Body: rendered})
+	}
+	return res
+}
+
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func systemPatch(event system.Event) timeline.StatePatch {
+	patch := timeline.StatePatch{}
+	if event.Model != "" {
+		patch.Model = timeline.StringPtr(event.Model)
+	}
+	if event.ClaudeCodeVersion != "" {
+		patch.Version = timeline.StringPtr(event.ClaudeCodeVersion)
+	}
+	if event.CWD != "" {
+		patch.CWD = timeline.StringPtr(event.CWD)
+	}
+	if len(event.Tools) > 0 {
+		patch.ToolsCount = timeline.IntPtr(len(event.Tools))
+	}
+	if len(event.Agents) > 0 {
+		patch.Agents = append([]string(nil), event.Agents...)
+	}
+	if event.PermissionMode != "" {
+		patch.PermissionMode = timeline.StringPtr(event.PermissionMode)
+	}
+	return patch
+}
+
+func resultPatch(event result.Event) timeline.StatePatch {
+	return timeline.StatePatch{
+		ClearActivity: true,
+		TurnCount:     timeline.IntPtr(event.NumTurns),
+		TotalCost:     timeline.FloatPtr(event.TotalCostUSD),
+		IsError:       timeline.BoolPtr(event.IsError),
+		DurationMS:    timeline.IntPtr(event.DurationMS),
+		DurationAPIMS: timeline.IntPtr(event.DurationAPIMS),
+		InputTokens:   timeline.IntPtr(event.Usage.InputTokens),
+		OutputTokens:  timeline.IntPtr(event.Usage.OutputTokens),
+		CacheCreated:  timeline.IntPtr(event.Usage.CacheCreationInputTokens),
+		CacheRead:     timeline.IntPtr(event.Usage.CacheReadInputTokens),
+	}
+}
+
+func toolUseResultPatch(raw json.RawMessage) timeline.StatePatch {
+	if len(raw) == 0 {
+		return timeline.StatePatch{}
+	}
+
+	patch := timeline.StatePatch{ClearActivity: true}
+	var envelope struct {
+		NewTodos json.RawMessage `json:"newTodos"`
+		Tasks    json.RawMessage `json:"tasks"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return patch
+	}
+	if envelope.NewTodos != nil {
+		var todos []state.Todo
+		if err := json.Unmarshal(envelope.NewTodos, &todos); err == nil {
+			patch.ReplaceTodos = true
+			patch.Todos = make([]timeline.Todo, len(todos))
+			for i, todo := range todos {
+				patch.Todos[i] = timeline.Todo{Content: todo.Content, Status: todo.Status, ActiveForm: todo.ActiveForm}
+			}
+		}
+		return patch
+	}
+	if envelope.Tasks != nil {
+		var tasks []state.TaskListItem
+		if err := json.Unmarshal(envelope.Tasks, &tasks); err == nil {
+			patch.ReplaceTodos = true
+			patch.Todos = make([]timeline.Todo, len(tasks))
+			for i, task := range tasks {
+				patch.Todos[i] = timeline.Todo{Content: task.Subject, Status: task.Status}
+			}
+		}
+	}
+	return patch
+}
+
 // detectAgent records which CLI produced the stream so the TUI can brand
 // itself accordingly. Codex envelope events are unambiguous; every other
 // concrete event type comes from Claude Code's stream-json. Ignored or empty
@@ -102,15 +204,57 @@ func (p *EventProcessor) Process(event Event) ProcessResult {
 func (p *EventProcessor) detectAgent(event Event) {
 	switch event.(type) {
 	case CodexEvent:
-		p.state.Agent = config.AgentCodex
+		p.state.ApplyPatch(timeline.StatePatch{Agent: timeline.StringPtr(config.AgentCodex)})
 	case SystemEvent, SubAgentSystemEvent, AssistantEvent, UserEvent, StreamEvent, ResultEvent:
-		p.state.Agent = config.AgentClaude
+		p.state.ApplyPatch(timeline.StatePatch{Agent: timeline.StringPtr(config.AgentClaude)})
 	}
 }
 
 // HasPendingTools returns whether there are pending tools awaiting results.
 func (p *EventProcessor) HasPendingTools() bool {
-	return p.renderers.PendingTools.Len() > 0
+	return p.renderers.PendingTools.Len() > 0 || len(p.activities) > 0
+}
+
+// PendingActivities returns live provider-neutral timeline activities.
+func (p *EventProcessor) PendingActivities() []timeline.Activity {
+	activities := make([]timeline.Activity, 0, len(p.activities))
+	for _, id := range p.activityOrder {
+		if activity, ok := p.activities[id]; ok {
+			activities = append(activities, activity)
+		}
+	}
+	return activities
+}
+
+func (p *EventProcessor) setActivity(activity timeline.Activity) {
+	if activity.ID == "" {
+		return
+	}
+	if p.activities == nil {
+		p.activities = make(map[string]timeline.Activity)
+	}
+	if _, exists := p.activities[activity.ID]; !exists {
+		p.activityOrder = append(p.activityOrder, activity.ID)
+	}
+	p.activities[activity.ID] = activity
+}
+
+func (p *EventProcessor) removeActivity(id string) {
+	if id == "" {
+		return
+	}
+	delete(p.activities, id)
+	for i, activeID := range p.activityOrder {
+		if activeID == id {
+			p.activityOrder = append(p.activityOrder[:i], p.activityOrder[i+1:]...)
+			return
+		}
+	}
+}
+
+func (p *EventProcessor) clearActivities() {
+	clear(p.activities)
+	p.activityOrder = nil
 }
 
 // RenderPendingTool renders a pending tool with the given icon (for spinner animation).
@@ -137,7 +281,8 @@ func (p *EventProcessor) processSystem(event system.Event) ProcessResult {
 		return ProcessResult{}
 	}
 
-	p.state.UpdateFromSystemEvent(event)
+	patch := systemPatch(event)
+	p.state.ApplyPatch(patch)
 
 	// Skip rendering for system events with no meaningful data.
 	// These are typically subagent events that lack parent_tool_use_id.
@@ -146,16 +291,22 @@ func (p *EventProcessor) processSystem(event system.Event) ProcessResult {
 	}
 
 	rendered := p.renderers.System.RenderToString(event)
-	return ProcessResult{Rendered: rendered}
+	return processResultFromBatch(rendered, "system", patch)
 }
 
 func (p *EventProcessor) processAssistant(event assistant.Event) ProcessResult {
-	p.state.IncrementTurnCount()
+	patch := timeline.StatePatch{IncrementTurns: 1}
 
 	// Accumulate per-turn token usage for real-time tracking
 	if u := event.Message.Usage; u != nil {
-		p.state.AccumulateUsage(u.InputTokens, u.OutputTokens, u.CacheCreationInputTokens, u.CacheReadInputTokens)
+		patch.AddUsage = &timeline.Usage{
+			InputTokens:  u.InputTokens,
+			OutputTokens: u.OutputTokens,
+			CacheCreated: u.CacheCreationInputTokens,
+			CacheRead:    u.CacheReadInputTokens,
+		}
 	}
+	p.state.ApplyPatch(patch)
 
 	r := p.renderers
 
@@ -168,7 +319,15 @@ func (p *EventProcessor) processAssistant(event assistant.Event) ProcessResult {
 		// Update state to show the first pending tool
 		for _, block := range event.Message.Content {
 			if block.Type == "tool_use" && block.ID != "" {
-				p.state.SetCurrentTool(block.Name, tools.GetToolArgFromBlock(block))
+				activity := timeline.Activity{
+					ID:       block.ID,
+					ParentID: stringValue(event.ParentToolUseID),
+					Name:     block.Name,
+					Input:    tools.GetToolArgFromBlock(block),
+				}
+				p.state.ApplyPatch(timeline.StatePatch{CurrentActivity: &activity})
+				patch.CurrentActivity = &activity
+				p.setActivity(activity)
 				break
 			}
 		}
@@ -182,14 +341,14 @@ func (p *EventProcessor) processAssistant(event assistant.Event) ProcessResult {
 	)
 	r.Stream.ResetBlockState()
 
-	return ProcessResult{
-		Rendered:        rendered,
-		HasPendingTools: r.PendingTools.Len() > 0,
-	}
+	res := processResultFromBatch(rendered, "assistant", patch)
+	res.HasPendingTools = r.PendingTools.Len() > 0
+	return res
 }
 
 func (p *EventProcessor) processUser(event user.Event) ProcessResult {
-	p.state.UpdateFromToolUseResult(event.ToolUseResult)
+	patch := toolUseResultPatch(event.ToolUseResult)
+	p.state.ApplyPatch(patch)
 	r := p.renderers
 
 	var content strings.Builder
@@ -200,6 +359,10 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 		// Resolve the parent tool early and render its header
 		if resolved := r.PendingTools.ResolveParentEarly(*event.ParentToolUseID); resolved != nil {
 			isNested = resolved.IsNested
+			if activity, ok := p.activities[*event.ParentToolUseID]; ok {
+				activity.HeaderRendered = true
+				p.setActivity(activity)
+			}
 			str, _ := tools.RenderResolved(*resolved)
 			content.WriteString(str)
 		}
@@ -209,10 +372,9 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 		} else {
 			content.WriteString(r.User.RenderSubAgentPromptToString(event))
 		}
-		return ProcessResult{
-			Rendered:        content.String(),
-			HasPendingTools: r.PendingTools.Len() > 0,
-		}
+		res := processResultFromBatch(content.String(), "user", patch)
+		res.HasPendingTools = r.PendingTools.Len() > 0
+		return res
 	}
 
 	// Match tool results with pending tools using the tracker's method
@@ -223,6 +385,9 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 		msg.Content[i] = tools.UserToolResult{
 			Type:      c.Type,
 			ToolUseID: c.ToolUseID,
+		}
+		if c.Type == "tool_result" {
+			p.removeActivity(c.ToolUseID)
 		}
 	}
 	matched := r.PendingTools.MatchFromUserMessage(msg)
@@ -243,7 +408,8 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 
 	// Clear tool state if no more pending tools
 	if r.PendingTools.Len() == 0 {
-		p.state.ClearCurrentTool()
+		patch.ClearActivity = true
+		p.state.ApplyPatch(timeline.StatePatch{ClearActivity: true})
 	}
 
 	// Render the tool result (with nested prefix if applicable)
@@ -253,10 +419,9 @@ func (p *EventProcessor) processUser(event user.Event) ProcessResult {
 		content.WriteString(r.User.RenderToString(event))
 	}
 
-	return ProcessResult{
-		Rendered:        content.String(),
-		HasPendingTools: r.PendingTools.Len() > 0,
-	}
+	res := processResultFromBatch(content.String(), "user", patch)
+	res.HasPendingTools = r.PendingTools.Len() > 0
+	return res
 }
 
 // isSubAgentPrompt checks if a user event is a sub-agent prompt.
@@ -281,10 +446,13 @@ func (p *EventProcessor) processStream(event stream.Event) ProcessResult {
 		if toolName == "" {
 			toolName = r.Stream.CurrentBlockType()
 		}
-		p.state.SetCurrentTool(toolName, "")
+		activity := timeline.Activity{Name: toolName}
+		patch := timeline.StatePatch{CurrentActivity: &activity}
+		p.state.ApplyPatch(patch)
+		return processResultFromBatch(rendered, "stream", patch)
 	}
 
-	return ProcessResult{Rendered: rendered}
+	return processResultFromRendered(rendered, "stream")
 }
 
 func (p *EventProcessor) processResult(event result.Event) ProcessResult {
@@ -295,16 +463,18 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 	// Flush any orphaned pending tools using the tracker's method
 	orphaned := r.PendingTools.FlushAll()
 	for _, o := range orphaned {
+		p.removeActivity(o.ID)
 		str, _ := tools.RenderResolved(o.ResolvedTool)
 		content.WriteString(str)
 		content.WriteString(style.OutputPrefix + style.MutedText("(no result)") + "\n")
 	}
+	p.clearActivities()
 
-	p.state.ClearCurrentTool()
-	p.state.UpdateFromResultEvent(event)
+	patch := resultPatch(event)
+	p.state.ApplyPatch(patch)
 	content.WriteString(r.Result.RenderToString(event))
 
-	return ProcessResult{Rendered: content.String()}
+	return processResultFromBatch(content.String(), "result", patch)
 }
 
 // processCodex handles an event from the Codex CLI stream. Codex events are
@@ -314,7 +484,55 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 // reflects a Claude one.
 func (p *EventProcessor) processCodex(event codex.Event) ProcessResult {
 	p.applyCodexState(event)
-	return ProcessResult{Rendered: p.renderers.Codex.Render(event)}
+	res := processResultFromBatch(p.renderers.Codex.Render(event), "codex", codexPatch(event))
+	res.HasPendingTools = len(p.activities) > 0
+	return res
+}
+
+func codexPatch(event codex.Event) timeline.StatePatch {
+	switch event.Type {
+	case codex.TypeTurnStarted:
+		return timeline.StatePatch{IncrementTurns: 1}
+	case codex.TypeTurnCompleted:
+		patch := timeline.StatePatch{ClearActivity: true}
+		if event.Usage != nil {
+			patch.AddUsage = &timeline.Usage{
+				InputTokens:     event.Usage.InputTokens,
+				OutputTokens:    event.Usage.OutputTokens,
+				CacheRead:       event.Usage.CachedInputTokens,
+				ReasoningTokens: event.Usage.ReasoningOutputTokens,
+			}
+		}
+		return patch
+	case codex.TypeTurnFailed:
+		return timeline.StatePatch{ClearActivity: true}
+	case codex.TypeItemStarted, codex.TypeItemUpdated, codex.TypeItemCompleted:
+		if event.Item == nil {
+			return timeline.StatePatch{}
+		}
+		completed := event.Type == codex.TypeItemCompleted
+		switch event.Item.Type {
+		case codex.ItemTodoList:
+			return timeline.StatePatch{ReplaceTodos: true, Todos: codexTodos(event.Item.Items)}
+		case codex.ItemCommandExecution:
+			return codexActivityPatch(completed, "Shell", codex.ShellCommand(event.Item.Command))
+		case codex.ItemMCPToolCall:
+			return codexActivityPatch(completed, codex.MCPLabel(event.Item), "")
+		case codex.ItemFileChange:
+			return codexActivityPatch(completed, "Edit", codex.FileChangeSummary(event.Item.Changes))
+		case codex.ItemWebSearch:
+			return codexActivityPatch(completed, "Web Search", event.Item.Query)
+		}
+	}
+	return timeline.StatePatch{}
+}
+
+func codexActivityPatch(completed bool, name, input string) timeline.StatePatch {
+	if completed {
+		return timeline.StatePatch{ClearActivity: true}
+	}
+	activity := timeline.Activity{Name: name, Input: input}
+	return timeline.StatePatch{CurrentActivity: &activity}
 }
 
 // applyCodexState updates the shared TUI state from a codex event. Codex runs
@@ -326,12 +544,16 @@ func (p *EventProcessor) processCodex(event codex.Event) ProcessResult {
 func (p *EventProcessor) applyCodexState(event codex.Event) {
 	switch event.Type {
 	case codex.TypeTurnStarted:
-		p.state.IncrementTurnCount()
+		p.state.ApplyPatch(timeline.StatePatch{IncrementTurns: 1})
 	case codex.TypeTurnCompleted:
 		if event.Usage != nil {
 			u := event.Usage
-			p.state.AccumulateUsage(u.InputTokens, u.OutputTokens, 0, u.CachedInputTokens)
-			p.state.ReasoningTokens += u.ReasoningOutputTokens
+			p.state.ApplyPatch(timeline.StatePatch{AddUsage: &timeline.Usage{
+				InputTokens:     u.InputTokens,
+				OutputTokens:    u.OutputTokens,
+				CacheRead:       u.CachedInputTokens,
+				ReasoningTokens: u.ReasoningOutputTokens,
+			}})
 		}
 		p.clearCodexActiveTools()
 	case codex.TypeTurnFailed:
@@ -353,7 +575,7 @@ func (p *EventProcessor) applyCodexItem(phase string, item *codex.Item) {
 	case codex.ItemTodoList:
 		// Replace the sidebar task list on every update so it tracks the
 		// latest completion state, even though the inline render dedupes by id.
-		p.state.Todos = codexTodos(item.Items)
+		p.state.ApplyPatch(timeline.StatePatch{ReplaceTodos: true, Todos: codexTodos(item.Items)})
 	case codex.ItemCommandExecution:
 		p.updateCodexActiveTool(completed, item.ID, "Shell", codex.ShellCommand(item.Command))
 	case codex.ItemMCPToolCall:
@@ -373,9 +595,10 @@ func (p *EventProcessor) applyCodexItem(phase string, item *codex.Item) {
 func (p *EventProcessor) updateCodexActiveTool(completed bool, id, name, input string) {
 	if id == "" {
 		if completed {
-			p.state.ClearCurrentTool()
+			p.state.ApplyPatch(timeline.StatePatch{ClearActivity: true})
 		} else {
-			p.state.SetCurrentTool(name, input)
+			activity := timeline.Activity{Name: name, Input: input}
+			p.state.ApplyPatch(timeline.StatePatch{CurrentActivity: &activity})
 		}
 		return
 	}
@@ -383,6 +606,7 @@ func (p *EventProcessor) updateCodexActiveTool(completed bool, id, name, input s
 	if completed {
 		delete(p.codexActiveTools, id)
 		p.removeCodexToolOrder(id)
+		p.removeActivity(id)
 		p.restoreLatestCodexTool()
 		return
 	}
@@ -394,24 +618,28 @@ func (p *EventProcessor) updateCodexActiveTool(completed bool, id, name, input s
 		p.codexToolOrder = append(p.codexToolOrder, id)
 	}
 	p.codexActiveTools[id] = codexActiveTool{name: name, input: input}
-	p.state.SetCurrentTool(name, input)
+	activity := timeline.Activity{ID: id, Name: name, Input: input}
+	p.setActivity(activity)
+	p.state.ApplyPatch(timeline.StatePatch{CurrentActivity: &activity})
 }
 
 func (p *EventProcessor) restoreLatestCodexTool() {
 	for i := len(p.codexToolOrder) - 1; i >= 0; i-- {
 		id := p.codexToolOrder[i]
 		if tool, ok := p.codexActiveTools[id]; ok {
-			p.state.SetCurrentTool(tool.name, tool.input)
+			activity := timeline.Activity{ID: id, Name: tool.name, Input: tool.input}
+			p.state.ApplyPatch(timeline.StatePatch{CurrentActivity: &activity})
 			return
 		}
 	}
-	p.state.ClearCurrentTool()
+	p.state.ApplyPatch(timeline.StatePatch{ClearActivity: true})
 }
 
 func (p *EventProcessor) clearCodexActiveTools() {
 	clear(p.codexActiveTools)
 	p.codexToolOrder = nil
-	p.state.ClearCurrentTool()
+	p.clearActivities()
+	p.state.ApplyPatch(timeline.StatePatch{ClearActivity: true})
 }
 
 func (p *EventProcessor) removeCodexToolOrder(id string) {
@@ -426,14 +654,14 @@ func (p *EventProcessor) removeCodexToolOrder(id string) {
 // codexTodos maps codex todo_list items onto the shared todo model. Codex only
 // reports a boolean completion (no explicit in-progress marker), so each item is
 // either completed or pending.
-func codexTodos(items []codex.TodoItem) []state.Todo {
-	todos := make([]state.Todo, len(items))
+func codexTodos(items []codex.TodoItem) []timeline.Todo {
+	todos := make([]timeline.Todo, len(items))
 	for i, it := range items {
 		status := "pending"
 		if it.Completed {
 			status = "completed"
 		}
-		todos[i] = state.Todo{Content: it.Text, Status: status}
+		todos[i] = timeline.Todo{Content: it.Text, Status: status}
 	}
 	return todos
 }

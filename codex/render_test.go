@@ -232,6 +232,9 @@ func TestRender_FileChangeSingle(t *testing.T) {
 	if !strings.Contains(out, "Edit") || !strings.Contains(out, "/tmp/bar.txt") {
 		t.Errorf("expected single-file header, got %q", out)
 	}
+	if !strings.Contains(out, "add") {
+		t.Errorf("expected single-file change detail, got %q", out)
+	}
 }
 
 func TestRender_FileChangeMultiple(t *testing.T) {
@@ -255,8 +258,50 @@ func TestRender_FileChangeDedup(t *testing.T) {
 	if out := r.Render(itemEvent(TypeItemStarted, item)); out == "" {
 		t.Fatal("started should render the file change")
 	}
-	if out := r.Render(itemEvent(TypeItemCompleted, item)); out != "" {
-		t.Errorf("completed duplicate should render nothing, got %q", out)
+	out := r.Render(itemEvent(TypeItemCompleted, item))
+	if strings.Contains(out, "Edit") {
+		t.Errorf("completed duplicate should not repeat header, got %q", out)
+	}
+	if !strings.Contains(out, "add") || !strings.Contains(out, "/a.txt") {
+		t.Errorf("completed duplicate should render change details, got %q", out)
+	}
+}
+
+func TestRender_FileChangeVeryVerboseDoesNotDumpSparseRawPayload(t *testing.T) {
+	r := newTestRendererWithLevel(t, true, 3)
+	event, err := ParseEvent([]byte(`{"type":"item.completed","item":{"id":"f1","type":"file_change","changes":[{"path":"/a.txt","kind":"update"}],"status":"completed"}}`))
+	if err != nil {
+		t.Fatalf("ParseEvent error: %v", err)
+	}
+	out := r.Render(event)
+	if strings.Contains(out, `"type":"file_change"`) || strings.Contains(out, `"status":"completed"`) {
+		t.Errorf("-vvv should not dump sparse raw payload, got %q", out)
+	}
+}
+
+func TestRender_FileChangeStructuredPatch(t *testing.T) {
+	r := newTestRendererWithLevel(t, true, 3)
+	item := Item{
+		ID:   "f1",
+		Type: ItemFileChange,
+		Changes: []FileChange{{
+			Path: "/tmp/app.go",
+			Kind: "update",
+			StructuredPatch: []PatchHunk{{
+				OldStart: 10,
+				OldLines: 2,
+				NewStart: 10,
+				NewLines: 3,
+				Lines:    []string{" package main", "-old()", "+new()", "+more()"},
+			}},
+		}},
+		Status: "completed",
+	}
+	out := r.Render(itemEvent(TypeItemCompleted, item))
+	for _, want := range []string{"10", "│", "old()", "new()", "more()"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in structured patch output, got %q", want, out)
+		}
 	}
 }
 

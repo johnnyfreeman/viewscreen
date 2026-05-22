@@ -1175,6 +1175,25 @@ func TestProcessEventRefreshesSearchMatches(t *testing.T) {
 	}
 }
 
+func TestProcessEventStoresTimelineEntries(t *testing.T) {
+	m := newTestModel()
+
+	m, _ = m.processEvent(events.AssistantEvent{
+		Data: assistant.Event{
+			Message: assistant.Message{
+				Content: []types.ContentBlock{{Type: "text", Text: "timeline primary"}},
+			},
+		},
+	})
+
+	if len(m.timeline) != 1 {
+		t.Fatalf("timeline entries = %d, want 1", len(m.timeline))
+	}
+	if !strings.Contains(m.visibleContent(), "timeline primary") {
+		t.Fatalf("visibleContent() = %q, want committed timeline entry", m.visibleContent())
+	}
+}
+
 func TestSearchIncludesVisiblePendingTools(t *testing.T) {
 	m := newTestModel()
 
