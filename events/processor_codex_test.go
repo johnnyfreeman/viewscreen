@@ -115,8 +115,11 @@ func TestProcessCodex_CommandLifecycle(t *testing.T) {
 	}
 
 	completed := p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &item}})
-	if !strings.Contains(completed.Rendered, "foo.txt") {
-		t.Errorf("completed rendered %q, want output", completed.Rendered)
+	if !strings.Contains(completed.Rendered, "1 lines") {
+		t.Errorf("completed rendered %q, want output summary", completed.Rendered)
+	}
+	if strings.Contains(completed.Rendered, "foo.txt") {
+		t.Errorf("completed should not expand output at default verbosity, got %q", completed.Rendered)
 	}
 	if strings.Contains(completed.Rendered, "Shell") {
 		t.Errorf("completed should not repeat the header, got %q", completed.Rendered)

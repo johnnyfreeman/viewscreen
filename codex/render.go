@@ -3,9 +3,9 @@ package codex
 import (
 	"encoding/json"
 	"fmt"
-	"slices"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
@@ -13,9 +13,13 @@ import (
 	"github.com/johnnyfreeman/viewscreen/textutil"
 )
 
-// maxOutputLines caps how many lines of command output are shown when not
-// running verbosely, mirroring the truncation the Claude renderers apply.
-const maxOutputLines = 25
+const (
+	// commandOutputLinesVeryVerbose mirrors Claude read-output expansion at -vv.
+	commandOutputLinesVeryVerbose = 5
+
+	// commandOutputLinesMaxVerbose mirrors Claude read-output expansion at -vvv.
+	commandOutputLinesMaxVerbose = 10
+)
 
 // argWidth is the maximum width of a header argument (command/path) before it
 // is truncated. Matches the tools header renderer.
@@ -29,6 +33,7 @@ type Renderer struct {
 	md         *render.MarkdownRenderer
 	config     config.Provider
 	headerSeen map[string]bool
+	width      int
 }
 
 // RendererOption configures a Renderer.
@@ -55,6 +60,7 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 		config:     cfg,
 		md:         render.NewMarkdownRenderer(cfg.NoColor(), terminal.Width()),
 		headerSeen: make(map[string]bool),
+		width:      terminal.Width(),
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -62,9 +68,12 @@ func NewRenderer(opts ...RendererOption) *Renderer {
 	return r
 }
 
-// SetWidth updates the word-wrap width of the markdown renderer.
+// SetWidth updates the word-wrap width of markdown and command output.
 func (r *Renderer) SetWidth(width int) {
 	r.md.SetWidth(width)
+	if width > 0 {
+		r.width = width
+	}
 }
 
 // Render renders a single codex event to a string. It returns "" for events
@@ -217,8 +226,8 @@ func (r *Renderer) writeCommandOutput(out *render.Output, item *Item) {
 	pw := textutil.NewPrefixedWriter(out, style.OutputPrefix, style.OutputContinue)
 	body := strings.TrimRight(item.AggregatedOutput, "\n")
 	if body != "" {
-		for _, line := range r.capLines(strings.Split(body, "\n")) {
-			pw.WriteLine(line)
+		for _, line := range r.commandOutputLines(strings.Split(body, "\n")) {
+			pw.WriteLine(r.truncateCommandOutputLine(line))
 		}
 	}
 	if item.ExitCode != nil && *item.ExitCode != 0 {
@@ -302,14 +311,48 @@ func (r *Renderer) writeUnknownItemDetails(out *render.Output, item *Item, heade
 	}
 }
 
-// capLines truncates a slice of output lines unless verbose output is enabled.
-func (r *Renderer) capLines(lines []string) []string {
-	if r.config.IsVerbose() || len(lines) <= maxOutputLines {
+// commandOutputLines applies the same read-output expansion policy as Claude:
+// default and -v show a summary, -vv shows 5 lines, and -vvv shows 10.
+func (r *Renderer) commandOutputLines(lines []string) []string {
+	level := r.config.GetVerboseLevel()
+	maxLines := 0
+	switch {
+	case level >= 3:
+		maxLines = commandOutputLinesMaxVerbose
+	case level >= 2:
+		maxLines = commandOutputLinesVeryVerbose
+	}
+
+	if maxLines == 0 {
+		return []string{style.MutedText(fmt.Sprintf("%d lines", len(lines)))}
+	}
+	if len(lines) <= maxLines {
 		return lines
 	}
-	hidden := len(lines) - maxOutputLines
-	kept := slices.Clone(lines[:maxOutputLines])
-	return append(kept, style.MutedText(fmt.Sprintf("… (+%d more lines)", hidden)))
+
+	hidden := len(lines) - maxLines
+	result := append([]string(nil), lines[:maxLines]...)
+	return append(result, style.MutedText(textutil.TruncationIndicator(hidden)))
+}
+
+func (r *Renderer) truncateCommandOutputLine(line string) string {
+	limit := max(20, r.width-ansi.StringWidth(style.OutputPrefix))
+	if ansi.StringWidth(line) <= limit {
+		return line
+	}
+
+	originalWidth := ansi.StringWidth(line)
+	omitted := originalWidth - limit
+	var tail string
+	for {
+		tail = style.MutedText(fmt.Sprintf("… (+%d more chars)", omitted))
+		next := originalWidth - max(0, limit-ansi.StringWidth(tail))
+		if next == omitted {
+			break
+		}
+		omitted = next
+	}
+	return ansi.Truncate(line, limit, tail)
 }
 
 // header renders a tool-style header line: a gradient bullet + label, followed

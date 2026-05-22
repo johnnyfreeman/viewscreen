@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"github.com/johnnyfreeman/viewscreen/style"
 	"github.com/johnnyfreeman/viewscreen/testutil"
@@ -13,18 +14,25 @@ import (
 // output suitable for substring assertions.
 func newTestRenderer(t *testing.T, showUsage, verbose bool) *Renderer {
 	t.Helper()
-	style.Init(true)
-	t.Cleanup(func() { style.Init(false) })
-
 	level := 0
 	if verbose {
 		level = 1
 	}
+	return newTestRendererWithLevel(t, showUsage, level)
+}
+
+func newTestRendererWithLevel(t *testing.T, showUsage bool, level int) *Renderer {
+	t.Helper()
+	style.Init(true)
+	t.Cleanup(func() { style.Init(false) })
+
 	cfg := testutil.MockConfigProvider{NoColorVal: true, ShowUsageVal: showUsage, VerboseLevelVal: level}
-	return NewRenderer(
+	r := NewRenderer(
 		WithConfigProvider(cfg),
 		WithMarkdownRenderer(render.NewMarkdownRenderer(true, 80)),
 	)
+	r.SetWidth(80)
+	return r
 }
 
 func itemEvent(phase string, item Item) Event {
@@ -98,8 +106,11 @@ func TestRender_CommandHeaderThenOutput(t *testing.T) {
 	if strings.Contains(completed, "Shell") {
 		t.Errorf("completed should not repeat the header, got %q", completed)
 	}
-	if !strings.Contains(completed, "foo.txt") {
-		t.Errorf("completed should include output, got %q", completed)
+	if !strings.Contains(completed, "1 lines") {
+		t.Errorf("completed should summarize output, got %q", completed)
+	}
+	if strings.Contains(completed, "foo.txt") {
+		t.Errorf("completed should not include default output, got %q", completed)
 	}
 }
 
@@ -110,8 +121,20 @@ func TestRender_CommandCompletedOnly(t *testing.T) {
 	if !strings.Contains(out, "Shell") || !strings.Contains(out, "echo hi") {
 		t.Errorf("expected header with unwrapped command, got %q", out)
 	}
-	if !strings.Contains(out, "hi") {
-		t.Errorf("expected output, got %q", out)
+	if !strings.Contains(out, "1 lines") {
+		t.Errorf("expected output summary, got %q", out)
+	}
+}
+
+func TestRender_CommandOutputVerboseStillSummarizes(t *testing.T) {
+	r := newTestRendererWithLevel(t, true, 1)
+	item := Item{ID: "c1", Type: ItemCommandExecution, Command: "/bin/sh -lc cat", AggregatedOutput: "one\ntwo\n", ExitCode: intPtr(0), Status: "completed"}
+	out := r.Render(itemEvent(TypeItemCompleted, item))
+	if !strings.Contains(out, "2 lines") {
+		t.Errorf("expected line summary at -v, got %q", out)
+	}
+	if strings.Contains(out, "one") || strings.Contains(out, "two") {
+		t.Errorf("-v should not expand command output, got %q", out)
 	}
 }
 
@@ -135,27 +158,71 @@ func TestRender_CommandNoOutput(t *testing.T) {
 
 func TestRender_CommandOutputTruncation(t *testing.T) {
 	var lines []string
-	for range maxOutputLines + 10 {
-		lines = append(lines, "line")
+	for i := range commandOutputLinesMaxVerbose + 3 {
+		lines = append(lines, "line "+string(rune('a'+i)))
 	}
 	output := strings.Join(lines, "\n") + "\n"
 	item := Item{ID: "c1", Type: ItemCommandExecution, Command: "/bin/sh -lc cat", AggregatedOutput: output, ExitCode: intPtr(0), Status: "completed"}
 
-	t.Run("non-verbose truncates", func(t *testing.T) {
+	t.Run("default summarizes", func(t *testing.T) {
 		r := newTestRenderer(t, true, false)
 		out := r.Render(itemEvent(TypeItemCompleted, item))
-		if !strings.Contains(out, "more lines") {
+		if !strings.Contains(out, "13 lines") {
+			t.Errorf("expected line summary, got %q", out)
+		}
+		if strings.Contains(out, "line a") {
+			t.Errorf("default should not expand output, got %q", out)
+		}
+	})
+
+	t.Run("-vv shows five lines", func(t *testing.T) {
+		r := newTestRendererWithLevel(t, true, 2)
+		out := r.Render(itemEvent(TypeItemCompleted, item))
+		if !strings.Contains(out, "line a") || !strings.Contains(out, "line e") {
+			t.Errorf("-vv should include first five lines, got %q", out)
+		}
+		if strings.Contains(out, "line f") {
+			t.Errorf("-vv should hide the sixth line, got %q", out)
+		}
+		if !strings.Contains(out, "8 more lines") {
 			t.Errorf("expected truncation note, got %q", out)
 		}
 	})
 
-	t.Run("verbose keeps all", func(t *testing.T) {
-		r := newTestRenderer(t, true, true)
+	t.Run("-vvv shows ten lines", func(t *testing.T) {
+		r := newTestRendererWithLevel(t, true, 3)
 		out := r.Render(itemEvent(TypeItemCompleted, item))
-		if strings.Contains(out, "more lines") {
-			t.Errorf("verbose should not truncate, got %q", out)
+		if !strings.Contains(out, "line a") || !strings.Contains(out, "line j") {
+			t.Errorf("-vvv should include first ten lines, got %q", out)
+		}
+		if strings.Contains(out, "line k") {
+			t.Errorf("-vvv should hide the eleventh line, got %q", out)
+		}
+		if !strings.Contains(out, "3 more lines") {
+			t.Errorf("expected truncation note, got %q", out)
 		}
 	})
+}
+
+func TestRender_CommandOutputLongLineTruncatesToWidth(t *testing.T) {
+	r := newTestRendererWithLevel(t, true, 2)
+	r.SetWidth(40)
+
+	long := strings.Repeat("x", 120)
+	item := Item{ID: "c1", Type: ItemCommandExecution, Command: "/bin/sh -lc cat", AggregatedOutput: long + "\n", ExitCode: intPtr(0), Status: "completed"}
+	out := r.Render(itemEvent(TypeItemCompleted, item))
+
+	if !strings.Contains(out, "more chars") {
+		t.Fatalf("expected omitted-character marker, got %q", out)
+	}
+	if strings.Contains(out, long) {
+		t.Fatalf("expected long physical line to be truncated, got %q", out)
+	}
+	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		if strings.Contains(line, "more chars") && ansi.StringWidth(line) > 40 {
+			t.Errorf("truncated output line width = %d, want <= 40; line %q", ansi.StringWidth(line), line)
+		}
+	}
 }
 
 func TestRender_FileChangeSingle(t *testing.T) {

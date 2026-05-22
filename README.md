@@ -52,11 +52,17 @@ echo "explain this codebase" | viewscreen -agent codex -p
 
 ### Flags
 
-- `-v` - Verbose output (show more details)
+- `-v` - Verbose output; expands write-style tool results while read-style output remains summarized
+- `-vv` - Very verbose; expands read-style output to the first 5 lines
+- `-vvv` - Max verbose; expands read-style output to the first 10 lines
 - `-no-color` - Disable colored output
 - `-usage` - Show token usage in result (default: true)
 - `-p` - Treat stdin as a prompt (not a JSON stream)
 - `-agent` - Agent to spawn in prompt mode: `claude` (default) or `codex`
+
+Codex `command_execution` output follows the same read-output expansion policy
+as Claude tool results: default and `-v` show a compact line-count summary,
+`-vv` shows 5 lines, and `-vvv` shows 10 lines.
 
 ## Event Types
 
