@@ -166,6 +166,75 @@ func TestProcessCodex_MCPCallDrivesSpinner(t *testing.T) {
 	}
 }
 
+func TestProcessCodex_FileChangeDrivesSpinner(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+	item := codex.Item{
+		ID:      "f1",
+		Type:    codex.ItemFileChange,
+		Changes: []codex.FileChange{{Path: "/tmp/bar.txt", Kind: "add"}},
+		Status:  "in_progress",
+	}
+
+	// An in-flight file change shows the Edit spinner labeled with the path,
+	// matching the inline header.
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemStarted, Item: &item}})
+	if s.CurrentTool != "Edit" {
+		t.Errorf("CurrentTool = %q, want Edit", s.CurrentTool)
+	}
+	if s.CurrentToolInput != "/tmp/bar.txt" {
+		t.Errorf("CurrentToolInput = %q, want the file path", s.CurrentToolInput)
+	}
+
+	item.Status = "completed"
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &item}})
+	if s.ToolInProgress {
+		t.Error("ToolInProgress = true after file_change item.completed, want false")
+	}
+}
+
+func TestProcessCodex_WebSearchDrivesSpinner(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+	item := codex.Item{ID: "w1", Type: codex.ItemWebSearch, Query: "golang testing", Status: "in_progress"}
+
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemStarted, Item: &item}})
+	if s.CurrentTool != "Web Search" {
+		t.Errorf("CurrentTool = %q, want Web Search", s.CurrentTool)
+	}
+	if s.CurrentToolInput != "golang testing" {
+		t.Errorf("CurrentToolInput = %q, want the query", s.CurrentToolInput)
+	}
+
+	item.Status = "completed"
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &item}})
+	if s.ToolInProgress {
+		t.Error("ToolInProgress = true after web_search item.completed, want false")
+	}
+}
+
+func TestProcessCodex_TurnStartedIncrementsTurnCount(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+
+	if s.TurnCount != 0 {
+		t.Fatalf("TurnCount = %d before any event, want 0", s.TurnCount)
+	}
+
+	// A codex exec is one turn: turn.started bumps the count so the sidebar
+	// stops showing a perpetual "Turns: 0".
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeTurnStarted}})
+	if s.TurnCount != 1 {
+		t.Errorf("TurnCount = %d after turn.started, want 1", s.TurnCount)
+	}
+
+	// turn.completed records usage but must not double-count the turn.
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeTurnCompleted, Usage: &codex.Usage{InputTokens: 10}}})
+	if s.TurnCount != 1 {
+		t.Errorf("TurnCount = %d after turn.completed, want 1", s.TurnCount)
+	}
+}
+
 func TestProcessCodex_TurnEndClearsSpinner(t *testing.T) {
 	s := state.NewState()
 	p := NewEventProcessor(s)

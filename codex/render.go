@@ -231,7 +231,7 @@ func (r *Renderer) writeCommandOutput(out *render.Output, item *Item) {
 
 func (r *Renderer) renderFileChange(item *Item) string {
 	out := render.StringOutput()
-	fmt.Fprint(out, header("Edit", fileChangeSummary(item.Changes)))
+	fmt.Fprint(out, header("Edit", FileChangeSummary(item.Changes)))
 	if len(item.Changes) > 1 {
 		pw := textutil.NewPrefixedWriter(out, style.OutputPrefix, style.OutputContinue)
 		for _, c := range item.Changes {
@@ -317,7 +317,11 @@ func unquote(s string) string {
 	return s
 }
 
-func fileChangeSummary(changes []FileChange) string {
+// FileChangeSummary returns the human-readable argument for a file_change item:
+// the single path when only one file is touched, or "N files" otherwise. It is
+// exported so the live spinner can label an in-flight file change the same way
+// the inline header does (mirroring ShellCommand and MCPLabel).
+func FileChangeSummary(changes []FileChange) string {
 	switch len(changes) {
 	case 0:
 		return ""

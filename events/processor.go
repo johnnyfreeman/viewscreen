@@ -309,10 +309,14 @@ func (p *EventProcessor) processCodex(event codex.Event) ProcessResult {
 
 // applyCodexState updates the shared TUI state from a codex event. Codex runs
 // one item at a time, so an item.started for a long-running item (a shell
-// command or MCP call) sets the current tool for the spinner, and the matching
-// item.completed — or the end of the turn — clears it.
+// command, MCP call, file change, or web search) sets the current tool for the
+// spinner, and the matching item.completed — or the end of the turn — clears it.
+// turn.started bumps the turn counter so the sidebar reflects work in progress
+// the way it does for Claude (whose assistant messages drive the count).
 func (p *EventProcessor) applyCodexState(event codex.Event) {
 	switch event.Type {
+	case codex.TypeTurnStarted:
+		p.state.IncrementTurnCount()
 	case codex.TypeTurnCompleted:
 		if event.Usage != nil {
 			u := event.Usage
@@ -328,6 +332,8 @@ func (p *EventProcessor) applyCodexState(event codex.Event) {
 }
 
 // applyCodexItem applies a single codex work item to the spinner and task list.
+// The spinner label matches the item's inline header so the live view and the
+// scrollback agree on what codex is doing.
 func (p *EventProcessor) applyCodexItem(phase string, item *codex.Item) {
 	if item == nil {
 		return
@@ -339,17 +345,23 @@ func (p *EventProcessor) applyCodexItem(phase string, item *codex.Item) {
 		// latest completion state, even though the inline render dedupes by id.
 		p.state.Todos = codexTodos(item.Items)
 	case codex.ItemCommandExecution:
-		if completed {
-			p.state.ClearCurrentTool()
-		} else {
-			p.state.SetCurrentTool("Shell", codex.ShellCommand(item.Command))
-		}
+		p.setOrClearCurrentTool(completed, "Shell", codex.ShellCommand(item.Command))
 	case codex.ItemMCPToolCall:
-		if completed {
-			p.state.ClearCurrentTool()
-		} else {
-			p.state.SetCurrentTool(codex.MCPLabel(item), "")
-		}
+		p.setOrClearCurrentTool(completed, codex.MCPLabel(item), "")
+	case codex.ItemFileChange:
+		p.setOrClearCurrentTool(completed, "Edit", codex.FileChangeSummary(item.Changes))
+	case codex.ItemWebSearch:
+		p.setOrClearCurrentTool(completed, "Web Search", item.Query)
+	}
+}
+
+// setOrClearCurrentTool shows the running tool while an item is in flight and
+// clears it once the item completes.
+func (p *EventProcessor) setOrClearCurrentTool(completed bool, name, input string) {
+	if completed {
+		p.state.ClearCurrentTool()
+	} else {
+		p.state.SetCurrentTool(name, input)
 	}
 }
 
