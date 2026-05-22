@@ -6,6 +6,7 @@ func TestIsEventType(t *testing.T) {
 	codexTypes := []string{
 		TypeThreadStarted, TypeTurnStarted, TypeTurnCompleted, TypeTurnFailed,
 		TypeItemStarted, TypeItemUpdated, TypeItemCompleted, TypeError,
+		"custom.started",
 	}
 	for _, tt := range codexTypes {
 		if !IsEventType(tt) {
@@ -77,6 +78,23 @@ func TestParseEvent_CommandExecutionItem(t *testing.T) {
 	}
 	if event.Item.ExitCode == nil || *event.Item.ExitCode != 0 {
 		t.Errorf("exit code = %v, want 0", event.Item.ExitCode)
+	}
+}
+
+func TestParseEvent_PreservesRawItemPayload(t *testing.T) {
+	line := `{"type":"item.completed","item":{"id":"item_1","type":"image_generation","prompt":"draw a terminal","status":"completed"}}`
+	event, err := ParseEvent([]byte(line))
+	if err != nil {
+		t.Fatalf("ParseEvent error: %v", err)
+	}
+	if event.Item == nil {
+		t.Fatal("Item is nil")
+	}
+	if event.Item.Type != "image_generation" {
+		t.Errorf("item type = %q, want image_generation", event.Item.Type)
+	}
+	if len(event.Item.Raw) == 0 {
+		t.Fatal("Raw item payload was not preserved")
 	}
 }
 

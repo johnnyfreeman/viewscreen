@@ -332,6 +332,17 @@ func TestParse_CodexEvent(t *testing.T) {
 	}
 }
 
+func TestParse_FutureCodexEnvelope(t *testing.T) {
+	result := Parse(`{"type":"session.configured","thread_id":"abc"}`)
+	codexEvent, ok := result.(CodexEvent)
+	if !ok {
+		t.Fatalf("Parse should return CodexEvent for dotted envelope type, got %T", result)
+	}
+	if codexEvent.Data.Type != "session.configured" {
+		t.Errorf("Type should be session.configured, got %q", codexEvent.Data.Type)
+	}
+}
+
 func TestParse_CodexInvalidJSON(t *testing.T) {
 	// A recognized codex envelope type with a malformed body should surface a
 	// ParseError rather than panicking.

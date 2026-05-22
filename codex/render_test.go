@@ -229,6 +229,40 @@ func TestRender_MCPToolCall(t *testing.T) {
 	}
 }
 
+func TestRender_UnknownItem(t *testing.T) {
+	r := newTestRenderer(t, true, false)
+	item := Item{
+		ID:      "x1",
+		Type:    "image_generation",
+		Message: "created image asset",
+		Status:  "completed",
+	}
+	out := r.Render(itemEvent(TypeItemCompleted, item))
+	if !strings.Contains(out, "Image Generation") {
+		t.Errorf("expected titleized fallback header, got %q", out)
+	}
+	if !strings.Contains(out, "created image asset") {
+		t.Errorf("expected fallback message, got %q", out)
+	}
+}
+
+func TestRender_UnknownItemVerboseShowsRawPayload(t *testing.T) {
+	r := newTestRenderer(t, true, true)
+	item := Item{
+		ID:     "x1",
+		Type:   "custom_tool",
+		Status: "completed",
+		Raw:    []byte(`{"id":"x1","type":"custom_tool","status":"completed","detail":{"count":2}}`),
+	}
+	out := r.Render(itemEvent(TypeItemCompleted, item))
+	if !strings.Contains(out, "Custom Tool") {
+		t.Errorf("expected fallback header, got %q", out)
+	}
+	if !strings.Contains(out, `"count":2`) {
+		t.Errorf("expected compact raw payload in verbose output, got %q", out)
+	}
+}
+
 func TestRender_TurnCompletedUsage(t *testing.T) {
 	t.Run("with usage shown", func(t *testing.T) {
 		r := newTestRenderer(t, true, false)

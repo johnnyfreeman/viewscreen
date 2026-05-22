@@ -1,6 +1,7 @@
 package codex
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -187,7 +188,7 @@ func (r *Renderer) renderItem(phase string, item *Item) string {
 		}
 		return r.renderError(firstNonEmpty(item.Message, item.Text))
 	default:
-		return ""
+		return r.renderUnknownItem(phase, item)
 	}
 }
 
@@ -269,6 +270,36 @@ func (r *Renderer) renderMCPToolCall(phase string, item *Item) string {
 
 func (r *Renderer) renderWebSearch(item *Item) string {
 	return header("Web Search", item.Query)
+}
+
+func (r *Renderer) renderUnknownItem(phase string, item *Item) string {
+	out := render.StringOutput()
+	arg := firstNonEmpty(item.Command, item.Query, item.Status)
+	if r.once(item.ID) {
+		fmt.Fprint(out, header(unknownItemLabel(item.Type), arg))
+	}
+	if phase == "completed" || phase == "updated" {
+		r.writeUnknownItemDetails(out, item, arg)
+	}
+	return out.String()
+}
+
+func (r *Renderer) writeUnknownItemDetails(out *render.Output, item *Item, headerArg string) {
+	pw := textutil.NewPrefixedWriter(out, style.OutputPrefix, style.OutputContinue)
+	detail := firstNonEmpty(item.Message, item.Text)
+	if detail != "" && detail != headerArg {
+		for _, line := range strings.Split(strings.TrimRight(detail, "\n"), "\n") {
+			pw.WriteLine(line)
+		}
+	}
+	if item.Status == "failed" {
+		pw.WriteLine(style.ErrorText("failed"))
+	}
+	if r.config.IsVerbose() && len(item.Raw) > 0 {
+		if compact := compactRawItem(item.Raw); compact != "" {
+			pw.WriteLine(style.MutedText(compact))
+		}
+	}
 }
 
 // capLines truncates a slice of output lines unless verbose output is enabled.
@@ -357,6 +388,29 @@ func MCPLabel(item *Item) string {
 	default:
 		return "MCP Tool"
 	}
+}
+
+func unknownItemLabel(itemType string) string {
+	if itemType == "" {
+		return "Codex Item"
+	}
+	parts := strings.Fields(strings.NewReplacer("_", " ", "-", " ").Replace(itemType))
+	for i, part := range parts {
+		parts[i] = strings.ToUpper(part[:1]) + part[1:]
+	}
+	return strings.Join(parts, " ")
+}
+
+func compactRawItem(raw json.RawMessage) string {
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return ""
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 func truncate(s string, max int) string {

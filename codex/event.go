@@ -10,7 +10,10 @@
 // Claude renderers.
 package codex
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // Envelope event types emitted by codex exec --json.
 const (
@@ -64,6 +67,8 @@ type ThreadError struct {
 // Item is the union of every item shape codex emits. Fields are decoded
 // leniently so unknown or partially-populated items still render sensibly.
 type Item struct {
+	Raw json.RawMessage `json:"-"`
+
 	ID   string `json:"id"`
 	Type string `json:"type"`
 
@@ -104,15 +109,31 @@ type TodoItem struct {
 }
 
 // IsEventType reports whether t is a codex envelope event type. It is used to
-// distinguish codex lines from Claude Code lines, which never use these types.
+// distinguish codex lines from Claude Code lines, which never use these known
+// types or Codex's dotted envelope naming convention.
 func IsEventType(t string) bool {
 	switch t {
 	case TypeThreadStarted, TypeTurnStarted, TypeTurnCompleted, TypeTurnFailed,
 		TypeItemStarted, TypeItemUpdated, TypeItemCompleted, TypeError:
 		return true
 	default:
-		return false
+		return strings.Contains(t, ".")
 	}
+}
+
+// UnmarshalJSON decodes a codex item while preserving the raw payload. Codex
+// can add item types before viewscreen knows their typed fields, and keeping
+// the original JSON lets the renderer still show useful detail for those
+// forward-compatible fallbacks.
+func (i *Item) UnmarshalJSON(data []byte) error {
+	type item Item
+	var decoded item
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*i = Item(decoded)
+	i.Raw = append(i.Raw[:0], data...)
+	return nil
 }
 
 // ParseEvent decodes a single codex JSONL line into an Event.
