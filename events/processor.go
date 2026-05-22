@@ -35,6 +35,7 @@ type EventProcessor struct {
 
 	codexActiveTools map[string]codexActiveTool
 	codexToolOrder   []string
+	codexSnapshots   *codex.FileSnapshotTracker
 	activities       map[string]timeline.Activity
 	activityOrder    []string
 }
@@ -50,6 +51,7 @@ func NewEventProcessor(s *state.State) *EventProcessor {
 		renderers:        NewRendererSet(),
 		state:            s,
 		codexActiveTools: make(map[string]codexActiveTool),
+		codexSnapshots:   codex.NewFileSnapshotTracker(),
 		activities:       make(map[string]timeline.Activity),
 	}
 }
@@ -62,6 +64,7 @@ func NewEventProcessorWithRenderers(s *state.State, rs *RendererSet) *EventProce
 		renderers:        rs,
 		state:            s,
 		codexActiveTools: make(map[string]codexActiveTool),
+		codexSnapshots:   codex.NewFileSnapshotTracker(),
 		activities:       make(map[string]timeline.Activity),
 	}
 }
@@ -483,10 +486,26 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 // the sidebar task list) so the TUI reflects a codex stream the same way it
 // reflects a Claude one.
 func (p *EventProcessor) processCodex(event codex.Event) ProcessResult {
+	p.prepareCodexFileChange(event)
 	p.applyCodexState(event)
 	res := processResultFromBatch(p.renderers.Codex.Render(event), "codex", codexPatch(event))
 	res.HasPendingTools = len(p.activities) > 0
 	return res
+}
+
+func (p *EventProcessor) prepareCodexFileChange(event codex.Event) {
+	if event.Item == nil || event.Item.Type != codex.ItemFileChange {
+		return
+	}
+	if p.codexSnapshots == nil {
+		p.codexSnapshots = codex.NewFileSnapshotTracker()
+	}
+	switch event.Type {
+	case codex.TypeItemStarted:
+		p.codexSnapshots.Capture(event.Item)
+	case codex.TypeItemUpdated, codex.TypeItemCompleted:
+		p.codexSnapshots.AttachPatches(event.Item)
+	}
 }
 
 func codexPatch(event codex.Event) timeline.StatePatch {

@@ -1,6 +1,8 @@
 package events
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -182,6 +184,38 @@ func TestProcessCodex_OverlappingCommandsRestoreSpinner(t *testing.T) {
 	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &slow}})
 	if s.ToolInProgress {
 		t.Error("ToolInProgress = true after all commands completed, want false")
+	}
+}
+
+func TestProcessCodex_FileChangeSnapshotRendersPatch(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "app.go")
+	if err := os.WriteFile(path, []byte("package main\n\nfunc old() {}\n"), 0o600); err != nil {
+		t.Fatalf("write old file: %v", err)
+	}
+
+	s := state.NewState()
+	p := NewEventProcessor(s)
+	p.Process(CodexEvent{Data: codex.Event{
+		Type: codex.TypeItemStarted,
+		Item: &codex.Item{ID: "f1", Type: codex.ItemFileChange, Changes: []codex.FileChange{{Path: path, Kind: "update"}}, Status: "in_progress"},
+	}})
+
+	if err := os.WriteFile(path, []byte("package main\n\nfunc new() {}\n"), 0o600); err != nil {
+		t.Fatalf("write new file: %v", err)
+	}
+
+	res := p.Process(CodexEvent{Data: codex.Event{
+		Type: codex.TypeItemCompleted,
+		Item: &codex.Item{ID: "f1", Type: codex.ItemFileChange, Changes: []codex.FileChange{{Path: path, Kind: "update"}}, Status: "completed"},
+	}})
+
+	if strings.Contains(res.Rendered, "Edit") {
+		t.Fatalf("completion should not repeat header, got %q", res.Rendered)
+	}
+	for _, want := range []string{"old", "new", "│", "-"} {
+		if !strings.Contains(res.Rendered, want) {
+			t.Fatalf("rendered completion = %q, want %q", res.Rendered, want)
+		}
 	}
 }
 
