@@ -149,6 +149,39 @@ func TestProcessCodex_CommandDrivesSpinner(t *testing.T) {
 	}
 }
 
+func TestProcessCodex_OverlappingCommandsRestoreSpinner(t *testing.T) {
+	s := state.NewState()
+	p := NewEventProcessor(s)
+
+	slow := codex.Item{ID: "c1", Type: codex.ItemCommandExecution, Command: "/usr/bin/zsh -lc 'rg --files'", Status: "in_progress"}
+	fast := codex.Item{ID: "c2", Type: codex.ItemCommandExecution, Command: "/usr/bin/zsh -lc 'git status --short'", Status: "in_progress"}
+
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemStarted, Item: &slow}})
+	if s.CurrentToolInput != "rg --files" {
+		t.Fatalf("CurrentToolInput after first start = %q, want rg --files", s.CurrentToolInput)
+	}
+
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemStarted, Item: &fast}})
+	if s.CurrentToolInput != "git status --short" {
+		t.Fatalf("CurrentToolInput after second start = %q, want git status --short", s.CurrentToolInput)
+	}
+
+	fast.Status = "completed"
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &fast}})
+	if !s.ToolInProgress {
+		t.Fatal("ToolInProgress = false after completing the newest command, want true for the older active command")
+	}
+	if s.CurrentToolInput != "rg --files" {
+		t.Errorf("CurrentToolInput after completing newest command = %q, want rg --files", s.CurrentToolInput)
+	}
+
+	slow.Status = "completed"
+	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeItemCompleted, Item: &slow}})
+	if s.ToolInProgress {
+		t.Error("ToolInProgress = true after all commands completed, want false")
+	}
+}
+
 func TestProcessCodex_MCPCallDrivesSpinner(t *testing.T) {
 	s := state.NewState()
 	p := NewEventProcessor(s)

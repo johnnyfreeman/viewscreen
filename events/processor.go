@@ -28,13 +28,22 @@ type ProcessResult struct {
 type EventProcessor struct {
 	renderers *RendererSet
 	state     *state.State
+
+	codexActiveTools map[string]codexActiveTool
+	codexToolOrder   []string
+}
+
+type codexActiveTool struct {
+	name  string
+	input string
 }
 
 // NewEventProcessor creates a new EventProcessor with the given state.
 func NewEventProcessor(s *state.State) *EventProcessor {
 	return &EventProcessor{
-		renderers: NewRendererSet(),
-		state:     s,
+		renderers:        NewRendererSet(),
+		state:            s,
+		codexActiveTools: make(map[string]codexActiveTool),
 	}
 }
 
@@ -43,8 +52,9 @@ func NewEventProcessor(s *state.State) *EventProcessor {
 // renderers need specific configuration.
 func NewEventProcessorWithRenderers(s *state.State, rs *RendererSet) *EventProcessor {
 	return &EventProcessor{
-		renderers: rs,
-		state:     s,
+		renderers:        rs,
+		state:            s,
+		codexActiveTools: make(map[string]codexActiveTool),
 	}
 }
 
@@ -323,9 +333,9 @@ func (p *EventProcessor) applyCodexState(event codex.Event) {
 			p.state.AccumulateUsage(u.InputTokens, u.OutputTokens, 0, u.CachedInputTokens)
 			p.state.ReasoningTokens += u.ReasoningOutputTokens
 		}
-		p.state.ClearCurrentTool()
+		p.clearCodexActiveTools()
 	case codex.TypeTurnFailed:
-		p.state.ClearCurrentTool()
+		p.clearCodexActiveTools()
 	case codex.TypeItemStarted, codex.TypeItemUpdated, codex.TypeItemCompleted:
 		p.applyCodexItem(event.Type, event.Item)
 	}
@@ -345,23 +355,71 @@ func (p *EventProcessor) applyCodexItem(phase string, item *codex.Item) {
 		// latest completion state, even though the inline render dedupes by id.
 		p.state.Todos = codexTodos(item.Items)
 	case codex.ItemCommandExecution:
-		p.setOrClearCurrentTool(completed, "Shell", codex.ShellCommand(item.Command))
+		p.updateCodexActiveTool(completed, item.ID, "Shell", codex.ShellCommand(item.Command))
 	case codex.ItemMCPToolCall:
-		p.setOrClearCurrentTool(completed, codex.MCPLabel(item), "")
+		p.updateCodexActiveTool(completed, item.ID, codex.MCPLabel(item), "")
 	case codex.ItemFileChange:
-		p.setOrClearCurrentTool(completed, "Edit", codex.FileChangeSummary(item.Changes))
+		p.updateCodexActiveTool(completed, item.ID, "Edit", codex.FileChangeSummary(item.Changes))
 	case codex.ItemWebSearch:
-		p.setOrClearCurrentTool(completed, "Web Search", item.Query)
+		p.updateCodexActiveTool(completed, item.ID, "Web Search", item.Query)
 	}
 }
 
-// setOrClearCurrentTool shows the running tool while an item is in flight and
-// clears it once the item completes.
-func (p *EventProcessor) setOrClearCurrentTool(completed bool, name, input string) {
+// updateCodexActiveTool shows the newest in-flight codex tool in the live
+// spinner while preserving older overlapping items. Codex can start multiple
+// command_execution items before completing them; when the visible item
+// completes, the spinner falls back to the next still-active item instead of
+// going blank.
+func (p *EventProcessor) updateCodexActiveTool(completed bool, id, name, input string) {
+	if id == "" {
+		if completed {
+			p.state.ClearCurrentTool()
+		} else {
+			p.state.SetCurrentTool(name, input)
+		}
+		return
+	}
+
 	if completed {
-		p.state.ClearCurrentTool()
-	} else {
-		p.state.SetCurrentTool(name, input)
+		delete(p.codexActiveTools, id)
+		p.removeCodexToolOrder(id)
+		p.restoreLatestCodexTool()
+		return
+	}
+
+	if p.codexActiveTools == nil {
+		p.codexActiveTools = make(map[string]codexActiveTool)
+	}
+	if _, exists := p.codexActiveTools[id]; !exists {
+		p.codexToolOrder = append(p.codexToolOrder, id)
+	}
+	p.codexActiveTools[id] = codexActiveTool{name: name, input: input}
+	p.state.SetCurrentTool(name, input)
+}
+
+func (p *EventProcessor) restoreLatestCodexTool() {
+	for i := len(p.codexToolOrder) - 1; i >= 0; i-- {
+		id := p.codexToolOrder[i]
+		if tool, ok := p.codexActiveTools[id]; ok {
+			p.state.SetCurrentTool(tool.name, tool.input)
+			return
+		}
+	}
+	p.state.ClearCurrentTool()
+}
+
+func (p *EventProcessor) clearCodexActiveTools() {
+	clear(p.codexActiveTools)
+	p.codexToolOrder = nil
+	p.state.ClearCurrentTool()
+}
+
+func (p *EventProcessor) removeCodexToolOrder(id string) {
+	for i, activeID := range p.codexToolOrder {
+		if activeID == id {
+			p.codexToolOrder = append(p.codexToolOrder[:i], p.codexToolOrder[i+1:]...)
+			return
+		}
 	}
 }
 
