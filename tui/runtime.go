@@ -101,6 +101,7 @@ func RunWithPrompt(prompt string) (string, error) {
 		WithClaudeProcess(proc),
 		WithClaudeStarter(start),
 		WithPrompt(prompt),
+		WithAgent(cfg.Agent),
 		WithInitialSize(width, height),
 		WithStartupInputGrace(startupInputGrace),
 		WithAutoExit(cfg.AutoExit),

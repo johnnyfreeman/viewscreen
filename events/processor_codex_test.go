@@ -4,8 +4,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/johnnyfreeman/viewscreen/assistant"
 	"github.com/johnnyfreeman/viewscreen/codex"
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/state"
+	"github.com/johnnyfreeman/viewscreen/system"
 )
 
 func TestProcessCodex_RendersAndAccumulatesUsage(t *testing.T) {
@@ -31,6 +34,59 @@ func TestProcessCodex_RendersAndAccumulatesUsage(t *testing.T) {
 	if s.CacheRead != 40 {
 		t.Errorf("CacheRead = %d, want 40", s.CacheRead)
 	}
+}
+
+func TestEventProcessor_DetectsAgent(t *testing.T) {
+	t.Run("codex events brand the session as codex", func(t *testing.T) {
+		s := state.NewState()
+		p := NewEventProcessor(s)
+
+		p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeThreadStarted, ThreadID: "t1"}})
+
+		if s.Agent != config.AgentCodex {
+			t.Errorf("Agent = %q, want %q", s.Agent, config.AgentCodex)
+		}
+	})
+
+	t.Run("claude stream-json events brand the session as claude", func(t *testing.T) {
+		s := state.NewState()
+		p := NewEventProcessor(s)
+
+		p.Process(SystemEvent{Data: system.Event{Subtype: "init", Model: "test-model"}})
+
+		if s.Agent != config.AgentClaude {
+			t.Errorf("Agent = %q, want %q", s.Agent, config.AgentClaude)
+		}
+	})
+
+	t.Run("seeded agent survives until a definitive event arrives", func(t *testing.T) {
+		s := state.NewState()
+		s.Agent = config.AgentCodex // seeded in prompt mode
+		p := NewEventProcessor(s)
+
+		// An ignored event must not clobber the seeded agent.
+		p.Process(IgnoredEvent{})
+		if s.Agent != config.AgentCodex {
+			t.Errorf("after ignored event Agent = %q, want %q", s.Agent, config.AgentCodex)
+		}
+
+		// A definitive codex event keeps it codex.
+		p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeTurnStarted}})
+		if s.Agent != config.AgentCodex {
+			t.Errorf("after codex event Agent = %q, want %q", s.Agent, config.AgentCodex)
+		}
+	})
+
+	t.Run("assistant events brand the session as claude", func(t *testing.T) {
+		s := state.NewState()
+		p := NewEventProcessor(s)
+
+		p.Process(AssistantEvent{Data: assistant.Event{}})
+
+		if s.Agent != config.AgentClaude {
+			t.Errorf("Agent = %q, want %q", s.Agent, config.AgentClaude)
+		}
+	})
 }
 
 func TestProcessCodex_CommandLifecycle(t *testing.T) {

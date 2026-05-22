@@ -1,6 +1,6 @@
 # viewscreen
 
-A terminal renderer for AI coding agents' streaming JSON output. Parses JSONL events from stdin and renders them with markdown formatting, syntax highlighting, and styled output. It understands both [Claude Code](https://claude.com/claude-code) (`--output-format stream-json`) and the [Codex CLI](https://github.com/openai/codex) (`codex exec --json`) event streams, auto-detecting the format per line.
+A terminal renderer for AI coding agents' streaming JSON output. Parses JSONL events from stdin and renders them with markdown formatting, syntax highlighting, and styled output. It understands both [Claude Code](https://claude.com/claude-code) (`--output-format stream-json`) and the [Codex CLI](https://github.com/openai/codex) (`codex exec --json`) event streams, auto-detecting the format per line. The TUI brands itself for whichever agent produced the stream — Codex streams show "codex" branding, Claude streams show "claude" — detected automatically (and seeded from `-agent` in prompt mode).
 
 ## Installation
 

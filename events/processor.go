@@ -5,6 +5,7 @@ import (
 
 	"github.com/johnnyfreeman/viewscreen/assistant"
 	"github.com/johnnyfreeman/viewscreen/codex"
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/stream"
@@ -60,6 +61,7 @@ func (p *EventProcessor) SetWidth(width int) {
 
 // Process handles a parsed event and returns the rendered result.
 func (p *EventProcessor) Process(event Event) ProcessResult {
+	p.detectAgent(event)
 	switch e := event.(type) {
 	case SystemEvent:
 		return p.processSystem(e.Data)
@@ -79,6 +81,20 @@ func (p *EventProcessor) Process(event Event) ProcessResult {
 		return ProcessResult{}
 	default:
 		return ProcessResult{}
+	}
+}
+
+// detectAgent records which CLI produced the stream so the TUI can brand
+// itself accordingly. Codex envelope events are unambiguous; every other
+// concrete event type comes from Claude Code's stream-json. Ignored or empty
+// events leave the current value untouched so a seeded agent (prompt mode)
+// survives until a definitive event arrives.
+func (p *EventProcessor) detectAgent(event Event) {
+	switch event.(type) {
+	case CodexEvent:
+		p.state.Agent = config.AgentCodex
+	case SystemEvent, SubAgentSystemEvent, AssistantEvent, UserEvent, StreamEvent, ResultEvent:
+		p.state.Agent = config.AgentClaude
 	}
 }
 

@@ -43,14 +43,14 @@ func TestNewSidebarRenderer(t *testing.T) {
 func TestSidebarRenderer_RenderLogo(t *testing.T) {
 	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
 
-	output := r.RenderLogo()
+	output := r.RenderLogo("")
 
 	// Should contain the decoration dots
 	if !strings.Contains(output, "·") {
 		t.Error("expected decoration dots in logo")
 	}
 
-	// Should contain "claude" text
+	// An unknown agent defaults to Claude branding.
 	if !strings.Contains(output, "claude") {
 		t.Error("expected 'claude' text in logo")
 	}
@@ -60,6 +60,19 @@ func TestSidebarRenderer_RenderLogo(t *testing.T) {
 		if !strings.Contains(output, line) {
 			t.Errorf("expected logo line %q in output", line)
 		}
+	}
+}
+
+func TestSidebarRenderer_RenderLogo_CodexBranding(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	output := r.RenderLogo("codex")
+
+	if !strings.Contains(output, "codex") {
+		t.Errorf("expected 'codex' branding in logo, got %q", output)
+	}
+	if strings.Contains(output, "claude") {
+		t.Errorf("did not expect 'claude' branding for codex logo, got %q", output)
 	}
 }
 

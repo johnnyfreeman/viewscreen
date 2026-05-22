@@ -81,9 +81,10 @@ func NewSidebarRenderer(styles SidebarStyles, spinner spinner.Model) *SidebarRen
 	}
 }
 
-// RenderLogo delegates to the LogoRenderer.
-func (r *SidebarRenderer) RenderLogo() string {
-	return r.logo.Render()
+// RenderLogo delegates to the LogoRenderer, branding the logo for the given
+// agent ("claude" or "codex").
+func (r *SidebarRenderer) RenderLogo(agent string) string {
+	return r.logo.Render(agent)
 }
 
 // RenderPrompt renders the user's prompt if available.
@@ -290,7 +291,7 @@ func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, sc
 	var sb strings.Builder
 	streamErr := optionalStreamError(streamErrOpt)
 
-	sb.WriteString(r.RenderLogo())
+	sb.WriteString(r.RenderLogo(s.Agent))
 	sb.WriteString("\n")
 	sb.WriteString(r.RenderAutoExitStatus(stdinDone, autoExitRemaining, streamErr))
 	sb.WriteString(r.RenderFollowIndicator(followMode))
@@ -549,7 +550,7 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	var sb strings.Builder
 
 	// Logo
-	sb.WriteString(r.RenderLogo())
+	sb.WriteString(r.RenderLogo(s.Agent))
 	sb.WriteString("\n")
 
 	// Auto-exit status

@@ -21,7 +21,7 @@ func TestNewLogoRenderer(t *testing.T) {
 
 func TestLogoRenderer_Render(t *testing.T) {
 	r := NewLogoRenderer()
-	output := r.Render()
+	output := r.Render("")
 
 	t.Run("contains decoration dots", func(t *testing.T) {
 		if !strings.Contains(output, "·") {
@@ -29,7 +29,7 @@ func TestLogoRenderer_Render(t *testing.T) {
 		}
 	})
 
-	t.Run("contains claude text", func(t *testing.T) {
+	t.Run("defaults to claude branding for unknown agent", func(t *testing.T) {
 		if !strings.Contains(output, "claude") {
 			t.Error("expected 'claude' text in logo")
 		}
@@ -49,6 +49,43 @@ func TestLogoRenderer_Render(t *testing.T) {
 			t.Errorf("expected at least 4 lines in logo, got %d", len(lines))
 		}
 	})
+}
+
+func TestLogoRenderer_RenderAgentBranding(t *testing.T) {
+	r := NewLogoRenderer()
+
+	t.Run("codex agent brands as codex", func(t *testing.T) {
+		output := r.Render("codex")
+		if !strings.Contains(output, "codex") {
+			t.Errorf("expected 'codex' branding, got %q", output)
+		}
+		if strings.Contains(output, "claude") {
+			t.Errorf("did not expect 'claude' branding for codex, got %q", output)
+		}
+	})
+
+	t.Run("claude agent brands as claude", func(t *testing.T) {
+		output := r.Render("claude")
+		if !strings.Contains(output, "claude") {
+			t.Errorf("expected 'claude' branding, got %q", output)
+		}
+	})
+}
+
+func TestAgentLabel(t *testing.T) {
+	tests := []struct {
+		agent string
+		want  string
+	}{
+		{"", "claude"},
+		{"claude", "claude"},
+		{"codex", "codex"},
+	}
+	for _, tt := range tests {
+		if got := agentLabel(tt.agent); got != tt.want {
+			t.Errorf("agentLabel(%q) = %q, want %q", tt.agent, got, tt.want)
+		}
+	}
 }
 
 func TestLogoRenderer_RenderTitle(t *testing.T) {

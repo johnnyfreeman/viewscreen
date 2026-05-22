@@ -108,6 +108,18 @@ func WithPrompt(prompt string) ModelOption {
 	}
 }
 
+// WithAgent seeds the active agent name ("claude" or "codex") so the TUI brands
+// itself correctly before the first stream event arrives. Used in prompt mode,
+// where the spawned agent is known up front. An empty name is ignored, leaving
+// branding to stream auto-detection.
+func WithAgent(name string) ModelOption {
+	return func(m *Model) {
+		if name != "" {
+			m.state.Agent = name
+		}
+	}
+}
+
 // WithInitialSize seeds the model with the terminal size known by the runtime.
 // Bubble Tea delivers its own resize message later, but the model's first render
 // happens before that message is processed.

@@ -32,6 +32,12 @@ type TaskListItem struct {
 
 // State holds the centralized session state extracted from events
 type State struct {
+	// Agent identifies the CLI that produced the stream ("claude" or "codex").
+	// It drives agent-specific branding in the TUI. It is empty until detected
+	// from the stream (see events.EventProcessor) or seeded from the spawn
+	// configuration in prompt mode.
+	Agent string
+
 	// Session info from system event
 	Model          string
 	Version        string
