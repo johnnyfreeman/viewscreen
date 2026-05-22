@@ -1,6 +1,6 @@
 # viewscreen
 
-A terminal renderer for Claude Code's streaming JSON output. Parses JSONL events from stdin and renders them with markdown formatting, syntax highlighting, and styled output.
+A terminal renderer for AI coding agents' streaming JSON output. Parses JSONL events from stdin and renders them with markdown formatting, syntax highlighting, and styled output. It understands both [Claude Code](https://claude.com/claude-code) (`--output-format stream-json`) and the [Codex CLI](https://github.com/openai/codex) (`codex exec --json`) event streams, auto-detecting the format per line.
 
 ## Installation
 
@@ -24,6 +24,12 @@ Pipe Claude Code's JSON output to viewscreen:
 claude --output-format stream-json | viewscreen
 ```
 
+Or pipe Codex CLI's JSON output to viewscreen:
+
+```bash
+codex exec --json "your prompt" | viewscreen
+```
+
 ### Flags
 
 - `-v` - Verbose output (show more details)
@@ -32,13 +38,26 @@ claude --output-format stream-json | viewscreen
 
 ## Event Types
 
-viewscreen handles the following event types:
+### Claude Code (stream-json)
 
 - `system` - System messages and configuration
 - `assistant` - Assistant responses
 - `user` - User input
 - `stream_event` - Streaming content deltas
 - `result` - Final results with token usage
+
+### Codex CLI (`codex exec --json`)
+
+- `thread.started` / `turn.started` / `turn.completed` / `turn.failed` - Session and turn envelopes
+- `item.started` / `item.updated` / `item.completed` - Work items, including:
+  - `agent_message` - Assistant responses (rendered as markdown)
+  - `reasoning` - Model reasoning summaries
+  - `command_execution` - Shell commands and their output
+  - `file_change` - File additions, updates, and deletions
+  - `todo_list` - Plan / todo updates
+  - `mcp_tool_call` - MCP tool invocations
+  - `web_search` - Web searches
+- `error` - Stream errors
 
 ## License
 

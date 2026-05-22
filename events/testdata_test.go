@@ -85,6 +85,8 @@ func TestProcessAllTestdata(t *testing.T) {
 					eventCounts["stream"]++
 				case ResultEvent:
 					eventCounts["result"]++
+				case CodexEvent:
+					eventCounts["codex"]++
 				case IgnoredEvent:
 					eventCounts["ignored"]++
 					continue

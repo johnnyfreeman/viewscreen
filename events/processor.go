@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/assistant"
+	"github.com/johnnyfreeman/viewscreen/codex"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/stream"
@@ -72,6 +73,8 @@ func (p *EventProcessor) Process(event Event) ProcessResult {
 		return p.processStream(e.Data)
 	case ResultEvent:
 		return p.processResult(e.Data)
+	case CodexEvent:
+		return p.processCodex(e.Data)
 	case IgnoredEvent:
 		return ProcessResult{}
 	default:
@@ -276,4 +279,15 @@ func (p *EventProcessor) processResult(event result.Event) ProcessResult {
 	content.WriteString(r.Result.RenderToString(event))
 
 	return ProcessResult{Rendered: content.String()}
+}
+
+// processCodex handles an event from the Codex CLI stream. Codex events are
+// rendered by a dedicated codex.Renderer; per-turn token usage is folded into
+// the shared state so the TUI sidebar reflects it.
+func (p *EventProcessor) processCodex(event codex.Event) ProcessResult {
+	if event.Type == codex.TypeTurnCompleted && event.Usage != nil {
+		u := event.Usage
+		p.state.AccumulateUsage(u.InputTokens, u.OutputTokens, 0, u.CachedInputTokens)
+	}
+	return ProcessResult{Rendered: p.renderers.Codex.Render(event)}
 }

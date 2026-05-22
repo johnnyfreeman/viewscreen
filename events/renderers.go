@@ -2,6 +2,7 @@ package events
 
 import (
 	"github.com/johnnyfreeman/viewscreen/assistant"
+	"github.com/johnnyfreeman/viewscreen/codex"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/stream"
 	"github.com/johnnyfreeman/viewscreen/system"
@@ -19,6 +20,7 @@ type RendererSet struct {
 	Result       *result.Renderer
 	Stream       *stream.Renderer
 	PendingTools *tools.ToolUseTracker
+	Codex        *codex.Renderer
 }
 
 // NewRendererSet creates a new RendererSet with default renderers.
@@ -30,6 +32,7 @@ func NewRendererSet() *RendererSet {
 		Result:       result.NewRenderer(),
 		Stream:       stream.NewRenderer(),
 		PendingTools: tools.NewToolUseTracker(),
+		Codex:        codex.NewRenderer(),
 	}
 }
 
@@ -38,4 +41,5 @@ func NewRendererSet() *RendererSet {
 func (rs *RendererSet) SetWidth(width int) {
 	rs.Stream.SetWidth(width)
 	rs.Assistant.SetWidth(width)
+	rs.Codex.SetWidth(width)
 }

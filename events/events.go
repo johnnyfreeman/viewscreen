@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/johnnyfreeman/viewscreen/assistant"
+	"github.com/johnnyfreeman/viewscreen/codex"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/stream"
 	"github.com/johnnyfreeman/viewscreen/system"
@@ -56,6 +57,13 @@ func (StreamEvent) eventMarker() {}
 type ResultEvent struct{ Data result.Event }
 
 func (ResultEvent) eventMarker() {}
+
+// CodexEvent wraps a parsed event from the Codex CLI stream (codex exec --json).
+// Codex uses an entirely separate set of envelope types from Claude Code, so it
+// is modeled as a distinct event rather than mapped onto the Claude events.
+type CodexEvent struct{ Data codex.Event }
+
+func (CodexEvent) eventMarker() {}
 
 // IgnoredEvent wraps an event type that is recognized but intentionally not processed.
 // Examples: rate_limit_event.
@@ -126,6 +134,13 @@ func Parse(line string) Event {
 		return IgnoredEvent{Type: base.Type}
 
 	default:
+		if codex.IsEventType(base.Type) {
+			event, err := codex.ParseEvent([]byte(line))
+			if err != nil {
+				return ParseError{Err: err, Line: line}
+			}
+			return CodexEvent{Data: event}
+		}
 		return ParseError{Err: nil, Line: "Unknown event type: " + base.Type}
 	}
 }

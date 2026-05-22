@@ -1,0 +1,9 @@
+{"type":"thread.started","thread_id":"019e4fe1-c386-7a32-8c22-a114c7386c42"}
+{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"I’ll inspect the current directory with `ls`, then read `foo.txt` if it exists."}}
+{"type":"item.started","item":{"id":"item_1","type":"command_execution","command":"/usr/bin/zsh -lc ls","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"command_execution","command":"/usr/bin/zsh -lc ls","aggregated_output":"foo.txt\n","exit_code":0,"status":"completed"}}
+{"type":"item.started","item":{"id":"item_2","type":"command_execution","command":"/usr/bin/zsh -lc 'cat foo.txt'","aggregated_output":"","exit_code":null,"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_2","type":"command_execution","command":"/usr/bin/zsh -lc 'cat foo.txt'","aggregated_output":"hello world\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_3","type":"agent_message","text":"`ls` shows:\n\n```text\nfoo.txt\n```\n\n`foo.txt` contains:\n\n```text\nhello world\n```"}}
+{"type":"turn.completed","usage":{"input_tokens":34004,"cached_input_tokens":18048,"output_tokens":143,"reasoning_output_tokens":0}}

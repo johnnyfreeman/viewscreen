@@ -320,3 +320,23 @@ func TestParse_ResultEvent_NewFields(t *testing.T) {
 		t.Errorf("Usage.ServiceTier should be 'standard', got %q", resultEvent.Data.Usage.ServiceTier)
 	}
 }
+
+func TestParse_CodexEvent(t *testing.T) {
+	result := Parse(`{"type":"thread.started","thread_id":"abc"}`)
+	codexEvent, ok := result.(CodexEvent)
+	if !ok {
+		t.Fatalf("Parse should return CodexEvent, got %T", result)
+	}
+	if codexEvent.Data.ThreadID != "abc" {
+		t.Errorf("ThreadID should be 'abc', got %q", codexEvent.Data.ThreadID)
+	}
+}
+
+func TestParse_CodexInvalidJSON(t *testing.T) {
+	// A recognized codex envelope type with a malformed body should surface a
+	// ParseError rather than panicking.
+	result := Parse(`{"type":"item.completed","item":"not-an-object"}`)
+	if _, ok := result.(ParseError); !ok {
+		t.Fatalf("Parse should return ParseError for malformed codex item, got %T", result)
+	}
+}

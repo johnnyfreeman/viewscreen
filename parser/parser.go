@@ -157,6 +157,8 @@ func eventTypeName(event events.Event) string {
 		return "stream_event"
 	case events.ResultEvent:
 		return "result"
+	case events.CodexEvent:
+		return "codex"
 	default:
 		return "unknown"
 	}
