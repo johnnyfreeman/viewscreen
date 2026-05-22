@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/system"
 )
@@ -67,6 +68,11 @@ type State struct {
 	CacheCreated int
 	CacheRead    int
 
+	// ReasoningTokens counts model "thinking" tokens. Codex reports these on
+	// turn.completed (reasoning_output_tokens); Claude's stream does not break
+	// them out separately, so this stays zero for Claude streams.
+	ReasoningTokens int
+
 	// Session timing
 	StartTime time.Time
 
@@ -87,6 +93,15 @@ func NewState() *State {
 // Elapsed returns the duration since the session started.
 func (s *State) Elapsed() time.Duration {
 	return time.Since(s.StartTime)
+}
+
+// ReportsCost reports whether the active agent emits a dollar cost for the
+// session. Codex's stream carries only token usage — never a cost — so its
+// sidebar omits the Cost and Rate fields rather than showing a misleading
+// $0.0000. Any other agent (Claude, or an as-yet-undetected stream) is assumed
+// to report cost.
+func (s *State) ReportsCost() bool {
+	return s.Agent != config.AgentCodex
 }
 
 // CostRate returns the cost per minute based on total cost and elapsed time.

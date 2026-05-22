@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/state"
 	"github.com/johnnyfreeman/viewscreen/style"
 )
@@ -121,7 +122,11 @@ func TestSidebarRenderer_RenderSessionInfo(t *testing.T) {
 	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
 
 	t.Run("renders model, turns, and cost", func(t *testing.T) {
-		output := r.RenderSessionInfo("claude-3-opus", 5, 0.1234)
+		s := state.NewState()
+		s.Model = "claude-3-opus"
+		s.TurnCount = 5
+		s.TotalCost = 0.1234
+		output := r.RenderSessionInfo(s)
 
 		if !strings.Contains(output, "Model") {
 			t.Error("expected 'Model' label in output")
@@ -145,7 +150,10 @@ func TestSidebarRenderer_RenderSessionInfo(t *testing.T) {
 
 	t.Run("truncates long model names", func(t *testing.T) {
 		longModel := strings.Repeat("a", 50)
-		output := r.RenderSessionInfo(longModel, 1, 0)
+		s := state.NewState()
+		s.Model = longModel
+		s.TurnCount = 1
+		output := r.RenderSessionInfo(s)
 
 		// Should not contain the full model name
 		if strings.Contains(output, longModel) {
@@ -154,6 +162,36 @@ func TestSidebarRenderer_RenderSessionInfo(t *testing.T) {
 		// Should contain ellipsis
 		if !strings.Contains(output, "...") {
 			t.Error("expected ellipsis for truncated model name")
+		}
+	})
+
+	t.Run("omits empty model line", func(t *testing.T) {
+		s := state.NewState()
+		s.TurnCount = 2
+		output := r.RenderSessionInfo(s)
+
+		if strings.Contains(output, "Model") {
+			t.Errorf("expected no Model label when model is unknown, got %q", output)
+		}
+		if !strings.Contains(output, "Turns") {
+			t.Error("expected 'Turns' label in output")
+		}
+	})
+
+	t.Run("omits cost for codex", func(t *testing.T) {
+		s := state.NewState()
+		s.Agent = config.AgentCodex
+		s.TurnCount = 3
+		output := r.RenderSessionInfo(s)
+
+		if strings.Contains(output, "Cost") {
+			t.Errorf("expected no Cost label for codex, got %q", output)
+		}
+		if strings.Contains(output, "$0.0000") {
+			t.Errorf("expected no $0.0000 cost for codex, got %q", output)
+		}
+		if !strings.Contains(output, "Turns") {
+			t.Error("expected 'Turns' label in output")
 		}
 	})
 }
@@ -965,6 +1003,59 @@ func TestSidebarRenderer_RenderTokenUsage(t *testing.T) {
 			t.Error("expected non-empty output when input tokens > 0")
 		}
 	})
+}
+
+func TestSidebarRenderer_RenderReasoningTokens(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	t.Run("zero reasoning returns empty string", func(t *testing.T) {
+		output := r.RenderReasoningTokens(0)
+		if output != "" {
+			t.Errorf("expected empty string for zero reasoning tokens, got %q", output)
+		}
+	})
+
+	t.Run("renders reasoning count with label", func(t *testing.T) {
+		output := r.RenderReasoningTokens(1500)
+
+		if !strings.Contains(output, "Reasoning") {
+			t.Error("expected 'Reasoning' label in output")
+		}
+		if !strings.Contains(output, "1.5k") {
+			t.Errorf("expected formatted reasoning tokens, got %q", output)
+		}
+	})
+}
+
+func TestSidebarRenderer_Render_Codex(t *testing.T) {
+	r := NewSidebarRenderer(NewSidebarStyles(), newTestSpinner())
+
+	s := state.NewState()
+	s.Agent = config.AgentCodex
+	s.TurnCount = 2
+	s.InputTokens = 34000
+	s.OutputTokens = 143
+	s.ReasoningTokens = 78
+
+	output := r.Render(s, 40, true, ScrollPosition{AtTop: true}, false, 0)
+
+	// Codex brands the logo and reports reasoning tokens...
+	if !strings.Contains(output, "codex") {
+		t.Error("expected codex branding in sidebar")
+	}
+	if !strings.Contains(output, "Reasoning") {
+		t.Error("expected Reasoning section for codex stream with reasoning tokens")
+	}
+	// ...but carries no model or cost, so those fields are omitted.
+	if strings.Contains(output, "Model") {
+		t.Errorf("expected no Model section for codex, got %q", output)
+	}
+	if strings.Contains(output, "Cost") {
+		t.Errorf("expected no Cost section for codex, got %q", output)
+	}
+	if strings.Contains(output, "$0.0000") {
+		t.Errorf("expected no $0.0000 cost for codex, got %q", output)
+	}
 }
 
 func TestFormatTokenCount(t *testing.T) {

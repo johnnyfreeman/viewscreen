@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/result"
 	"github.com/johnnyfreeman/viewscreen/system"
 )
@@ -249,6 +250,31 @@ func TestState_Elapsed(t *testing.T) {
 	if elapsed > 6*time.Second {
 		t.Errorf("Elapsed() = %v, expected < 6s", elapsed)
 	}
+}
+
+func TestState_ReportsCost(t *testing.T) {
+	t.Run("codex does not report cost", func(t *testing.T) {
+		s := NewState()
+		s.Agent = config.AgentCodex
+		if s.ReportsCost() {
+			t.Error("ReportsCost() = true for codex, want false")
+		}
+	})
+
+	t.Run("claude reports cost", func(t *testing.T) {
+		s := NewState()
+		s.Agent = config.AgentClaude
+		if !s.ReportsCost() {
+			t.Error("ReportsCost() = false for claude, want true")
+		}
+	})
+
+	t.Run("undetected agent defaults to reporting cost", func(t *testing.T) {
+		s := NewState()
+		if !s.ReportsCost() {
+			t.Error("ReportsCost() = false for undetected agent, want true")
+		}
+	})
 }
 
 func TestState_CostRate(t *testing.T) {

@@ -102,19 +102,28 @@ func (r *SidebarRenderer) RenderLabelValue(label, value string) string {
 		style.SidebarValueText(value) + "\n\n"
 }
 
-// RenderSessionInfo renders model, turns, and cost.
-func (r *SidebarRenderer) RenderSessionInfo(model string, turns int, cost float64) string {
+// RenderSessionInfo renders the session metrics the active agent reports:
+// model (when known), turn count, and cost. The Model line is omitted when the
+// model is unknown, and the Cost line is omitted for agents that do not report
+// a cost (e.g. Codex), so a Codex sidebar shows neither an empty Model nor a
+// misleading $0.0000.
+func (r *SidebarRenderer) RenderSessionInfo(s *state.State) string {
 	var sb strings.Builder
 
-	// Truncate model name if needed
-	modelName := model
-	if len(modelName) > r.width-4 {
-		modelName = modelName[:r.width-7] + "..."
+	if s.Model != "" {
+		// Truncate model name if needed
+		modelName := s.Model
+		if len(modelName) > r.width-4 {
+			modelName = modelName[:r.width-7] + "..."
+		}
+		sb.WriteString(r.RenderLabelValue("Model", modelName))
 	}
 
-	sb.WriteString(r.RenderLabelValue("Model", modelName))
-	sb.WriteString(r.RenderLabelValue("Turns", fmt.Sprintf("%d", turns)))
-	sb.WriteString(r.RenderLabelValue("Cost", fmt.Sprintf("$%.4f", cost)))
+	sb.WriteString(r.RenderLabelValue("Turns", fmt.Sprintf("%d", s.TurnCount)))
+
+	if s.ReportsCost() {
+		sb.WriteString(r.RenderLabelValue("Cost", fmt.Sprintf("$%.4f", s.TotalCost)))
+	}
 
 	return sb.String()
 }
@@ -129,6 +138,17 @@ func (r *SidebarRenderer) RenderTokenUsage(input, output int) string {
 	sb.WriteString(r.RenderLabelValue("Tokens",
 		fmt.Sprintf("↑%s ↓%s", formatTokenCount(input), formatTokenCount(output))))
 	return sb.String()
+}
+
+// RenderReasoningTokens renders the model "thinking" token count. It returns
+// an empty string when no reasoning tokens were reported (e.g. Claude streams,
+// which do not break them out), matching the self-omitting style of the other
+// usage sections.
+func (r *SidebarRenderer) RenderReasoningTokens(reasoning int) string {
+	if reasoning == 0 {
+		return ""
+	}
+	return r.RenderLabelValue("Reasoning", formatTokenCount(reasoning))
 }
 
 // RenderCacheUsage renders the cache read/created token section.
@@ -296,11 +316,12 @@ func (r *SidebarRenderer) Render(s *state.State, height int, followMode bool, sc
 	sb.WriteString(r.RenderAutoExitStatus(stdinDone, autoExitRemaining, streamErr))
 	sb.WriteString(r.RenderFollowIndicator(followMode))
 	sb.WriteString(r.RenderPrompt(s.Prompt))
-	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+	sb.WriteString(r.RenderSessionInfo(s))
 	sb.WriteString(r.RenderCostRate(s.CostRate()))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
 	sb.WriteString(r.RenderScrollPosition(scrollPos))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
+	sb.WriteString(r.RenderReasoningTokens(s.ReasoningTokens))
 	sb.WriteString(r.RenderCacheUsage(s.CacheRead, s.CacheCreated))
 
 	if s.ToolInProgress {
@@ -565,11 +586,12 @@ func RenderDetailsModal(s *state.State, sp spinner.Model, width, height int, sty
 	}
 
 	// Session info
-	sb.WriteString(r.RenderSessionInfo(s.Model, s.TurnCount, s.TotalCost))
+	sb.WriteString(r.RenderSessionInfo(s))
 	sb.WriteString(r.RenderCostRate(s.CostRate()))
 	sb.WriteString(r.RenderElapsed(s.Elapsed()))
 	sb.WriteString(r.RenderScrollPosition(scrollPos))
 	sb.WriteString(r.RenderTokenUsage(s.InputTokens, s.OutputTokens))
+	sb.WriteString(r.RenderReasoningTokens(s.ReasoningTokens))
 	sb.WriteString(r.RenderCacheUsage(s.CacheRead, s.CacheCreated))
 
 	// Current tool

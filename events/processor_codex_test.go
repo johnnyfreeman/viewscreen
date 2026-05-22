@@ -22,7 +22,7 @@ func TestProcessCodex_RendersAndAccumulatesUsage(t *testing.T) {
 	}
 
 	// turn.completed should fold token usage into shared state for the sidebar.
-	usage := &codex.Usage{InputTokens: 100, OutputTokens: 20, CachedInputTokens: 40}
+	usage := &codex.Usage{InputTokens: 100, OutputTokens: 20, CachedInputTokens: 40, ReasoningOutputTokens: 12}
 	p.Process(CodexEvent{Data: codex.Event{Type: codex.TypeTurnCompleted, Usage: usage}})
 
 	if s.InputTokens != 100 {
@@ -33,6 +33,14 @@ func TestProcessCodex_RendersAndAccumulatesUsage(t *testing.T) {
 	}
 	if s.CacheRead != 40 {
 		t.Errorf("CacheRead = %d, want 40", s.CacheRead)
+	}
+	if s.ReasoningTokens != 12 {
+		t.Errorf("ReasoningTokens = %d, want 12", s.ReasoningTokens)
+	}
+
+	// Codex reports no dollar cost, so the sidebar must not show a cost field.
+	if s.ReportsCost() {
+		t.Error("ReportsCost() = true for codex stream, want false")
 	}
 }
 

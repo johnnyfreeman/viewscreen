@@ -304,6 +304,7 @@ func (p *EventProcessor) processCodex(event codex.Event) ProcessResult {
 	if event.Type == codex.TypeTurnCompleted && event.Usage != nil {
 		u := event.Usage
 		p.state.AccumulateUsage(u.InputTokens, u.OutputTokens, 0, u.CachedInputTokens)
+		p.state.ReasoningTokens += u.ReasoningOutputTokens
 	}
 	return ProcessResult{Rendered: p.renderers.Codex.Render(event)}
 }
