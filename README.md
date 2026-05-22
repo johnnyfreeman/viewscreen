@@ -30,11 +30,33 @@ Or pipe Codex CLI's JSON output to viewscreen:
 codex exec --json "your prompt" | viewscreen
 ```
 
+### Launching an agent directly
+
+Instead of piping, viewscreen can spawn the agent for you. Pass a prompt as an
+argument and viewscreen runs the agent in streaming-JSON mode and renders its
+output live (in the TUI when stdout is a terminal):
+
+```bash
+# Spawn Claude Code (default)
+viewscreen "explain this codebase"
+
+# Spawn the Codex CLI
+viewscreen -agent codex "explain this codebase"
+```
+
+With `-p`, the prompt is read from stdin instead of an argument:
+
+```bash
+echo "explain this codebase" | viewscreen -agent codex -p
+```
+
 ### Flags
 
 - `-v` - Verbose output (show more details)
 - `-no-color` - Disable colored output
 - `-usage` - Show token usage in result (default: true)
+- `-p` - Treat stdin as a prompt (not a JSON stream)
+- `-agent` - Agent to spawn in prompt mode: `claude` (default) or `codex`
 
 ## Event Types
 

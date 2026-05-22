@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/johnnyfreeman/viewscreen/claude"
+	"github.com/johnnyfreeman/viewscreen/agent"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/parser"
 	"github.com/johnnyfreeman/viewscreen/tui"
@@ -76,7 +76,7 @@ func NewRunner(opts ...RunnerOption) *Runner {
 		errOutput:     os.Stderr,
 		parserFactory: parser.NewParser,
 		promptStarter: func(prompt string, stdin io.Reader) (promptProcess, error) {
-			return claude.Start(prompt, stdin)
+			return agent.Start(config.Get().Agent, prompt, stdin)
 		},
 		exitFunc:   os.Exit,
 		configOpts: []config.Option{config.WithArgs(os.Args[1:])},
@@ -175,7 +175,7 @@ func (r *Runner) runPromptLegacy(prompt string) error {
 	if stdout == nil {
 		_ = proc.Kill()
 		_ = proc.Wait()
-		return errors.New("claude stdout unavailable")
+		return errors.New("agent stdout unavailable")
 	}
 
 	p := parser.NewParserWithOptions(parser.WithInput(stdout))

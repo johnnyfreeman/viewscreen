@@ -7,14 +7,18 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	claudepkg "github.com/johnnyfreeman/viewscreen/claude"
+	"github.com/johnnyfreeman/viewscreen/agent"
 	"github.com/johnnyfreeman/viewscreen/config"
 	"github.com/johnnyfreeman/viewscreen/render"
 	"golang.org/x/term"
 )
 
-func startClaudeProcess(prompt string) (managedClaudeProcess, error) {
-	return claudepkg.Start(prompt, nil)
+// agentStarter returns a starter that spawns the named agent. It is used both
+// for the initial prompt-mode run and for prompt-editor re-runs.
+func agentStarter(name string) func(string) (managedClaudeProcess, error) {
+	return func(prompt string) (managedClaudeProcess, error) {
+		return agent.Start(name, prompt, nil)
+	}
 }
 
 // Run starts the TUI and returns the final rendered content for optional dumping.
@@ -64,14 +68,16 @@ func streamInputReader(stdin io.Reader, stdinIsTTY bool) io.Reader {
 	return stdin
 }
 
-// RunWithPrompt spawns claude with the given prompt and runs the TUI on its output.
+// RunWithPrompt spawns the configured agent with the given prompt and runs the
+// TUI on its output.
 func RunWithPrompt(prompt string) (string, error) {
 	// Initialize styles (needed for renderers)
 	cfg := config.Get()
 	render.NewMarkdownRenderer(cfg.NoColor(), 80)
 	resetTerminalModes(os.Stdout)
 
-	proc, err := startClaudeProcess(prompt)
+	start := agentStarter(cfg.Agent)
+	proc, err := start(prompt)
 	if err != nil {
 		return "", err
 	}
@@ -79,7 +85,7 @@ func RunWithPrompt(prompt string) (string, error) {
 	if stdout == nil {
 		_ = proc.Kill()
 		_ = proc.Wait()
-		return "", errors.New("claude stdout unavailable")
+		return "", errors.New("agent stdout unavailable")
 	}
 
 	var teaOpts []tea.ProgramOption
@@ -93,7 +99,7 @@ func RunWithPrompt(prompt string) (string, error) {
 	model := NewModel(
 		WithInputReader(stdout),
 		WithClaudeProcess(proc),
-		WithClaudeStarter(startClaudeProcess),
+		WithClaudeStarter(start),
 		WithPrompt(prompt),
 		WithInitialSize(width, height),
 		WithStartupInputGrace(startupInputGrace),

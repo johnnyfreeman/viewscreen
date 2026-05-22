@@ -2,10 +2,18 @@ package config
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"strings"
 
 	"github.com/johnnyfreeman/viewscreen/style"
+)
+
+// Agent names selectable via the -agent flag. They identify which CLI
+// viewscreen spawns in prompt mode.
+const (
+	AgentClaude = "claude"
+	AgentCodex  = "codex"
 )
 
 // Provider abstracts config access for testability.
@@ -42,6 +50,7 @@ type Config struct {
 	Dump         bool
 	PromptMode   bool
 	Prompt       string
+	Agent        string
 }
 
 // IsVerbose implements Provider. True at -v or higher.
@@ -138,9 +147,14 @@ func Parse(opts ...Option) (*Config, error) {
 	p.flagSet.BoolVar(&c.AutoExit, "auto-exit", false, "Auto-exit after stream ends (useful in loops)")
 	p.flagSet.BoolVar(&c.Dump, "dump", false, "Print content to stdout on TUI exit (preserves output in scrollback)")
 	p.flagSet.BoolVar(&c.PromptMode, "p", false, "Treat stdin as a prompt (not a JSON stream)")
+	p.flagSet.StringVar(&c.Agent, "agent", AgentClaude, "Agent to spawn in prompt mode (claude or codex)")
 
 	if err := p.flagSet.Parse(p.args); err != nil {
 		return nil, err
+	}
+
+	if c.Agent != AgentClaude && c.Agent != AgentCodex {
+		return nil, fmt.Errorf("unknown agent %q (want %q or %q)", c.Agent, AgentClaude, AgentCodex)
 	}
 
 	// Compute verbose level from flags (highest wins)

@@ -615,6 +615,44 @@ func TestParse_AutoExitFlag(t *testing.T) {
 	}
 }
 
+func TestParse_AgentFlag(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		want      string
+		wantError bool
+	}{
+		{name: "default is claude", args: []string{}, want: AgentClaude},
+		{name: "explicit claude", args: []string{"-agent", "claude"}, want: AgentClaude},
+		{name: "codex", args: []string{"-agent", "codex"}, want: AgentCodex},
+		{name: "equals form", args: []string{"-agent=codex"}, want: AgentCodex},
+		{name: "unknown rejected", args: []string{"-agent", "gemini"}, wantError: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := Parse(
+				WithArgs(tt.args),
+				WithStyleInitializer(&MockStyleInitializer{}),
+				WithErrOutput(io.Discard),
+			)
+
+			if tt.wantError {
+				if err == nil {
+					t.Fatalf("expected error for args %v, got nil", tt.args)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if cfg.Agent != tt.want {
+				t.Errorf("Agent: got %q, want %q", cfg.Agent, tt.want)
+			}
+		})
+	}
+}
+
 func TestParse_DumpFlag(t *testing.T) {
 	tests := []struct {
 		name     string
