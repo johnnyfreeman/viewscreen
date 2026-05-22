@@ -565,6 +565,62 @@ func TestRenderHeader(t *testing.T) {
 	})
 }
 
+func TestRenderHeader_Codex(t *testing.T) {
+	t.Run("brands codex and omits model and cost", func(t *testing.T) {
+		s := state.NewState()
+		s.Agent = config.AgentCodex
+		s.TurnCount = 2
+
+		output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true}, false, 0)
+		plain := ansi.Strip(output)
+
+		if !strings.Contains(plain, "codex") {
+			t.Errorf("expected codex branding in header, got %q", plain)
+		}
+		if strings.Contains(plain, "claude") {
+			t.Errorf("did not expect claude branding for codex header, got %q", plain)
+		}
+		// Codex reports no cost, so the $ segment must be absent rather than $0.00.
+		if strings.Contains(plain, "$") {
+			t.Errorf("expected no cost segment for codex header, got %q", plain)
+		}
+		// Turn count is still reported.
+		if !strings.Contains(plain, "2") {
+			t.Errorf("expected turn count in codex header, got %q", plain)
+		}
+	})
+
+	t.Run("omits empty model segment without leaving a gap", func(t *testing.T) {
+		s := state.NewState()
+		s.Agent = config.AgentCodex
+		s.TurnCount = 1
+
+		output := RenderHeader(s, 100, true, ScrollPosition{AtTop: true}, false, 0)
+		plain := ansi.Strip(output)
+
+		// With no model and no cost, the info reads "turns │ elapsed │ scroll":
+		// exactly two separators, never a leading "│" from a dropped model.
+		if strings.Count(plain, "│") != 2 {
+			t.Errorf("expected 2 separators for codex info, got %q", plain)
+		}
+	})
+
+	t.Run("fits narrow terminal width", func(t *testing.T) {
+		s := state.NewState()
+		s.Agent = config.AgentCodex
+		s.TurnCount = 4
+		width := 42
+
+		output := RenderHeader(s, width, true, ScrollPosition{AtTop: true}, false, 0)
+		if strings.Contains(output, "\n") {
+			t.Errorf("expected codex header to stay on one line, got %q", output)
+		}
+		if got := ansi.StringWidth(output); got != width {
+			t.Errorf("codex header width = %d, want %d; output=%q", got, width, output)
+		}
+	})
+}
+
 func TestRenderDetailsModal(t *testing.T) {
 	s := state.NewState()
 	s.Model = "claude-opus"

@@ -90,11 +90,30 @@ func TestAgentLabel(t *testing.T) {
 
 func TestLogoRenderer_RenderTitle(t *testing.T) {
 	r := NewLogoRenderer()
-	output := r.RenderTitle()
 
-	if !strings.Contains(output, "VIEWSCREEN") {
-		t.Error("expected VIEWSCREEN in title output")
-	}
+	t.Run("contains wordmark", func(t *testing.T) {
+		output := r.RenderTitle("")
+		if !strings.Contains(output, "VIEWSCREEN") {
+			t.Error("expected VIEWSCREEN in title output")
+		}
+	})
+
+	t.Run("brands for the agent", func(t *testing.T) {
+		output := r.RenderTitle("codex")
+		if !strings.Contains(output, "codex") {
+			t.Errorf("expected 'codex' branding in title, got %q", output)
+		}
+		if strings.Contains(output, "claude") {
+			t.Errorf("did not expect 'claude' branding for codex, got %q", output)
+		}
+	})
+
+	t.Run("defaults to claude for unknown agent", func(t *testing.T) {
+		output := r.RenderTitle("")
+		if !strings.Contains(output, "claude") {
+			t.Errorf("expected default 'claude' branding, got %q", output)
+		}
+	})
 }
 
 func TestLogoLines(t *testing.T) {

@@ -359,29 +359,39 @@ func NewHeaderStyles() HeaderStyles {
 }
 
 // RenderHeader renders a single-line header for narrow terminals.
-// Format: ─── VIEWSCREEN ─── model │ 5 │ $0.12 │ 42% ─── [?] ───
+// Format: ─── VIEWSCREEN claude ─── model │ 5 │ $0.12 │ 42% ─── [?] ───
+//
+// The header adapts to the active agent: the model segment is dropped until a
+// model is known, and the cost segment is dropped for agents that do not report
+// a cost (e.g. Codex), so a Codex header shows neither an empty model nor a
+// misleading $0.00.
 func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPosition, stdinDone bool, autoExitRemaining int, streamErrOpt ...error) string {
 	logo := NewLogoRenderer()
 
-	// Build the info section: model │ turns │ cost
-	model := s.Model
-	maxModelLen := 15
-	if len(model) > maxModelLen {
-		model = model[:maxModelLen-2] + ".."
-	}
-
 	elapsed := formatDuration(s.Elapsed())
 	scrollStr := FormatScrollPosition(scrollPos)
-	info := fmt.Sprintf("%s %s %d %s $%.2f %s %s %s %s",
-		model,
-		style.MutedText("│"),
-		s.TurnCount,
-		style.MutedText("│"),
-		s.TotalCost,
-		style.MutedText("│"),
-		elapsed,
-		style.MutedText("│"),
-		scrollStr)
+
+	// Build the info section from the segments the active agent reports:
+	// [model] │ turns │ [cost] │ elapsed │ scroll
+	var modelLabel string
+	if s.Model != "" {
+		modelLabel = s.Model
+		maxModelLen := 15
+		if len(modelLabel) > maxModelLen {
+			modelLabel = modelLabel[:maxModelLen-2] + ".."
+		}
+	}
+
+	var segments []string
+	if modelLabel != "" {
+		segments = append(segments, modelLabel)
+	}
+	segments = append(segments, fmt.Sprintf("%d", s.TurnCount))
+	if s.ReportsCost() {
+		segments = append(segments, fmt.Sprintf("$%.2f", s.TotalCost))
+	}
+	segments = append(segments, elapsed, scrollStr)
+	info := strings.Join(segments, " "+style.MutedText("│")+" ")
 
 	// Auto-exit hint
 	autoExitHint := ""
@@ -398,7 +408,7 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 	}
 
 	// Fixed parts
-	title := logo.RenderTitle()
+	title := logo.RenderTitle(s.Agent)
 	keyHint := style.MutedText("[?]")
 
 	// Paused indicator when follow mode is off
@@ -409,10 +419,12 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 		pausedLen = 1 // single character width
 	}
 
-	// Calculate decoration lengths
-	// Raw lengths (without ANSI): "─── " + "VIEWSCREEN" + " ─── " + info + " ─── " + [paused] + "[?]" + " ───"
-	titleLen := 10 // "VIEWSCREEN"
-	infoLen := len(model) + 3 + len(fmt.Sprintf("%d", s.TurnCount)) + 3 + len(fmt.Sprintf("$%.2f", s.TotalCost)) + 3 + len(elapsed) + 3 + len(scrollStr)
+	// Calculate decoration lengths from the visible (ANSI-stripped) widths of
+	// the title and info, so the math stays correct as agent branding and the
+	// conditional model/cost segments change their length.
+	// Layout: "─── " + title + " ─── " + info + " ─── " + [paused] + "[?]" + " ───"
+	titleLen := ansi.StringWidth(title)
+	infoLen := ansi.StringWidth(info)
 	keyHintLen := 3 // "[?]"
 	pausedExtra := 0
 	if pausedLen > 0 {
@@ -452,17 +464,25 @@ func RenderHeader(s *state.State, width int, followMode bool, scrollPos ScrollPo
 		trailingStr,
 		style.MutedText(rightDeco))
 	if ansi.StringWidth(header) > width {
-		return renderCompactHeader(title, model, scrollStr, trailingStr, width)
+		return renderCompactHeader(title, modelLabel, scrollStr, trailingStr, width)
 	}
 	return fitBarLine(header, width)
 }
 
+// renderCompactHeader degrades the header for very narrow terminals, dropping
+// the lowest-priority segments first. model may be empty (e.g. for Codex or
+// before a model is known), in which case its candidate is skipped entirely
+// rather than left as an empty gap.
 func renderCompactHeader(title, model, scrollStr, trailingStr string, width int) string {
 	candidates := []string{
-		strings.Join([]string{title, model, scrollStr, trailingStr}, " "),
 		strings.Join([]string{title, scrollStr, trailingStr}, " "),
 		strings.Join([]string{title, trailingStr}, " "),
 		trailingStr,
+	}
+	if model != "" {
+		candidates = append([]string{
+			strings.Join([]string{title, model, scrollStr, trailingStr}, " "),
+		}, candidates...)
 	}
 
 	for _, candidate := range candidates {

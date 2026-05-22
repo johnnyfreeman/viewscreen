@@ -50,10 +50,12 @@ func (r *LogoRenderer) Render(agent string) string {
 	return sb.String()
 }
 
-// RenderTitle renders just the styled "VIEWSCREEN" title.
-// Used by the header in narrow terminal mode.
-func (r *LogoRenderer) RenderTitle() string {
-	return style.ApplyThemeBoldGradient("VIEWSCREEN")
+// RenderTitle renders the styled "VIEWSCREEN" wordmark followed by a muted
+// agent sub-label, used by the header in narrow terminal mode. The agent
+// argument is the active CLI ("claude" or "codex"); an empty agent falls back
+// to "claude" branding, matching the wide-sidebar logo.
+func (r *LogoRenderer) RenderTitle(agent string) string {
+	return style.ApplyThemeBoldGradient("VIEWSCREEN") + " " + style.MutedText(agentLabel(agent))
 }
 
 // agentLabel returns the sub-label shown under the logo for the given agent.
