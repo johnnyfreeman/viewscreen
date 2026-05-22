@@ -35,13 +35,13 @@ func AutoExitTick() tea.Cmd {
 	}
 }
 
-// WaitClaudeProcess reaps a spawned claude subprocess without blocking Update.
-func WaitClaudeProcess(proc managedClaudeProcess) tea.Cmd {
+// WaitAgentProcess reaps a spawned agent subprocess without blocking Update.
+func WaitAgentProcess(proc managedAgentProcess) tea.Cmd {
 	if proc == nil {
 		return nil
 	}
 	return func() tea.Msg {
-		return ClaudeExitedMsg{Err: proc.Wait()}
+		return AgentExitedMsg{Err: proc.Wait()}
 	}
 }
 

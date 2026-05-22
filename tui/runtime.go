@@ -15,8 +15,8 @@ import (
 
 // agentStarter returns a starter that spawns the named agent. It is used both
 // for the initial prompt-mode run and for prompt-editor re-runs.
-func agentStarter(name string) func(string) (managedClaudeProcess, error) {
-	return func(prompt string) (managedClaudeProcess, error) {
+func agentStarter(name string) func(string) (managedAgentProcess, error) {
+	return func(prompt string) (managedAgentProcess, error) {
 		return agent.Start(name, prompt, nil)
 	}
 }
@@ -98,8 +98,8 @@ func RunWithPrompt(prompt string) (string, error) {
 
 	model := NewModel(
 		WithInputReader(stdout),
-		WithClaudeProcess(proc),
-		WithClaudeStarter(start),
+		WithAgentProcess(proc),
+		WithAgentStarter(start),
 		WithPrompt(prompt),
 		WithAgent(cfg.Agent),
 		WithInitialSize(width, height),
@@ -118,11 +118,11 @@ func RunWithPrompt(prompt string) (string, error) {
 	}
 
 	if m, ok := finalModel.(Model); ok {
-		// If the user quit before Claude closed stdout, terminate it so the TUI
+		// If the user quit before the agent closed stdout, terminate it so the TUI
 		// exits immediately instead of waiting for the generation to finish.
-		m.stopClaudeProcessIfRunning()
-		if m.claudeProcess != nil {
-			_ = m.claudeProcess.Wait()
+		m.stopAgentProcessIfRunning()
+		if m.agentProcess != nil {
+			_ = m.agentProcess.Wait()
 		} else {
 			_ = proc.Wait()
 		}

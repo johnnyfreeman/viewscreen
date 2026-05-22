@@ -14,18 +14,18 @@ import (
 	"github.com/johnnyfreeman/viewscreen/types"
 )
 
-type fakeClaudeProcess struct {
+type fakeAgentProcess struct {
 	killCount int
 	waitCount int
 	stdout    io.ReadCloser
 }
 
-func (p *fakeClaudeProcess) Stdout() io.ReadCloser { return p.stdout }
-func (p *fakeClaudeProcess) Wait() error {
+func (p *fakeAgentProcess) Stdout() io.ReadCloser { return p.stdout }
+func (p *fakeAgentProcess) Wait() error {
 	p.waitCount++
 	return nil
 }
-func (p *fakeClaudeProcess) Kill() error {
+func (p *fakeAgentProcess) Kill() error {
 	p.killCount++
 	return nil
 }
@@ -140,10 +140,10 @@ func TestHandleKeyMsg(t *testing.T) {
 		}
 	})
 
-	t.Run("quit kills running spawned claude process", func(t *testing.T) {
-		proc := &fakeClaudeProcess{}
+	t.Run("quit kills running spawned agent process", func(t *testing.T) {
+		proc := &fakeAgentProcess{}
 		m := newTestModel()
-		m.claudeProcess = proc
+		m.agentProcess = proc
 		m.stdinDone = false
 
 		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
@@ -156,10 +156,10 @@ func TestHandleKeyMsg(t *testing.T) {
 		}
 	})
 
-	t.Run("quit does not kill completed spawned claude process", func(t *testing.T) {
-		proc := &fakeClaudeProcess{}
+	t.Run("quit does not kill completed spawned agent process", func(t *testing.T) {
+		proc := &fakeAgentProcess{}
 		m := newTestModel()
-		m.claudeProcess = proc
+		m.agentProcess = proc
 		m.stdinDone = true
 
 		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Text: "q"})
@@ -613,26 +613,26 @@ func TestHandleStdinClosed(t *testing.T) {
 		}
 	})
 
-	t.Run("starts countdown for spawned claude when autoExit enabled", func(t *testing.T) {
+	t.Run("starts countdown for spawned agent when autoExit enabled", func(t *testing.T) {
 		m := newTestModel()
 		m.autoExit = true
-		m.claudeProcess = &fakeClaudeProcess{}
+		m.agentProcess = &fakeAgentProcess{}
 
 		m, cmd := m.handleStdinClosed(nil)
 
 		if m.autoExitRemaining != 5 {
-			t.Errorf("expected autoExitRemaining=5 for spawned claude, got %d", m.autoExitRemaining)
+			t.Errorf("expected autoExitRemaining=5 for spawned agent, got %d", m.autoExitRemaining)
 		}
 		if cmd == nil {
-			t.Error("expected tick command when autoExit is explicit in spawned claude mode")
+			t.Error("expected tick command when autoExit is explicit in spawned agent mode")
 		}
 	})
 
-	t.Run("keeps spawned claude TUI open when autoExit disabled", func(t *testing.T) {
-		proc := &fakeClaudeProcess{}
+	t.Run("keeps spawned agent TUI open when autoExit disabled", func(t *testing.T) {
+		proc := &fakeAgentProcess{}
 		m := newTestModel()
 		m.autoExit = false
-		m.claudeProcess = proc
+		m.agentProcess = proc
 
 		m, cmd := m.handleStdinClosed(nil)
 
@@ -640,11 +640,11 @@ func TestHandleStdinClosed(t *testing.T) {
 			t.Errorf("expected autoExitRemaining=0 without autoExit, got %d", m.autoExitRemaining)
 		}
 		if cmd == nil {
-			t.Fatal("expected wait command to reap spawned claude process")
+			t.Fatal("expected wait command to reap spawned agent process")
 		}
 		msg := cmd()
-		if _, ok := msg.(ClaudeExitedMsg); !ok {
-			t.Fatalf("command returned %T, want ClaudeExitedMsg", msg)
+		if _, ok := msg.(AgentExitedMsg); !ok {
+			t.Fatalf("command returned %T, want AgentExitedMsg", msg)
 		}
 		if proc.waitCount != 1 {
 			t.Errorf("Wait called %d times, want 1", proc.waitCount)
@@ -743,29 +743,29 @@ func TestHandleStdinClosed(t *testing.T) {
 	})
 }
 
-func TestHandleClaudeExited(t *testing.T) {
+func TestHandleAgentExited(t *testing.T) {
 	t.Run("clears completed spawned process", func(t *testing.T) {
-		proc := &fakeClaudeProcess{}
+		proc := &fakeAgentProcess{}
 		m := newTestModel()
-		m.claudeProcess = proc
+		m.agentProcess = proc
 
-		m = m.handleClaudeExited(ClaudeExitedMsg{})
+		m = m.handleAgentExited(AgentExitedMsg{})
 
-		if m.claudeProcess != nil {
-			t.Error("expected completed claude process to be cleared")
+		if m.agentProcess != nil {
+			t.Error("expected completed agent process to be cleared")
 		}
 	})
 }
 
 func TestHandleRerun(t *testing.T) {
 	t.Run("uses injected starter and resets stream state", func(t *testing.T) {
-		oldProc := &fakeClaudeProcess{}
-		newProc := &fakeClaudeProcess{stdout: io.NopCloser(strings.NewReader(""))}
+		oldProc := &fakeAgentProcess{}
+		newProc := &fakeAgentProcess{stdout: io.NopCloser(strings.NewReader(""))}
 		var gotPrompt string
 
 		m := newTestModel()
-		m.claudeProcess = oldProc
-		m.claudeStarter = func(prompt string) (managedClaudeProcess, error) {
+		m.agentProcess = oldProc
+		m.rerunStarter = func(prompt string) (managedAgentProcess, error) {
 			gotPrompt = prompt
 			return newProc, nil
 		}
@@ -786,7 +786,7 @@ func TestHandleRerun(t *testing.T) {
 		if gotPrompt != "new prompt" {
 			t.Errorf("starter prompt = %q, want new prompt", gotPrompt)
 		}
-		if m.claudeProcess != newProc {
+		if m.agentProcess != newProc {
 			t.Error("expected model to use new process")
 		}
 		if m.stdinDone {
@@ -810,9 +810,9 @@ func TestHandleRerun(t *testing.T) {
 	})
 
 	t.Run("reports missing starter instead of spawning from model code", func(t *testing.T) {
-		oldProc := &fakeClaudeProcess{}
+		oldProc := &fakeAgentProcess{}
 		m := newTestModel()
-		m.claudeProcess = oldProc
+		m.agentProcess = oldProc
 
 		m, cmd := m.handleRerun(RerunMsg{Prompt: "new prompt"})
 
@@ -822,21 +822,21 @@ func TestHandleRerun(t *testing.T) {
 		if oldProc.killCount != 1 {
 			t.Errorf("old Kill called %d times, want 1", oldProc.killCount)
 		}
-		if m.claudeProcess != nil {
+		if m.agentProcess != nil {
 			t.Error("expected stale process to clear after failed rerun")
 		}
 		if !m.stdinDone {
 			t.Error("expected stdinDone after failed rerun")
 		}
-		if got := m.content.String(); !strings.Contains(got, "claude starter unavailable") {
+		if got := m.content.String(); !strings.Contains(got, "agent starter unavailable") {
 			t.Fatalf("content = %q, want starter error", got)
 		}
 	})
 
 	t.Run("reports missing stdout from started process", func(t *testing.T) {
-		newProc := &fakeClaudeProcess{}
+		newProc := &fakeAgentProcess{}
 		m := newTestModel()
-		m.claudeStarter = func(string) (managedClaudeProcess, error) {
+		m.rerunStarter = func(string) (managedAgentProcess, error) {
 			return newProc, nil
 		}
 
@@ -848,7 +848,7 @@ func TestHandleRerun(t *testing.T) {
 		if !m.stdinDone {
 			t.Error("expected stdinDone after failed rerun")
 		}
-		if got := m.content.String(); !strings.Contains(got, "claude stdout unavailable") {
+		if got := m.content.String(); !strings.Contains(got, "agent stdout unavailable") {
 			t.Fatalf("content = %q, want stdout error", got)
 		}
 		if newProc.killCount != 1 {

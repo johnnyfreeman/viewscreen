@@ -11,7 +11,7 @@ var promptBarNewlineReplacer = strings.NewReplacer("\r\n", " ", "\r", " ", "\n",
 
 // PromptEditor holds the state for the prompt editing feature.
 // When active, it captures keyboard input to let the user edit the prompt
-// that will be used for the next claude invocation.
+// that will be used for the next agent invocation.
 type PromptEditor struct {
 	Active bool   // Whether prompt editing is active
 	Value  string // Current prompt text

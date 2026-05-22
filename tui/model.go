@@ -35,26 +35,26 @@ type Model struct {
 	processor         *events.EventProcessor
 	search            Search
 	promptEditor      PromptEditor
-	followMode        bool                 // auto-scroll to bottom on new content
-	autoExit          bool                 // --auto-exit flag enabled
-	autoExitRemaining int                  // seconds left in countdown, 0 = inactive
-	autoExitCanceled  bool                 // user interacted before auto-exit could start
-	showParseErrors   bool                 // show malformed stream-json lines in content
-	streamErr         error                // non-nil when stdin ended because of a scanner/read error
-	claudeProcess     managedClaudeProcess // non-nil when we spawned claude
-	claudeStarter     claudeProcessStarter // starts replacement claude runs for prompt edits
-	prompt            string               // the prompt used to spawn claude
-	inputReader       io.Reader            // where to read stream-json lines (defaults to os.Stdin)
-	ignoreInputUntil  time.Time            // drops startup terminal report bytes parsed as text keys
+	followMode        bool                // auto-scroll to bottom on new content
+	autoExit          bool                // --auto-exit flag enabled
+	autoExitRemaining int                 // seconds left in countdown, 0 = inactive
+	autoExitCanceled  bool                // user interacted before auto-exit could start
+	showParseErrors   bool                // show malformed stream-json lines in content
+	streamErr         error               // non-nil when stdin ended because of a scanner/read error
+	agentProcess      managedAgentProcess // non-nil when we spawned the agent
+	rerunStarter      agentProcessStarter // starts replacement agent runs for prompt edits
+	prompt            string              // the prompt used to spawn the agent
+	inputReader       io.Reader           // where to read stream-json lines (defaults to os.Stdin)
+	ignoreInputUntil  time.Time           // drops startup terminal report bytes parsed as text keys
 }
 
-type managedClaudeProcess interface {
+type managedAgentProcess interface {
 	Stdout() io.ReadCloser
 	Wait() error
 	Kill() error
 }
 
-type claudeProcessStarter func(prompt string) (managedClaudeProcess, error)
+type agentProcessStarter func(prompt string) (managedAgentProcess, error)
 
 const (
 	defaultInitialWidth  = 80
@@ -73,17 +73,17 @@ func WithInputReader(r io.Reader) ModelOption {
 	}
 }
 
-// WithClaudeProcess attaches a spawned claude subprocess to the model.
-func WithClaudeProcess(p managedClaudeProcess) ModelOption {
+// WithAgentProcess attaches a spawned agent subprocess to the model.
+func WithAgentProcess(p managedAgentProcess) ModelOption {
 	return func(m *Model) {
-		m.claudeProcess = p
+		m.agentProcess = p
 	}
 }
 
-// WithClaudeStarter sets the factory used for prompt-editor re-runs.
-func WithClaudeStarter(starter claudeProcessStarter) ModelOption {
+// WithAgentStarter sets the factory used for prompt-editor re-runs.
+func WithAgentStarter(starter agentProcessStarter) ModelOption {
 	return func(m *Model) {
-		m.claudeStarter = starter
+		m.rerunStarter = starter
 	}
 }
 
@@ -257,8 +257,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
-	case ClaudeExitedMsg:
-		m = m.handleClaudeExited(msg)
+	case AgentExitedMsg:
+		m = m.handleAgentExited(msg)
 
 	case RerunMsg:
 		m, cmd = m.handleRerun(msg)
@@ -375,15 +375,15 @@ func (m Model) scrollPosition() ScrollPosition {
 	}
 }
 
-func (m *Model) stopClaudeProcessIfRunning() {
-	if m.stdinDone || m.claudeProcess == nil {
+func (m *Model) stopAgentProcessIfRunning() {
+	if m.stdinDone || m.agentProcess == nil {
 		return
 	}
-	_ = m.claudeProcess.Kill()
+	_ = m.agentProcess.Kill()
 }
 
 func (m Model) quitCommand() (Model, tea.Cmd) {
-	m.stopClaudeProcessIfRunning()
+	m.stopAgentProcessIfRunning()
 	return m, tea.Quit
 }
 

@@ -268,9 +268,9 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 	t.Run("e opens editor when stdin done in subprocess mode", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
-		m.claudeProcess = &fakeClaudeProcess{}
-		m.claudeStarter = func(string) (managedClaudeProcess, error) {
-			return &fakeClaudeProcess{}, nil
+		m.agentProcess = &fakeAgentProcess{}
+		m.rerunStarter = func(string) (managedAgentProcess, error) {
+			return &fakeAgentProcess{}, nil
 		}
 		m.state.Prompt = "test prompt"
 
@@ -287,8 +287,8 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
 		m.state.Prompt = "failed prompt"
-		m.claudeStarter = func(string) (managedClaudeProcess, error) {
-			return &fakeClaudeProcess{}, nil
+		m.rerunStarter = func(string) (managedAgentProcess, error) {
+			return &fakeAgentProcess{}, nil
 		}
 
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})
@@ -314,9 +314,9 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 	t.Run("e does nothing when stdin not done", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = false
-		m.claudeProcess = &fakeClaudeProcess{}
-		m.claudeStarter = func(string) (managedClaudeProcess, error) {
-			return &fakeClaudeProcess{}, nil
+		m.agentProcess = &fakeAgentProcess{}
+		m.rerunStarter = func(string) (managedAgentProcess, error) {
+			return &fakeAgentProcess{}, nil
 		}
 
 		m, _ = m.handleKeyMsg(tea.KeyPressMsg{Text: "e"})
@@ -328,9 +328,9 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 	t.Run("e does nothing when help modal open", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
-		m.claudeProcess = &fakeClaudeProcess{}
-		m.claudeStarter = func(string) (managedClaudeProcess, error) {
-			return &fakeClaudeProcess{}, nil
+		m.agentProcess = &fakeAgentProcess{}
+		m.rerunStarter = func(string) (managedAgentProcess, error) {
+			return &fakeAgentProcess{}, nil
 		}
 		m.showHelpModal = true
 
@@ -343,9 +343,9 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 	t.Run("e does nothing when details modal open", func(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
-		m.claudeProcess = &fakeClaudeProcess{}
-		m.claudeStarter = func(string) (managedClaudeProcess, error) {
-			return &fakeClaudeProcess{}, nil
+		m.agentProcess = &fakeAgentProcess{}
+		m.rerunStarter = func(string) (managedAgentProcess, error) {
+			return &fakeAgentProcess{}, nil
 		}
 		m.showDetailsModal = true
 
@@ -375,8 +375,8 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 		m := newTestModel()
 		m.stdinDone = true
 		m.state.Prompt = "failed prompt"
-		m.claudeStarter = func(string) (managedClaudeProcess, error) {
-			return &fakeClaudeProcess{}, nil
+		m.rerunStarter = func(string) (managedAgentProcess, error) {
+			return &fakeAgentProcess{}, nil
 		}
 		m.promptEditor.Enter("failed prompt")
 		m.promptEditor.TypeRune('!')
@@ -458,8 +458,8 @@ func TestPromptEditorKeyHandling(t *testing.T) {
 
 	t.Run("ctrl+c quits during editing", func(t *testing.T) {
 		m := newTestModel()
-		proc := &fakeClaudeProcess{}
-		m.claudeProcess = proc
+		proc := &fakeAgentProcess{}
+		m.agentProcess = proc
 		m.promptEditor.Enter("test")
 
 		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
@@ -542,9 +542,9 @@ func TestPromptViewportHeight(t *testing.T) {
 		m := NewModel()
 		m = m.handleWindowSizeMsg(tea.WindowSizeMsg{Width: 120, Height: 50})
 		m.stdinDone = true
-		m.claudeProcess = &fakeClaudeProcess{}
-		m.claudeStarter = func(string) (managedClaudeProcess, error) {
-			return &fakeClaudeProcess{}, nil
+		m.agentProcess = &fakeAgentProcess{}
+		m.rerunStarter = func(string) (managedAgentProcess, error) {
+			return &fakeAgentProcess{}, nil
 		}
 		heightWithout := m.viewport.Height()
 

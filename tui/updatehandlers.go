@@ -12,7 +12,7 @@ import (
 	"github.com/johnnyfreeman/viewscreen/state"
 )
 
-var errClaudeStarterUnavailable = errors.New("claude starter unavailable")
+var errAgentStarterUnavailable = errors.New("agent starter unavailable")
 
 // handleKeyMsg processes keyboard input and returns the model and any command.
 func (m Model) handleKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
@@ -277,7 +277,7 @@ func (m Model) shouldStartAutoExitCountdown() bool {
 // action. Prompt edits only have an effect after the current stream finishes
 // and when this TUI still has a starter capable of launching another run.
 func (m Model) canEditPrompt() bool {
-	return m.stdinDone && m.claudeStarter != nil
+	return m.stdinDone && m.rerunStarter != nil
 }
 
 // handlePromptEditorKeyMsg processes keyboard input while prompt editing is active.
@@ -289,7 +289,7 @@ func (m Model) handlePromptEditorKeyMsg(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.prompt = m.promptEditor.Value
 		m.promptEditor.Exit()
 		m.updateViewportDimensions()
-		if m.claudeStarter != nil {
+		if m.rerunStarter != nil {
 			return m, func() tea.Msg { return RerunMsg{Prompt: m.state.Prompt} }
 		}
 	case msg.String() == "backspace":
@@ -447,8 +447,8 @@ func (m Model) handleStdinClosed(err error) (Model, tea.Cmd) {
 
 	m.stdinDone = true
 	m.streamErr = err
-	if m.claudeProcess != nil {
-		cmds = append(cmds, WaitClaudeProcess(m.claudeProcess))
+	if m.agentProcess != nil {
+		cmds = append(cmds, WaitAgentProcess(m.agentProcess))
 	}
 	if err != nil {
 		m.autoExitRemaining = 0
@@ -463,19 +463,19 @@ func (m Model) handleStdinClosed(err error) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) handleClaudeExited(msg ClaudeExitedMsg) Model {
-	if m.claudeProcess != nil {
-		m.claudeProcess = nil
+func (m Model) handleAgentExited(msg AgentExitedMsg) Model {
+	if m.agentProcess != nil {
+		m.agentProcess = nil
 	}
 	return m
 }
 
-// handleRerun kills the old claude process, resets state, and spawns a new run.
+// handleRerun kills the old agent process, resets state, and spawns a new run.
 func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	// Kill old process
-	if m.claudeProcess != nil {
-		m.claudeProcess.Kill()
-		m.claudeProcess.Wait()
+	if m.agentProcess != nil {
+		m.agentProcess.Kill()
+		m.agentProcess.Wait()
 	}
 
 	// Reset state
@@ -490,16 +490,16 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	m.processor = events.NewEventProcessor(st)
 	m.prompt = msg.Prompt
 	m.followMode = true
-	m.claudeProcess = nil
+	m.agentProcess = nil
 	m.search.Clear()
 	m.updateViewportDimensions()
 
-	// Spawn new claude process
-	if m.claudeStarter == nil {
-		m.failRerunStart(errClaudeStarterUnavailable)
+	// Spawn new agent process
+	if m.rerunStarter == nil {
+		m.failRerunStart(errAgentStarterUnavailable)
 		return m, nil
 	}
-	proc, err := m.claudeStarter(msg.Prompt)
+	proc, err := m.rerunStarter(msg.Prompt)
 	if err != nil {
 		m.failRerunStart(err)
 		return m, nil
@@ -508,11 +508,11 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 	if stdout == nil {
 		_ = proc.Kill()
 		_ = proc.Wait()
-		m.failRerunStart(errors.New("claude stdout unavailable"))
+		m.failRerunStart(errors.New("agent stdout unavailable"))
 		return m, nil
 	}
 
-	m.claudeProcess = proc
+	m.agentProcess = proc
 	m.inputReader = stdout
 	m.scanner = newStreamScanner(m.inputReader)
 
@@ -523,7 +523,7 @@ func (m Model) handleRerun(msg RerunMsg) (Model, tea.Cmd) {
 }
 
 func (m *Model) failRerunStart(err error) {
-	m.content.WriteString("Error starting claude: " + err.Error() + "\n")
+	m.content.WriteString("Error starting agent: " + err.Error() + "\n")
 	m.viewport.SetContent(m.content.String())
 	m.stdinDone = true
 }

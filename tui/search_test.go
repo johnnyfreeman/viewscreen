@@ -587,8 +587,8 @@ func TestHandleKeyMsgSearch(t *testing.T) {
 
 	t.Run("ctrl+c quits from search mode", func(t *testing.T) {
 		m := newTestModel()
-		proc := &fakeClaudeProcess{}
-		m.claudeProcess = proc
+		proc := &fakeAgentProcess{}
+		m.agentProcess = proc
 		m.search.Enter()
 		_, cmd := m.handleKeyMsg(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
 		if cmd == nil {
