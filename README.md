@@ -62,6 +62,8 @@ echo "explain this codebase" | viewscreen -agent codex -p
 
 ### Claude Code (stream-json)
 
+See [docs/stream-json](docs/stream-json/index.md) for the full reference.
+
 - `system` - System messages and configuration
 - `assistant` - Assistant responses
 - `user` - User input
@@ -69,6 +71,8 @@ echo "explain this codebase" | viewscreen -agent codex -p
 - `result` - Final results with token usage
 
 ### Codex CLI (`codex exec --json`)
+
+See [docs/codex-json](docs/codex-json/index.md) for the full reference.
 
 - `thread.started` / `turn.started` / `turn.completed` / `turn.failed` - Session and turn envelopes
 - `item.started` / `item.updated` / `item.completed` - Work items, including:
